@@ -1028,29 +1028,31 @@ Technical Requirements:
         console.log(`Video generation completed in ${totalTime} seconds!`);
         console.log('Operation response:', JSON.stringify(operation.response, null, 2));
 
-        // Check for errors in the operation
-        if (!operation.response?.generatedVideos || operation.response.generatedVideos.length === 0) {
-            console.error('No videos in response:', operation.response);
-            throw new Error('비디오 생성이 완료되었지만 결과가 없습니다.');
+        // Extract video URL from response - handle multiple possible response structures
+        // Structure 1: generateVideoResponse.generatedSamples[0].video.uri (actual API response)
+        // Structure 2: generatedVideos[0].video (SDK wrapper)
+        const response = operation.response as any;
+        let videoUrl: string | undefined;
+
+        // Try actual API response structure first
+        if (response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri) {
+            videoUrl = response.generateVideoResponse.generatedSamples[0].video.uri;
+            console.log('Found video URL in generateVideoResponse.generatedSamples');
+        }
+        // Try SDK wrapper structure
+        else if (response?.generatedVideos?.[0]?.video?.uri) {
+            videoUrl = response.generatedVideos[0].video.uri;
+            console.log('Found video URL in generatedVideos');
+        }
+        // Try direct generatedSamples
+        else if (response?.generatedSamples?.[0]?.video?.uri) {
+            videoUrl = response.generatedSamples[0].video.uri;
+            console.log('Found video URL in generatedSamples');
         }
 
-        const generatedVideo = operation.response.generatedVideos[0];
-        console.log('Generated video object:', JSON.stringify(generatedVideo, null, 2));
-
-        // Get video URL - the video file object contains the URL
-        const videoFile = generatedVideo.video;
-        if (!videoFile) {
-            console.error('No video file in generated video:', generatedVideo);
-            throw new Error('생성된 비디오에 파일 정보가 없습니다.');
-        }
-
-        console.log('Video file object:', JSON.stringify(videoFile, null, 2));
-
-        // Try different possible URL properties
-        const videoUrl = videoFile.uri || (videoFile as any).url || (videoFile as any).downloadUri;
         if (!videoUrl) {
-            console.error('No URI found in video file:', videoFile);
-            throw new Error('생성된 비디오에 유효한 URL이 없습니다.');
+            console.error('Could not find video URL in response:', response);
+            throw new Error('비디오 생성이 완료되었지만 URL을 찾을 수 없습니다.');
         }
 
         console.log('=== VIDEO GENERATION SUCCESS ===');

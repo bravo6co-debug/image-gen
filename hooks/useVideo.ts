@@ -2,12 +2,9 @@ import { useCallback, useState } from 'react';
 import { useProject } from '../contexts/ProjectContext';
 import {
   VideoTimeline,
-  TimelineScene,
-  AudioTrack,
-  Transition,
-  AnimationConfig,
   VideoClip,
   Scene,
+  ImageData,
 } from '../types';
 
 interface UseVideoReturn {
@@ -15,85 +12,58 @@ interface UseVideoReturn {
   timeline: VideoTimeline | null;
   currentTime: number;
   isPlaying: boolean;
-  generatingClipSceneId: string | null;
-  isGeneratingAllClips: boolean;
+  isPaused: boolean;
+  isGenerating: boolean;
+  generatingClipId: string | null;
   error: string | null;
 
   // 타임라인 관리
-  createTimeline: () => void;
+  createTimeline: (name?: string) => void;
   setTimeline: (timeline: VideoTimeline | null) => void;
 
-  // 타임라인 씬 관리
-  addSceneToTimeline: (scene: TimelineScene) => void;
-  updateTimelineScene: (sceneId: string, updates: Partial<TimelineScene>) => void;
-  removeFromTimeline: (sceneId: string) => void;
-  reorderTimelineScenes: (sceneIds: string[]) => void;
-
-  // 전환 효과
-  setTransition: (transition: Transition) => void;
-  removeTransition: (fromSceneId: string, toSceneId: string) => void;
-
-  // 오디오 트랙
-  addAudioTrack: (track: AudioTrack) => void;
-  updateAudioTrack: (trackId: string, updates: Partial<AudioTrack>) => void;
-  removeAudioTrack: (trackId: string) => void;
-
-  // 애니메이션
-  setSceneAnimation: (sceneId: string, animation: AnimationConfig) => void;
+  // 클립 관리
+  addClipFromScene: (scene: Scene) => void;
+  addClipsFromScenes: (scenes: Scene[]) => void;
+  removeClip: (clipId: string) => void;
+  reorderClip: (clipId: string, newOrder: number) => void;
+  updateClip: (clipId: string, updates: Partial<VideoClip>) => void;
 
   // 영상 클립 생성 (AI)
-  generateVideoClip: (sceneId: string, sourceScene: Scene) => Promise<VideoClip>;
-  generateAllVideoClips: (scenes: Scene[]) => Promise<void>;
+  generateClipVideo: (clipId: string, referenceImages?: ImageData[]) => Promise<void>;
+  generateAllClipVideos: (referenceImages?: ImageData[]) => Promise<void>;
 
   // 재생 컨트롤
   play: () => void;
   pause: () => void;
+  stop: () => void;
   seek: (time: number) => void;
-  setCurrentTime: (time: number) => void;
-
-  // 내보내기
-  exportVideo: (config: ExportConfig) => Promise<Blob>;
 
   // 유틸리티
-  getTotalDuration: () => number;
-  getSceneAtTime: (time: number) => TimelineScene | null;
   clearError: () => void;
 }
 
-interface ExportConfig {
-  width: number;
-  height: number;
-  fps: number;
-  format: 'mp4' | 'webm';
-  quality: 'high' | 'medium' | 'low';
-}
-
 export function useVideo(): UseVideoReturn {
-  const {
-    timeline,
-    setTimeline: contextSetTimeline,
-    addSceneToTimeline: contextAddScene,
-    updateTimelineScene: contextUpdateScene,
-    removeFromTimeline: contextRemoveFromTimeline,
-  } = useProject();
+  const { timeline, setTimeline: contextSetTimeline } = useProject();
 
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [generatingClipSceneId, setGeneratingClipSceneId] = useState<string | null>(null);
-  const [isGeneratingAllClips, setIsGeneratingAllClips] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingClipId, setGeneratingClipId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // =============================================
   // 타임라인 관리
   // =============================================
 
-  const createTimeline = useCallback(() => {
+  const createTimeline = useCallback((name?: string) => {
     const newTimeline: VideoTimeline = {
       id: crypto.randomUUID(),
-      scenes: [],
+      name: name || '새 프로젝트',
+      clips: [],
       totalDuration: 0,
-      audioTracks: [],
-      transitions: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     };
     contextSetTimeline(newTimeline);
   }, [contextSetTimeline]);
@@ -103,187 +73,211 @@ export function useVideo(): UseVideoReturn {
   }, [contextSetTimeline]);
 
   // =============================================
-  // 타임라인 씬 관리
+  // 클립 관리
   // =============================================
 
-  const addSceneToTimeline = useCallback((scene: TimelineScene) => {
-    contextAddScene(scene);
-  }, [contextAddScene]);
-
-  const updateTimelineScene = useCallback((sceneId: string, updates: Partial<TimelineScene>) => {
-    contextUpdateScene(sceneId, updates);
-  }, [contextUpdateScene]);
-
-  const removeFromTimeline = useCallback((sceneId: string) => {
-    contextRemoveFromTimeline(sceneId);
-  }, [contextRemoveFromTimeline]);
-
-  const reorderTimelineScenes = useCallback((sceneIds: string[]) => {
+  const addClipFromScene = useCallback((scene: Scene) => {
     if (!timeline) return;
 
-    const sceneMap = new Map(timeline.scenes.map(s => [s.id, s]));
-    let currentStartTime = 0;
+    const sourceImage = scene.customImage || scene.generatedImage;
+    if (!sourceImage) return;
 
-    const reorderedScenes = sceneIds
-      .map((id, index) => {
-        const scene = sceneMap.get(id);
-        if (!scene) return null;
+    const newClip: VideoClip = {
+      id: crypto.randomUUID(),
+      sceneId: scene.id,
+      order: timeline.clips.length,
+      duration: scene.duration || 5,
+      sourceImage,
+      motionPrompt: scene.imagePrompt,
+      status: 'pending',
+      createdAt: Date.now(),
+    };
 
-        const updatedScene: TimelineScene = {
-          ...scene,
-          position: index,
-          startTime: currentStartTime,
-        };
-        currentStartTime += scene.duration;
-        return updatedScene;
-      })
-      .filter((s): s is TimelineScene => s !== null);
+    const updatedClips = [...timeline.clips, newClip];
+    const totalDuration = updatedClips.reduce((sum, c) => sum + c.duration, 0);
 
     contextSetTimeline({
       ...timeline,
-      scenes: reorderedScenes,
-      totalDuration: currentStartTime,
+      clips: updatedClips,
+      totalDuration,
+      updatedAt: Date.now(),
     });
   }, [timeline, contextSetTimeline]);
 
-  // =============================================
-  // 전환 효과
-  // =============================================
-
-  const setTransition = useCallback((transition: Transition) => {
+  const addClipsFromScenes = useCallback((scenes: Scene[]) => {
     if (!timeline) return;
 
-    const existingIndex = timeline.transitions.findIndex(
-      t => t.fromSceneId === transition.fromSceneId && t.toSceneId === transition.toSceneId
-    );
+    const newClips: VideoClip[] = [];
+    let order = timeline.clips.length;
 
-    let newTransitions: Transition[];
-    if (existingIndex !== -1) {
-      newTransitions = timeline.transitions.map((t, i) =>
-        i === existingIndex ? transition : t
-      );
-    } else {
-      newTransitions = [...timeline.transitions, transition];
+    for (const scene of scenes) {
+      const sourceImage = scene.customImage || scene.generatedImage;
+      if (!sourceImage) continue;
+
+      newClips.push({
+        id: crypto.randomUUID(),
+        sceneId: scene.id,
+        order: order++,
+        duration: scene.duration || 5,
+        sourceImage,
+        motionPrompt: scene.imagePrompt,
+        status: 'pending',
+        createdAt: Date.now(),
+      });
     }
 
+    if (newClips.length === 0) return;
+
+    const updatedClips = [...timeline.clips, ...newClips];
+    const totalDuration = updatedClips.reduce((sum, c) => sum + c.duration, 0);
+
     contextSetTimeline({
       ...timeline,
-      transitions: newTransitions,
+      clips: updatedClips,
+      totalDuration,
+      updatedAt: Date.now(),
     });
   }, [timeline, contextSetTimeline]);
 
-  const removeTransition = useCallback((fromSceneId: string, toSceneId: string) => {
+  const removeClip = useCallback((clipId: string) => {
     if (!timeline) return;
 
+    const updatedClips = timeline.clips
+      .filter(c => c.id !== clipId)
+      .map((clip, index) => ({ ...clip, order: index }));
+
+    const totalDuration = updatedClips.reduce((sum, c) => sum + c.duration, 0);
+
     contextSetTimeline({
       ...timeline,
-      transitions: timeline.transitions.filter(
-        t => !(t.fromSceneId === fromSceneId && t.toSceneId === toSceneId)
-      ),
+      clips: updatedClips,
+      totalDuration,
+      updatedAt: Date.now(),
     });
   }, [timeline, contextSetTimeline]);
 
-  // =============================================
-  // 오디오 트랙
-  // =============================================
-
-  const addAudioTrack = useCallback((track: AudioTrack) => {
+  const reorderClip = useCallback((clipId: string, newOrder: number) => {
     if (!timeline) return;
 
+    const clipIndex = timeline.clips.findIndex(c => c.id === clipId);
+    if (clipIndex === -1) return;
+
+    const clips = [...timeline.clips];
+    const [movedClip] = clips.splice(clipIndex, 1);
+    clips.splice(newOrder, 0, movedClip);
+
+    const updatedClips = clips.map((clip, index) => ({ ...clip, order: index }));
+
     contextSetTimeline({
       ...timeline,
-      audioTracks: [...timeline.audioTracks, track],
+      clips: updatedClips,
+      updatedAt: Date.now(),
     });
   }, [timeline, contextSetTimeline]);
 
-  const updateAudioTrack = useCallback((trackId: string, updates: Partial<AudioTrack>) => {
+  const updateClip = useCallback((clipId: string, updates: Partial<VideoClip>) => {
     if (!timeline) return;
 
-    contextSetTimeline({
-      ...timeline,
-      audioTracks: timeline.audioTracks.map(t =>
-        t.id === trackId ? { ...t, ...updates } : t
-      ),
-    });
-  }, [timeline, contextSetTimeline]);
+    const updatedClips = timeline.clips.map(clip =>
+      clip.id === clipId ? { ...clip, ...updates } : clip
+    );
 
-  const removeAudioTrack = useCallback((trackId: string) => {
-    if (!timeline) return;
+    const totalDuration = updatedClips.reduce((sum, c) => sum + c.duration, 0);
 
     contextSetTimeline({
       ...timeline,
-      audioTracks: timeline.audioTracks.filter(t => t.id !== trackId),
+      clips: updatedClips,
+      totalDuration,
+      updatedAt: Date.now(),
     });
   }, [timeline, contextSetTimeline]);
-
-  // =============================================
-  // 애니메이션
-  // =============================================
-
-  const setSceneAnimation = useCallback((sceneId: string, animation: AnimationConfig) => {
-    contextUpdateScene(sceneId, { animation });
-  }, [contextUpdateScene]);
 
   // =============================================
   // 영상 클립 생성 (AI)
   // =============================================
 
-  const generateVideoClip = useCallback(async (
-    sceneId: string,
-    sourceScene: Scene
-  ): Promise<VideoClip> => {
-    setGeneratingClipSceneId(sceneId);
+  const generateClipVideo = useCallback(async (
+    clipId: string,
+    referenceImages?: ImageData[]
+  ): Promise<void> => {
+    if (!timeline) return;
+
+    const clip = timeline.clips.find(c => c.id === clipId);
+    if (!clip || !clip.sourceImage) return;
+
+    setGeneratingClipId(clipId);
+    setIsGenerating(true);
     setError(null);
 
     try {
       // TODO: AI 영상 생성 API 연동 (Veo, Runway, Pika 등)
-      // 현재는 placeholder
-
-      // 시뮬레이션: 5-7초 클립 생성
+      // 현재는 시뮬레이션
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      const clip: VideoClip = {
-        id: crypto.randomUUID(),
-        sceneId,
-        duration: 5 + Math.random() * 2, // 5-7초
-        createdAt: Date.now(),
-        status: 'complete',
-        // videoData와 thumbnail은 실제 API 연동 시 채워짐
-      };
+      // 시뮬레이션: 생성 완료
+      const updatedClips = timeline.clips.map(c =>
+        c.id === clipId
+          ? {
+              ...c,
+              status: 'complete' as const,
+              generatedVideo: {
+                url: '', // 실제 API 연동 시 URL
+                thumbnailUrl: `data:${c.sourceImage?.mimeType};base64,${c.sourceImage?.data}`,
+                duration: c.duration,
+              },
+            }
+          : c
+      );
 
-      // 타임라인 씬 업데이트
-      if (timeline) {
-        const timelineScene = timeline.scenes.find(s => s.sceneId === sceneId);
-        if (timelineScene) {
-          contextUpdateScene(timelineScene.id, { videoClip: clip });
-        }
-      }
-
-      return clip;
+      contextSetTimeline({
+        ...timeline,
+        clips: updatedClips,
+        updatedAt: Date.now(),
+      });
     } catch (e) {
       const message = e instanceof Error ? e.message : '영상 클립 생성에 실패했습니다.';
       setError(message);
-      throw e;
-    } finally {
-      setGeneratingClipSceneId(null);
-    }
-  }, [timeline, contextUpdateScene]);
 
-  const generateAllVideoClips = useCallback(async (scenes: Scene[]): Promise<void> => {
-    setIsGeneratingAllClips(true);
+      // 에러 상태 업데이트
+      const updatedClips = timeline.clips.map(c =>
+        c.id === clipId ? { ...c, status: 'error' as const } : c
+      );
+      contextSetTimeline({
+        ...timeline,
+        clips: updatedClips,
+        updatedAt: Date.now(),
+      });
+    } finally {
+      setGeneratingClipId(null);
+      setIsGenerating(false);
+    }
+  }, [timeline, contextSetTimeline]);
+
+  const generateAllClipVideos = useCallback(async (
+    referenceImages?: ImageData[]
+  ): Promise<void> => {
+    if (!timeline) return;
+
+    const pendingClips = timeline.clips.filter(
+      c => c.status === 'pending' && c.sourceImage
+    );
+
+    if (pendingClips.length === 0) return;
+
+    setIsGenerating(true);
     setError(null);
 
-    for (const scene of scenes) {
+    for (const clip of pendingClips) {
       try {
-        await generateVideoClip(scene.id, scene);
+        await generateClipVideo(clip.id, referenceImages);
       } catch (e) {
-        console.error(`Failed to generate clip for scene ${scene.sceneNumber}:`, e);
-        // 다른 씬은 계속 진행
+        console.error(`Failed to generate clip ${clip.id}:`, e);
+        // 다른 클립은 계속 진행
       }
     }
 
-    setIsGeneratingAllClips(false);
-  }, [generateVideoClip]);
+    setIsGenerating(false);
+  }, [timeline, generateClipVideo]);
 
   // =============================================
   // 재생 컨트롤
@@ -291,10 +285,17 @@ export function useVideo(): UseVideoReturn {
 
   const play = useCallback(() => {
     setIsPlaying(true);
+    setIsPaused(false);
   }, []);
 
   const pause = useCallback(() => {
+    setIsPaused(true);
+  }, []);
+
+  const stop = useCallback(() => {
     setIsPlaying(false);
+    setIsPaused(false);
+    setCurrentTime(0);
   }, []);
 
   const seek = useCallback((time: number) => {
@@ -303,47 +304,8 @@ export function useVideo(): UseVideoReturn {
   }, [timeline]);
 
   // =============================================
-  // 내보내기
-  // =============================================
-
-  const exportVideo = useCallback(async (config: ExportConfig): Promise<Blob> => {
-    // TODO: Canvas API + MediaRecorder 또는 FFmpeg.wasm으로 구현
-    // 현재는 placeholder
-
-    setError(null);
-
-    try {
-      // 시뮬레이션
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Placeholder blob
-      return new Blob(['video data'], { type: `video/${config.format}` });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : '영상 내보내기에 실패했습니다.';
-      setError(message);
-      throw e;
-    }
-  }, []);
-
-  // =============================================
   // 유틸리티
   // =============================================
-
-  const getTotalDuration = useCallback((): number => {
-    return timeline?.totalDuration || 0;
-  }, [timeline]);
-
-  const getSceneAtTime = useCallback((time: number): TimelineScene | null => {
-    if (!timeline) return null;
-
-    for (const scene of timeline.scenes) {
-      if (time >= scene.startTime && time < scene.startTime + scene.duration) {
-        return scene;
-      }
-    }
-
-    return null;
-  }, [timeline]);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -354,48 +316,33 @@ export function useVideo(): UseVideoReturn {
     timeline,
     currentTime,
     isPlaying,
-    generatingClipSceneId,
-    isGeneratingAllClips,
+    isPaused,
+    isGenerating,
+    generatingClipId,
     error,
 
     // 타임라인 관리
     createTimeline,
     setTimeline,
 
-    // 타임라인 씬 관리
-    addSceneToTimeline,
-    updateTimelineScene,
-    removeFromTimeline,
-    reorderTimelineScenes,
-
-    // 전환 효과
-    setTransition,
-    removeTransition,
-
-    // 오디오 트랙
-    addAudioTrack,
-    updateAudioTrack,
-    removeAudioTrack,
-
-    // 애니메이션
-    setSceneAnimation,
+    // 클립 관리
+    addClipFromScene,
+    addClipsFromScenes,
+    removeClip,
+    reorderClip,
+    updateClip,
 
     // 영상 클립 생성
-    generateVideoClip,
-    generateAllVideoClips,
+    generateClipVideo,
+    generateAllClipVideos,
 
     // 재생 컨트롤
     play,
     pause,
+    stop,
     seek,
-    setCurrentTime,
-
-    // 내보내기
-    exportVideo,
 
     // 유틸리티
-    getTotalDuration,
-    getSceneAtTime,
     clearError,
   };
 }

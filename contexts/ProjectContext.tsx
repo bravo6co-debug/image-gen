@@ -7,7 +7,6 @@ import {
   Scenario,
   Scene,
   VideoTimeline,
-  TimelineScene,
   AppMode,
   AspectRatio,
 } from '../types';
@@ -52,9 +51,6 @@ interface ProjectContextValue {
   // 타임라인
   timeline: VideoTimeline | null;
   setTimeline: (timeline: VideoTimeline | null) => void;
-  addSceneToTimeline: (scene: TimelineScene) => void;
-  updateTimelineScene: (sceneId: string, updates: Partial<TimelineScene>) => void;
-  removeFromTimeline: (sceneId: string) => void;
 
   // UI 상태
   currentTab: AppMode;
@@ -323,52 +319,6 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
     setIsDirty(true);
   }, []);
 
-  const addSceneToTimeline = useCallback((scene: TimelineScene) => {
-    setTimelineState(prev => {
-      if (!prev) {
-        return {
-          id: crypto.randomUUID(),
-          scenes: [scene],
-          totalDuration: scene.duration,
-          audioTracks: [],
-          transitions: [],
-        };
-      }
-      return {
-        ...prev,
-        scenes: [...prev.scenes, scene],
-        totalDuration: prev.totalDuration + scene.duration,
-      };
-    });
-    setIsDirty(true);
-  }, []);
-
-  const updateTimelineScene = useCallback((sceneId: string, updates: Partial<TimelineScene>) => {
-    setTimelineState(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        scenes: prev.scenes.map(s =>
-          s.id === sceneId ? { ...s, ...updates } : s
-        ),
-      };
-    });
-    setIsDirty(true);
-  }, []);
-
-  const removeFromTimeline = useCallback((sceneId: string) => {
-    setTimelineState(prev => {
-      if (!prev) return null;
-      const removedScene = prev.scenes.find(s => s.id === sceneId);
-      return {
-        ...prev,
-        scenes: prev.scenes.filter(s => s.id !== sceneId),
-        totalDuration: prev.totalDuration - (removedScene?.duration || 0),
-      };
-    });
-    setIsDirty(true);
-  }, []);
-
   // =============================================
   // 활성화된 캐릭터 관리
   // =============================================
@@ -453,9 +403,6 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
     // 타임라인
     timeline,
     setTimeline,
-    addSceneToTimeline,
-    updateTimelineScene,
-    removeFromTimeline,
 
     // UI 상태
     currentTab,

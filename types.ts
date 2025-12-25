@@ -148,29 +148,49 @@ export interface Project {
 
 export interface VideoTimeline {
   id: string;
-  scenes: TimelineScene[];
+  name?: string;
+  clips: VideoClip[];
   totalDuration: number;
-  audioTracks: AudioTrack[];
-  transitions: Transition[];
+  createdAt?: number;
+  updatedAt?: number;
 }
 
+// AI 생성 영상 클립
+export interface VideoClip {
+  id: string;
+  sceneId?: string;
+  order: number;
+  duration: number;
+  sourceImage?: ImageData;
+  motionPrompt?: string;
+  generatedVideo?: {
+    url: string;
+    thumbnailUrl?: string;
+    duration: number;
+  };
+  createdAt: number;
+  status: 'pending' | 'generating' | 'complete' | 'error';
+  error?: string;
+}
+
+// Legacy 타임라인 씬 (호환성 유지)
 export interface TimelineScene {
   id: string;
-  sceneId: string;           // Scene 참조
-  startTime: number;         // 밀리초
-  duration: number;          // 밀리초
-  position: number;          // 순서
+  sceneId: string;
+  startTime: number;
+  duration: number;
+  position: number;
   animation?: AnimationConfig;
-  videoClip?: VideoClip;     // AI 생성 영상 클립
+  videoClip?: VideoClip;
 }
 
 export interface AudioTrack {
   id: string;
   type: 'narration' | 'bgm' | 'sfx';
-  source: string;            // URL 또는 base64
+  source: string;
   startTime: number;
   duration: number;
-  volume: number;            // 0-1
+  volume: number;
 }
 
 export interface Transition {
@@ -184,20 +204,7 @@ export interface Transition {
 export interface AnimationConfig {
   type: 'kenBurns' | 'zoom' | 'pan' | 'none';
   direction?: 'in' | 'out' | 'left' | 'right';
-  intensity: number;         // 0-100
-}
-
-// AI 생성 영상 클립
-export interface VideoClip {
-  id: string;
-  sceneId: string;
-  videoData?: Blob;           // 영상 데이터
-  videoUrl?: string;          // 영상 URL (Blob URL)
-  duration: number;          // 실제 생성된 영상 길이 (초)
-  thumbnail?: ImageData;     // 썸네일
-  createdAt: number;
-  status: 'pending' | 'generating' | 'complete' | 'error';
-  error?: string;
+  intensity: number;
 }
 
 export type AspectRatio = '16:9' | '9:16';

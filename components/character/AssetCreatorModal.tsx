@@ -13,7 +13,7 @@ import {
 } from '../../types';
 import { useProject } from '../../contexts/ProjectContext';
 import { SparklesIcon, ClearIcon, LayersIcon } from '../Icons';
-import { extractCharacterData, generateCharacterPortraits } from '../../services/geminiService';
+import { extractCharacterData, generateCharacterPortraits, generatePropImages, generateBackgroundImages } from '../../services/geminiService';
 
 type AssetCategory = 'character' | 'prop' | 'background';
 
@@ -126,9 +126,8 @@ export const AssetCreatorModal: React.FC<AssetCreatorModalProps> = ({
           addCharacter(newCharacter);
         });
       } else if (category === 'prop') {
-        // 소품 AI 생성 (TODO: 소품 전용 이미지 생성 API 연동)
-        // 현재는 캐릭터 초상화 API를 임시 사용
-        const imagesData = await generateCharacterPortraits(description, generatedCount, aspectRatio);
+        // 소품 AI 생성 - 소품 전용 함수 사용 (인물 없이 물건만 생성)
+        const imagesData = await generatePropImages(description, generatedCount, aspectRatio);
 
         imagesData.forEach((imgData) => {
           const newProp: PropAsset = {
@@ -146,8 +145,15 @@ export const AssetCreatorModal: React.FC<AssetCreatorModalProps> = ({
           addProp(newProp);
         });
       } else {
-        // 배경 AI 생성 (TODO: 배경 전용 이미지 생성 API 연동)
-        const imagesData = await generateCharacterPortraits(description, generatedCount, aspectRatio);
+        // 배경 AI 생성 - 배경 전용 함수 사용 (인물 없이 환경만 생성)
+        const imagesData = await generateBackgroundImages(
+          description,
+          locationType,
+          timeOfDay,
+          weather,
+          generatedCount,
+          aspectRatio
+        );
 
         imagesData.forEach((imgData) => {
           const newBackground: BackgroundAsset = {

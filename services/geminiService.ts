@@ -167,6 +167,199 @@ export const generateCharacterPortraits = async (
 
 
 /**
+ * Generates a single prop image (object/item without people).
+ */
+const generateOnePropImage = async (prompt: string, aspectRatio: AspectRatio): Promise<ImageData> => {
+    const finalPrompt = `
+**TASK: Generate a photorealistic product/prop photograph for a reference library.**
+
+**PROP DESCRIPTION:** "${prompt}"
+
+**CRITICAL RULES:**
+1. Generate ONLY the described object/prop - NO PEOPLE, NO HANDS, NO HUMAN BODY PARTS
+2. The prop must be the sole subject of the image
+3. Clean, professional product photography style
+
+---
+**COMPOSITION & SETUP (VERY STRICT):**
+-   **Shot Type:** Clean product shot, centered in frame
+-   **Background:** Simple, non-distracting backdrop (solid white, light gray, or subtle gradient)
+-   **Angle:** 3/4 view or front view to show the object clearly
+-   **Scale:** The object should fill approximately 60-80% of the frame
+-   **Focus:** Sharp focus on the entire object
+
+---
+**MANDATORY PHOTOGRAPHIC STYLE (NON-NEGOTIABLE):**
+-   **Style:** Professional product photography, e-commerce quality
+-   **Lighting:** Clean, soft studio lighting. Even illumination with subtle shadows for depth
+-   **Quality:** Ultra high resolution, sharp details, accurate colors
+
+---
+**ABSOLUTELY FORBIDDEN:**
+-   NO humans, hands, fingers, or any body parts
+-   NO text, watermarks, labels, or typography
+-   NO busy or distracting backgrounds
+-   NO artistic filters or heavy post-processing
+`;
+
+    try {
+        const response = await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt: finalPrompt,
+            config: {
+                numberOfImages: 1,
+                outputMimeType: 'image/jpeg',
+                aspectRatio: aspectRatio,
+            },
+        });
+
+        if (!response.generatedImages || response.generatedImages.length === 0) {
+            throw new Error("AI did not return any images.");
+        }
+
+        const img = response.generatedImages[0];
+        return {
+            mimeType: 'image/jpeg',
+            data: img.image.imageBytes,
+        };
+
+    } catch (e) {
+        console.error("Error during prop image generation:", e);
+        if (e instanceof Error) {
+            throw new Error(`Prop generation failed: ${e.message}`);
+        }
+        throw new Error("An unknown error occurred during prop generation.");
+    }
+};
+
+/**
+ * Generates multiple prop images.
+ */
+export const generatePropImages = async (
+    prompt: string,
+    numberOfImages: number,
+    aspectRatio: AspectRatio
+): Promise<ImageData[]> => {
+    try {
+        const generationPromises: Promise<ImageData>[] = [];
+        for (let i = 0; i < numberOfImages; i++) {
+            generationPromises.push(generateOnePropImage(prompt, aspectRatio));
+        }
+        const results = await Promise.all(generationPromises);
+        return results.filter(Boolean);
+    } catch (e) {
+        console.error("Error during parallel prop generation:", e);
+        if (e instanceof Error) {
+            throw new Error(`Prop generation failed: ${e.message}`);
+        }
+        throw new Error("An unknown error occurred during prop generation.");
+    }
+};
+
+/**
+ * Generates a single background/environment image (no people).
+ */
+const generateOneBackgroundImage = async (
+    prompt: string,
+    locationType: string,
+    timeOfDay: string,
+    weather: string,
+    aspectRatio: AspectRatio
+): Promise<ImageData> => {
+    const finalPrompt = `
+**TASK: Generate a photorealistic background/environment photograph for a reference library.**
+
+**SCENE DESCRIPTION:** "${prompt}"
+**Location Type:** ${locationType}
+**Time of Day:** ${timeOfDay}
+**Weather:** ${weather}
+
+**CRITICAL RULES:**
+1. Generate ONLY the environment/background - ABSOLUTELY NO PEOPLE, NO CHARACTERS, NO HUMAN FIGURES
+2. This is a pure landscape/interior shot - empty of any human presence
+3. The scene should look like a location scout photograph or empty film set
+
+---
+**COMPOSITION (VERY STRICT):**
+-   **Shot Type:** Wide establishing shot or medium wide shot
+-   **Perspective:** Eye-level or slightly elevated angle
+-   **Depth:** Show depth and layers in the environment
+-   **Focus:** Deep focus - everything should be relatively sharp
+
+---
+**MANDATORY PHOTOGRAPHIC STYLE (NON-NEGOTIABLE):**
+-   **Style:** Cinematic location photography, film production quality
+-   **Lighting:** Natural lighting appropriate for the time of day specified
+-   **Atmosphere:** Capture the mood and atmosphere of the location
+-   **Quality:** High resolution, professional grade
+
+---
+**ABSOLUTELY FORBIDDEN:**
+-   NO humans, silhouettes, or any human figures (even distant ones)
+-   NO animals unless specifically mentioned
+-   NO text, watermarks, or typography
+-   NO obvious CGI or artificial elements
+`;
+
+    try {
+        const response = await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt: finalPrompt,
+            config: {
+                numberOfImages: 1,
+                outputMimeType: 'image/jpeg',
+                aspectRatio: aspectRatio,
+            },
+        });
+
+        if (!response.generatedImages || response.generatedImages.length === 0) {
+            throw new Error("AI did not return any images.");
+        }
+
+        const img = response.generatedImages[0];
+        return {
+            mimeType: 'image/jpeg',
+            data: img.image.imageBytes,
+        };
+
+    } catch (e) {
+        console.error("Error during background image generation:", e);
+        if (e instanceof Error) {
+            throw new Error(`Background generation failed: ${e.message}`);
+        }
+        throw new Error("An unknown error occurred during background generation.");
+    }
+};
+
+/**
+ * Generates multiple background images.
+ */
+export const generateBackgroundImages = async (
+    prompt: string,
+    locationType: string,
+    timeOfDay: string,
+    weather: string,
+    numberOfImages: number,
+    aspectRatio: AspectRatio
+): Promise<ImageData[]> => {
+    try {
+        const generationPromises: Promise<ImageData>[] = [];
+        for (let i = 0; i < numberOfImages; i++) {
+            generationPromises.push(generateOneBackgroundImage(prompt, locationType, timeOfDay, weather, aspectRatio));
+        }
+        const results = await Promise.all(generationPromises);
+        return results.filter(Boolean);
+    } catch (e) {
+        console.error("Error during parallel background generation:", e);
+        if (e instanceof Error) {
+            throw new Error(`Background generation failed: ${e.message}`);
+        }
+        throw new Error("An unknown error occurred during background generation.");
+    }
+};
+
+
+/**
  * Edits an existing image based on a text prompt describing the modifications.
  */
 export const editImage = async (

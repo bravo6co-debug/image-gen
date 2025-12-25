@@ -38,8 +38,17 @@ interface UseScenarioReturn {
   regenerateScene: (sceneId: string, instruction?: string) => Promise<Scene>;
 
   // 이미지 생성
-  generateSceneImage: (sceneId: string, referenceImages?: ImageData[]) => Promise<void>;
-  generateAllSceneImages: (referenceImages?: ImageData[]) => Promise<void>;
+  generateSceneImage: (
+    sceneId: string,
+    characterImages: ImageData[],
+    propImages: ImageData[],
+    backgroundImage: ImageData | null
+  ) => Promise<void>;
+  generateAllSceneImages: (
+    characterImages: ImageData[],
+    propImages: ImageData[],
+    backgroundImage: ImageData | null
+  ) => Promise<void>;
 
   // 이미지 교체
   replaceSceneImage: (sceneId: string, newImage: ImageData) => void;
@@ -175,7 +184,9 @@ export function useScenario(): UseScenarioReturn {
 
   const generateSceneImage = useCallback(async (
     sceneId: string,
-    referenceImages?: ImageData[]
+    characterImages: ImageData[],
+    propImages: ImageData[],
+    backgroundImage: ImageData | null
   ): Promise<void> => {
     if (!scenario) throw new Error('시나리오가 없습니다.');
 
@@ -186,7 +197,7 @@ export function useScenario(): UseScenarioReturn {
     setError(null);
 
     try {
-      const imageData = await apiGenerateSceneImage(scene, referenceImages || [], aspectRatio);
+      const imageData = await apiGenerateSceneImage(scene, characterImages, propImages, backgroundImage, aspectRatio);
       contextUpdateScene(sceneId, {
         generatedImage: imageData,
         imageSource: 'ai',
@@ -201,7 +212,9 @@ export function useScenario(): UseScenarioReturn {
   }, [scenario, aspectRatio, contextUpdateScene]);
 
   const generateAllSceneImages = useCallback(async (
-    referenceImages?: ImageData[]
+    characterImages: ImageData[],
+    propImages: ImageData[],
+    backgroundImage: ImageData | null
   ): Promise<void> => {
     if (!scenario) throw new Error('시나리오가 없습니다.');
 
@@ -217,7 +230,7 @@ export function useScenario(): UseScenarioReturn {
     for (const scene of scenesWithoutImages) {
       setGeneratingImageSceneId(scene.id);
       try {
-        const imageData = await apiGenerateSceneImage(scene, referenceImages || [], aspectRatio);
+        const imageData = await apiGenerateSceneImage(scene, characterImages, propImages, backgroundImage, aspectRatio);
         contextUpdateScene(scene.id, {
           generatedImage: imageData,
           imageSource: 'ai',

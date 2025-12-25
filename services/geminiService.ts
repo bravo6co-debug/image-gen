@@ -241,6 +241,8 @@ Your primary task is to intelligently modify the provided base image according t
 const generateOneImage = async (
     prompt: string,
     characterImages: ImageData[],
+    propImages: ImageData[],
+    backgroundImage: ImageData | null,
     addVariation: boolean,
     aspectRatio: AspectRatio
 ): Promise<ImageData> => {
@@ -256,6 +258,26 @@ const generateOneImage = async (
         });
     });
 
+    // Add prop images for the model to reference
+    propImages.forEach(img => {
+        parts.push({
+            inlineData: {
+                mimeType: img.mimeType,
+                data: img.data
+            }
+        });
+    });
+
+    // Add background image for the model to reference
+    if (backgroundImage) {
+        parts.push({
+            inlineData: {
+                mimeType: backgroundImage.mimeType,
+                data: backgroundImage.data
+            }
+        });
+    }
+
     // Pick a random photorealistic style and create the style prompt part
     const randomStyle = PHOTOREALISTIC_STYLES[Math.floor(Math.random() * PHOTOREALISTIC_STYLES.length)];
     const styleReferencePromptPart = `
@@ -268,22 +290,41 @@ const generateOneImage = async (
 
     const variationPrompt = addVariation ? "\n**VARIATION:** Create a different composition, pose, or camera angle from previous generations for this prompt." : "";
 
-    const finalPrompt = `
-**AI Model Instructions: Absolute Character Consistency & Photorealism**
+    // Build prop reference section if props exist
+    const propReferenceSection = propImages.length > 0 ? `
+---
+**PROP REFERENCE (Images ${characterImages.length + 1} to ${characterImages.length + propImages.length})**
+**CRITICAL:** Any props/objects mentioned in the scene description MUST look IDENTICAL to these reference images.
+- Match the EXACT design, color, shape, logo, brand name, and all visual details
+- The prop should be clearly visible and immediately recognizable as the same object
+- Do NOT generate a generic or different version of the prop
+- This is a NON-NEGOTIABLE requirement for product/brand consistency
+` : '';
 
-Your three primary, non-negotiable goals are:
-1.  **Character Consistency:** Perfectly replicate the person from the reference images.
-2.  **Photorealism:** Generate an image that is indistinguishable from a real photograph.
-3.  **Aspect Ratio:** The final image MUST have a ${aspectRatio === '16:9' ? 'wide, horizontal 16:9' : 'tall, vertical 9:16'} aspect ratio.
+    // Build background reference section if background exists
+    const backgroundReferenceSection = backgroundImage ? `
+---
+**BACKGROUND REFERENCE (Last image)**
+Use this background image as reference for the scene setting. Match the location, lighting atmosphere, and environmental details.
+` : '';
+
+    const finalPrompt = `
+**AI Model Instructions: Character, Prop & Scene Consistency**
+
+Your primary, non-negotiable goals are:
+1.  **Character Consistency:** Perfectly replicate the person from the character reference images.
+2.  **Prop Consistency:** Props/objects in the scene MUST match the provided prop reference images EXACTLY.
+3.  **Photorealism:** Generate an image that is indistinguishable from a real photograph.
+4.  **Aspect Ratio:** The final image MUST have a ${aspectRatio === '16:9' ? 'wide, horizontal 16:9' : 'tall, vertical 9:16'} aspect ratio.
 
 ---
-**1. CHARACTER DESIGN (Source: Reference Images ONLY)**
+**1. CHARACTER REFERENCE (First ${characterImages.length} image${characterImages.length > 1 ? 's' : ''})**
 **ACTION:** This is your highest priority. Analyze the provided reference image(s) to understand the character's exact appearance. You MUST replicate their facial features, age, hair style and color, and overall look with extreme precision.
 **CRITICAL ETHNICITY MANDATE:** The character in the reference images is ethnically Korean. Your generated image MUST maintain this Korean ethnicity. This is a strict, non-negotiable rule. The generated person must be undeniably the SAME PERSON as in the reference photos.
-${styleReferencePromptPart}
+${propReferenceSection}${backgroundReferenceSection}${styleReferencePromptPart}
 ---
 **3. SCENE DESCRIPTION (Source: User's Text Prompt)**
-**ACTION:** Place the character from section 1, rendered in the photographic style from section 2, into the scene described by the user's prompt below.
+**ACTION:** Place the character from section 1, with props from section 2 if applicable, rendered in the photographic style, into the scene described by the user's prompt below.
 **USER PROMPT:**
 "${prompt}"
 ${variationPrompt}
@@ -329,6 +370,8 @@ ${variationPrompt}
 export const generateImages = async (
     prompt: string,
     characterImages: ImageData[],
+    propImages: ImageData[],
+    backgroundImage: ImageData | null,
     numberOfImages: number,
     aspectRatio: AspectRatio
 ): Promise<ImageData[]> => {
@@ -336,7 +379,7 @@ export const generateImages = async (
 
     for (let i = 0; i < numberOfImages; i++) {
         generationPromises.push(
-            generateOneImage(prompt, characterImages, i > 0, aspectRatio)
+            generateOneImage(prompt, characterImages, propImages, backgroundImage, i > 0, aspectRatio)
         );
     }
 
@@ -605,6 +648,8 @@ ${customInstruction ? `**사용자 지시**: ${customInstruction}` : '새로운 
 export const generateSceneImage = async (
     scene: Scene,
     characterImages: ImageData[],
+    propImages: ImageData[],
+    backgroundImage: ImageData | null,
     aspectRatio: AspectRatio
 ): Promise<ImageData> => {
     const enhancedPrompt = `
@@ -620,5 +665,5 @@ ${scene.imagePrompt}
 - Emotional storytelling through visuals
 `;
 
-    return generateOneImage(enhancedPrompt, characterImages, false, aspectRatio);
+    return generateOneImage(enhancedPrompt, characterImages, propImages, backgroundImage, false, aspectRatio);
 };

@@ -5,7 +5,9 @@ import { TrashIcon, PencilIcon, MagnifyingGlassPlusIcon } from '../Icons';
 interface BackgroundCardProps {
   background: BackgroundAsset;
   isSelected: boolean;
+  isActive?: boolean;
   onClick: () => void;
+  onActivate?: () => void;
   onDelete: () => void;
   onEdit?: () => void;
   onZoom?: () => void;
@@ -36,7 +38,9 @@ const WEATHER_ICONS: Record<Weather, string> = {
 export const BackgroundCard: React.FC<BackgroundCardProps> = ({
   background,
   isSelected,
+  isActive = false,
   onClick,
+  onActivate,
   onDelete,
   onEdit,
   onZoom,
@@ -47,7 +51,7 @@ export const BackgroundCard: React.FC<BackgroundCardProps> = ({
     <div
       className={`
         relative group bg-gray-800 rounded-xl border-2 transition-all duration-200 cursor-pointer
-        ${isSelected ? 'border-green-500 ring-2 ring-green-500/30' : 'border-gray-700 hover:border-gray-600'}
+        ${isActive ? 'border-green-500 ring-2 ring-green-500/30' : isSelected ? 'border-gray-500' : 'border-gray-700 hover:border-gray-600'}
       `}
       onClick={onClick}
     >
@@ -84,6 +88,24 @@ export const BackgroundCard: React.FC<BackgroundCardProps> = ({
           <div className="absolute bottom-2 left-2 px-1.5 py-0.5 bg-purple-600/80 rounded text-xs text-white">
             🔒 컨텍스트
           </div>
+        )}
+
+        {/* 활성화 버튼 */}
+        {onActivate && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onActivate();
+            }}
+            className={`absolute bottom-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+              isActive
+                ? 'bg-green-500 text-white'
+                : 'bg-gray-900/80 text-gray-400 hover:bg-green-600 hover:text-white'
+            }`}
+            title={isActive ? '비활성화' : '활성화'}
+          >
+            {isActive ? '✓' : '+'}
+          </button>
         )}
 
         {/* 호버 오버레이 */}

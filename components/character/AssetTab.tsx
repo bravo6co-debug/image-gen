@@ -31,6 +31,10 @@ export const AssetTab: React.FC<AssetTabProps> = ({ onAssetSelect }) => {
     removeBackground,
     activeCharacterIds,
     toggleActiveCharacter,
+    activePropIds,
+    toggleActiveProp,
+    activeBackgroundId,
+    setActiveBackgroundId,
     aspectRatio,
   } = useProject();
 
@@ -282,7 +286,9 @@ export const AssetTab: React.FC<AssetTabProps> = ({ onAssetSelect }) => {
                 key={prop.id}
                 prop={prop}
                 isSelected={selectedAssetId === prop.id}
+                isActive={activePropIds.includes(prop.id)}
                 onClick={() => handleAssetClick(prop)}
+                onActivate={() => toggleActiveProp(prop.id)}
                 onDelete={() => handleDeleteAsset(prop.id)}
               />
             ))}
@@ -303,7 +309,9 @@ export const AssetTab: React.FC<AssetTabProps> = ({ onAssetSelect }) => {
                 key={bg.id}
                 background={bg}
                 isSelected={selectedAssetId === bg.id}
+                isActive={activeBackgroundId === bg.id}
                 onClick={() => handleAssetClick(bg)}
+                onActivate={() => setActiveBackgroundId(activeBackgroundId === bg.id ? null : bg.id)}
                 onDelete={() => handleDeleteAsset(bg.id)}
               />
             ))}
@@ -317,37 +325,106 @@ export const AssetTab: React.FC<AssetTabProps> = ({ onAssetSelect }) => {
         )}
       </div>
 
-      {/* 활성화된 캐릭터 바 */}
-      {activeCharacterIds.length > 0 && (
+      {/* 활성화된 에셋 바 */}
+      {(activeCharacterIds.length > 0 || activePropIds.length > 0 || activeBackgroundId) && (
         <div className="flex-shrink-0 p-3 border-t border-gray-700 bg-gray-800">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-gray-400">
-              활성화된 캐릭터 ({activeCharacterIds.length}/5):
-            </span>
-            <div className="flex gap-2">
-              {activeCharacterIds.map((id) => {
-                const char = characters.find((c) => c.id === id);
-                if (!char) return null;
-                return (
-                  <div key={id} className="relative group">
-                    <img
-                      src={`data:${char.image.mimeType};base64,${char.image.data}`}
-                      alt={char.name}
-                      className="w-10 h-10 object-cover rounded-lg border-2 border-indigo-500"
-                    />
-                    <button
-                      onClick={() => toggleActiveCharacter(id)}
-                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      ×
-                    </button>
-                    <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-xs text-gray-400 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-                      {char.name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="flex items-center gap-6 flex-wrap">
+            {/* 활성화된 캐릭터 */}
+            {activeCharacterIds.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-400">
+                  캐릭터 ({activeCharacterIds.length}/5):
+                </span>
+                <div className="flex gap-2">
+                  {activeCharacterIds.map((id) => {
+                    const char = characters.find((c) => c.id === id);
+                    if (!char) return null;
+                    return (
+                      <div key={id} className="relative group">
+                        <img
+                          src={`data:${char.image.mimeType};base64,${char.image.data}`}
+                          alt={char.name}
+                          className="w-10 h-10 object-cover rounded-lg border-2 border-indigo-500"
+                        />
+                        <button
+                          onClick={() => toggleActiveCharacter(id)}
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          ×
+                        </button>
+                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-xs text-gray-400 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                          {char.name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 활성화된 소품 */}
+            {activePropIds.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-400">
+                  소품 ({activePropIds.length}/5):
+                </span>
+                <div className="flex gap-2">
+                  {activePropIds.map((id) => {
+                    const prop = props.find((p) => p.id === id);
+                    if (!prop) return null;
+                    return (
+                      <div key={id} className="relative group">
+                        <img
+                          src={`data:${prop.image.mimeType};base64,${prop.image.data}`}
+                          alt={prop.name}
+                          className="w-10 h-10 object-cover rounded-lg border-2 border-amber-500"
+                        />
+                        <button
+                          onClick={() => toggleActiveProp(id)}
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          ×
+                        </button>
+                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-xs text-gray-400 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                          {prop.name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 활성화된 배경 */}
+            {activeBackgroundId && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-400">
+                  배경:
+                </span>
+                {(() => {
+                  const bg = backgrounds.find((b) => b.id === activeBackgroundId);
+                  if (!bg) return null;
+                  return (
+                    <div className="relative group">
+                      <img
+                        src={`data:${bg.image.mimeType};base64,${bg.image.data}`}
+                        alt={bg.name}
+                        className="w-16 h-10 object-cover rounded-lg border-2 border-green-500"
+                      />
+                      <button
+                        onClick={() => setActiveBackgroundId(null)}
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        ×
+                      </button>
+                      <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-xs text-gray-400 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                        {bg.name}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
       )}

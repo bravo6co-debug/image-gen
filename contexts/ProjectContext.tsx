@@ -62,6 +62,11 @@ interface ProjectContextValue {
   activeCharacterIds: string[];
   setActiveCharacterIds: (ids: string[]) => void;
   toggleActiveCharacter: (id: string) => void;
+  activePropIds: string[];
+  setActivePropIds: (ids: string[]) => void;
+  toggleActiveProp: (id: string) => void;
+  activeBackgroundId: string | null;
+  setActiveBackgroundId: (id: string | null) => void;
 
   // 유틸리티
   isDirty: boolean;
@@ -102,6 +107,8 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
   const [currentTab, setCurrentTab] = useState<AppMode>('character');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
   const [activeCharacterIds, setActiveCharacterIds] = useState<string[]>([]);
+  const [activePropIds, setActivePropIds] = useState<string[]>([]);
+  const [activeBackgroundId, setActiveBackgroundId] = useState<string | null>(null);
 
   // =============================================
   // 프로젝트 관리
@@ -126,6 +133,8 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
     setScenarioState(null);
     setTimelineState(null);
     setActiveCharacterIds([]);
+    setActivePropIds([]);
+    setActiveBackgroundId(null);
     setIsDirty(false);
   }, []);
 
@@ -197,6 +206,7 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
 
   const removeProp = useCallback((id: string) => {
     setProps(prev => prev.filter(p => p.id !== id));
+    setActivePropIds(prev => prev.filter(pid => pid !== id));
     setIsDirty(true);
   }, []);
 
@@ -218,6 +228,7 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
 
   const removeBackground = useCallback((id: string) => {
     setBackgrounds(prev => prev.filter(b => b.id !== id));
+    setActiveBackgroundId(prev => prev === id ? null : prev);
     setIsDirty(true);
   }, []);
 
@@ -335,6 +346,18 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
     });
   }, []);
 
+  const toggleActiveProp = useCallback((id: string) => {
+    setActivePropIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(pid => pid !== id);
+      }
+      if (prev.length >= 5) {
+        return prev; // 최대 5개
+      }
+      return [...prev, id];
+    });
+  }, []);
+
   // =============================================
   // 자동 저장 (localStorage)
   // =============================================
@@ -414,6 +437,11 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
     activeCharacterIds,
     setActiveCharacterIds,
     toggleActiveCharacter,
+    activePropIds,
+    setActivePropIds,
+    toggleActiveProp,
+    activeBackgroundId,
+    setActiveBackgroundId,
 
     // 유틸리티
     isDirty,

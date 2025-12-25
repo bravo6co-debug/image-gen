@@ -543,7 +543,17 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
 
 // Main Scenario Tab Component
 export const ScenarioTab: React.FC = () => {
-  const { characters, activeCharacterIds, toggleActiveCharacter, aspectRatio, setAspectRatio } = useProject();
+  const {
+    characters,
+    activeCharacterIds,
+    toggleActiveCharacter,
+    props,
+    activePropIds,
+    backgrounds,
+    activeBackgroundId,
+    aspectRatio,
+    setAspectRatio,
+  } = useProject();
   const {
     scenario,
     isGenerating,
@@ -574,8 +584,20 @@ export const ScenarioTab: React.FC = () => {
     .map(id => characters.find(c => c.id === id))
     .filter((c): c is NonNullable<typeof c> => c !== undefined);
 
+  // 활성화된 소품 목록
+  const activeProps = activePropIds
+    .map(id => props.find(p => p.id === id))
+    .filter((p): p is NonNullable<typeof p> => p !== undefined);
+
+  // 활성화된 배경
+  const activeBackground = activeBackgroundId
+    ? backgrounds.find(b => b.id === activeBackgroundId)
+    : null;
+
   // 참조 이미지 생성
-  const referenceImages = activeCharacters.map(c => c.image);
+  const characterImages = activeCharacters.map(c => c.image);
+  const propImages = activeProps.map(p => p.image);
+  const backgroundImage = activeBackground?.image || null;
 
   const handleGenerateScenario = async (config: ScenarioConfig) => {
     try {
@@ -587,11 +609,11 @@ export const ScenarioTab: React.FC = () => {
   };
 
   const handleGenerateSceneImage = async (sceneId: string) => {
-    await generateSceneImage(sceneId, referenceImages);
+    await generateSceneImage(sceneId, characterImages, propImages, backgroundImage);
   };
 
   const handleGenerateAllImages = async () => {
-    await generateAllSceneImages(referenceImages);
+    await generateAllSceneImages(characterImages, propImages, backgroundImage);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

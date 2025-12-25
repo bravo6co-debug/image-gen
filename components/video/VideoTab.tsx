@@ -3,6 +3,7 @@ import { useProject } from '../../contexts/ProjectContext';
 import { useVideo } from '../../hooks/useVideo';
 import { useScenario } from '../../hooks/useScenario';
 import { VideoClip, Scene } from '../../types';
+import { checkVeoApiAvailability } from '../../services/geminiService';
 import {
   SparklesIcon,
   TrashIcon,
@@ -10,6 +11,28 @@ import {
   ClearIcon,
   LayersIcon,
 } from '../Icons';
+
+// Veo API 상태 타입
+type VeoApiStatus = 'unknown' | 'checking' | 'available' | 'unavailable';
+
+// API 상태 아이콘
+const ApiStatusIcon: React.FC<{ status: VeoApiStatus; error?: string }> = ({ status, error }) => {
+  const statusConfig = {
+    unknown: { color: 'text-gray-400', bg: 'bg-gray-600', label: 'API 상태 확인 안됨' },
+    checking: { color: 'text-blue-400', bg: 'bg-blue-600', label: 'API 확인 중...' },
+    available: { color: 'text-green-400', bg: 'bg-green-600', label: 'Veo API 사용 가능' },
+    unavailable: { color: 'text-red-400', bg: 'bg-red-600', label: error || 'Veo API 사용 불가' },
+  };
+
+  const config = statusConfig[status];
+
+  return (
+    <div className="flex items-center gap-2" title={config.label}>
+      <div className={`w-2 h-2 rounded-full ${config.bg} ${status === 'checking' ? 'animate-pulse' : ''}`} />
+      <span className={`text-xs ${config.color}`}>{config.label}</span>
+    </div>
+  );
+};
 
 // Icons
 const PlayIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -509,6 +532,25 @@ export const VideoTab: React.FC = () => {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [playingVideoClip, setPlayingVideoClip] = useState<VideoClip | null>(null);
 
+  // Veo API 상태
+  const [veoApiStatus, setVeoApiStatus] = useState<VeoApiStatus>('unknown');
+  const [veoApiError, setVeoApiError] = useState<string | undefined>();
+
+  // Veo API 상태 체크
+  const checkApiStatus = async () => {
+    setVeoApiStatus('checking');
+    setVeoApiError(undefined);
+
+    const result = await checkVeoApiAvailability();
+
+    if (result.available) {
+      setVeoApiStatus('available');
+    } else {
+      setVeoApiStatus('unavailable');
+      setVeoApiError(result.error);
+    }
+  };
+
   // 활성화된 캐릭터의 참조 이미지
   const referenceImages = activeCharacterIds
     .map(id => characters.find(c => c.id === id)?.image)
@@ -574,7 +616,7 @@ export const VideoTab: React.FC = () => {
             )}
             <button
               onClick={handleGenerateAllClips}
-              disabled={isGenerating || clips.length === 0 || clips.every(c => c.generatedVideo)}
+              disabled={isGenerating || clips.length === 0 || clips.every(c => c.generatedVideo) || veoApiStatus === 'unavailable'}
               className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50"
             >
               <SparklesIcon className="w-4 h-4" />
@@ -583,13 +625,48 @@ export const VideoTab: React.FC = () => {
           </div>
         </div>
 
+        {/* Veo API 상태 표시 */}
+        <div className="mt-3 flex items-center justify-between bg-gray-900/50 rounded-lg px-3 py-2">
+          <ApiStatusIcon status={veoApiStatus} error={veoApiError} />
+          <button
+            onClick={checkApiStatus}
+            disabled={veoApiStatus === 'checking'}
+            className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50"
+          >
+            {veoApiStatus === 'checking' ? '확인 중...' : 'API 상태 확인'}
+          </button>
+        </div>
+
         {/* Error Display */}
         {error && (
-          <div className="mt-3 p-3 bg-red-900/50 border border-red-700 rounded-lg text-sm text-red-300 flex items-center justify-between">
-            <span>{error}</span>
-            <button onClick={clearError} className="text-red-400 hover:text-red-300">
-              <ClearIcon className="w-4 h-4" />
-            </button>
+          <div className="mt-3 p-3 bg-red-900/50 border border-red-700 rounded-lg text-sm text-red-300">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium">오류 발생</span>
+              <button onClick={clearError} className="text-red-400 hover:text-red-300">
+                <ClearIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs">{error}</p>
+            {veoApiStatus === 'unknown' && (
+              <button
+                onClick={checkApiStatus}
+                className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline"
+              >
+                API 상태를 확인해 보세요
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* API 사용 불가 경고 */}
+        {veoApiStatus === 'unavailable' && !error && (
+          <div className="mt-3 p-3 bg-amber-900/50 border border-amber-700 rounded-lg text-sm text-amber-300">
+            <p className="font-medium mb-1">Veo API 사용 불가</p>
+            <p className="text-xs text-amber-400">{veoApiError}</p>
+            <p className="text-xs text-gray-400 mt-2">
+              현재 API 키로는 Veo 2.0 비디오 생성을 사용할 수 없습니다.
+              Google AI Studio에서 Veo API 접근 권한을 확인하세요.
+            </p>
           </div>
         )}
       </div>
@@ -685,8 +762,9 @@ export const VideoTab: React.FC = () => {
                   <div className="flex items-end">
                     <button
                       onClick={() => handleGenerateClip(selectedClip.id)}
-                      disabled={isGenerating || !selectedClip.sourceImage}
+                      disabled={isGenerating || !selectedClip.sourceImage || veoApiStatus === 'unavailable'}
                       className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50"
+                      title={veoApiStatus === 'unavailable' ? 'Veo API 사용 불가' : ''}
                     >
                       {selectedClip.generatedVideo ? '재생성' : '비디오 생성'}
                     </button>

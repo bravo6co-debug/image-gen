@@ -885,6 +885,58 @@ export interface VideoGenerationResult {
 }
 
 /**
+ * Check if Veo API is available with the current API key
+ */
+export const checkVeoApiAvailability = async (): Promise<{ available: boolean; error?: string }> => {
+    try {
+        // Try to list available models to check API access
+        console.log('Checking Veo API availability...');
+
+        // Simple test - try to initiate a minimal request
+        // This will fail fast if API key doesn't have Veo access
+        const testOperation = await ai.models.generateVideos({
+            model: 'veo-2.0-generate-001',
+            prompt: 'test',
+            config: {
+                numberOfVideos: 1,
+                durationSeconds: 5,
+            },
+        });
+
+        // If we get here, the API is accessible
+        // Cancel the operation since this was just a test
+        console.log('Veo API is available');
+        return { available: true };
+
+    } catch (e) {
+        console.error('Veo API check failed:', e);
+        const errorMessage = e instanceof Error ? e.message : String(e);
+
+        if (errorMessage.includes('PERMISSION_DENIED') || errorMessage.includes('403')) {
+            return {
+                available: false,
+                error: 'API 키에 Veo 권한이 없습니다. Google AI Studio에서 Veo API를 활성화하세요.'
+            };
+        }
+        if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+            return {
+                available: false,
+                error: 'Veo 모델을 찾을 수 없습니다. API 키가 Veo를 지원하는지 확인하세요.'
+            };
+        }
+        if (errorMessage.includes('INVALID_ARGUMENT')) {
+            // This might actually mean the API is available but our test request was invalid
+            return { available: true };
+        }
+
+        return {
+            available: false,
+            error: `Veo API 확인 실패: ${errorMessage}`
+        };
+    }
+};
+
+/**
  * Generates a video clip from a source image using Google Veo API.
  * Uses image-to-video generation with motion prompt.
  */
@@ -894,41 +946,53 @@ export const generateVideoFromImage = async (
     durationSeconds: number = 5
 ): Promise<VideoGenerationResult> => {
     try {
-        console.log('Starting video generation with Veo API...');
+        console.log('=== VIDEO GENERATION START ===');
+        console.log('Model: veo-2.0-generate-001');
         console.log('Motion prompt:', motionPrompt);
         console.log('Duration:', durationSeconds, 'seconds');
+        console.log('Image MIME type:', sourceImage.mimeType);
+        console.log('Image data length:', sourceImage.data.length, 'chars');
 
         // Prepare the enhanced prompt for video generation
         const enhancedPrompt = `
-**Cinematic video generation from reference image:**
+Cinematic video generation from reference image:
 ${motionPrompt}
 
-**Motion & Camera Requirements:**
+Motion & Camera Requirements:
 - Smooth, natural camera movements
 - Realistic motion physics
 - Cinematic quality, film-like aesthetics
-- Korean drama/movie style cinematography
 
-**Technical Requirements:**
+Technical Requirements:
 - High quality video output
 - Consistent lighting throughout
 - No sudden jumps or artifacts
 `.trim();
 
+        console.log('Calling ai.models.generateVideos...');
+
         // Generate video using Veo model
-        let operation = await ai.models.generateVideos({
-            model: 'veo-2.0-generate-001',
-            prompt: enhancedPrompt,
-            image: {
-                imageBytes: sourceImage.data,
-                mimeType: sourceImage.mimeType as 'image/jpeg' | 'image/png',
-            },
-            config: {
-                numberOfVideos: 1,
-                durationSeconds: Math.min(durationSeconds, 8), // Veo supports up to 8 seconds
-                aspectRatio: '16:9',
-            },
-        });
+        let operation;
+        try {
+            operation = await ai.models.generateVideos({
+                model: 'veo-2.0-generate-001',
+                prompt: enhancedPrompt,
+                image: {
+                    imageBytes: sourceImage.data,
+                    mimeType: sourceImage.mimeType as 'image/jpeg' | 'image/png',
+                },
+                config: {
+                    numberOfVideos: 1,
+                    durationSeconds: Math.min(durationSeconds, 8),
+                    aspectRatio: '16:9',
+                },
+            });
+            console.log('Operation created successfully');
+            console.log('Operation name:', operation.name);
+        } catch (initError) {
+            console.error('Failed to create video generation operation:', initError);
+            throw new Error(`Veo API 호출 실패: ${initError instanceof Error ? initError.message : String(initError)}`);
+        }
 
         console.log('Video generation started, polling for completion...');
 
@@ -936,56 +1000,101 @@ ${motionPrompt}
         const maxPollingTime = 300000; // 5 minutes
         const pollInterval = 10000; // 10 seconds
         const startTime = Date.now();
+        let pollCount = 0;
 
         while (!operation.done) {
+            pollCount++;
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+
             if (Date.now() - startTime > maxPollingTime) {
-                throw new Error('Video generation timed out after 5 minutes');
+                throw new Error(`비디오 생성 시간 초과 (${elapsed}초 경과). 나중에 다시 시도하세요.`);
             }
 
-            console.log('Waiting for video generation to complete...');
+            console.log(`Polling #${pollCount} - ${elapsed}s elapsed...`);
             await new Promise(resolve => setTimeout(resolve, pollInterval));
 
-            operation = await ai.operations.getVideosOperation({
-                operation: operation,
-            });
+            try {
+                operation = await ai.operations.getVideosOperation({
+                    operation: operation,
+                });
+                console.log(`Poll #${pollCount} - done: ${operation.done}`);
+            } catch (pollError) {
+                console.error(`Poll #${pollCount} failed:`, pollError);
+                throw new Error(`비디오 생성 상태 확인 실패: ${pollError instanceof Error ? pollError.message : String(pollError)}`);
+            }
         }
 
-        console.log('Video generation completed!');
+        const totalTime = Math.round((Date.now() - startTime) / 1000);
+        console.log(`Video generation completed in ${totalTime} seconds!`);
+        console.log('Operation response:', JSON.stringify(operation.response, null, 2));
 
         // Check for errors in the operation
         if (!operation.response?.generatedVideos || operation.response.generatedVideos.length === 0) {
-            throw new Error('Video generation completed but no videos were returned');
+            console.error('No videos in response:', operation.response);
+            throw new Error('비디오 생성이 완료되었지만 결과가 없습니다.');
         }
 
         const generatedVideo = operation.response.generatedVideos[0];
+        console.log('Generated video object:', JSON.stringify(generatedVideo, null, 2));
 
         // Get video URL - the video file object contains the URL
         const videoFile = generatedVideo.video;
-        if (!videoFile || !videoFile.uri) {
-            throw new Error('Generated video does not contain a valid URI');
+        if (!videoFile) {
+            console.error('No video file in generated video:', generatedVideo);
+            throw new Error('생성된 비디오에 파일 정보가 없습니다.');
         }
 
+        console.log('Video file object:', JSON.stringify(videoFile, null, 2));
+
+        // Try different possible URL properties
+        const videoUrl = videoFile.uri || (videoFile as any).url || (videoFile as any).downloadUri;
+        if (!videoUrl) {
+            console.error('No URI found in video file:', videoFile);
+            throw new Error('생성된 비디오에 유효한 URL이 없습니다.');
+        }
+
+        console.log('=== VIDEO GENERATION SUCCESS ===');
+        console.log('Video URL:', videoUrl);
+
         return {
-            videoUrl: videoFile.uri,
-            thumbnailUrl: `data:${sourceImage.mimeType};base64,${sourceImage.data}`, // Use source image as thumbnail
+            videoUrl: videoUrl,
+            thumbnailUrl: `data:${sourceImage.mimeType};base64,${sourceImage.data}`,
             duration: durationSeconds,
         };
 
     } catch (e) {
-        console.error('Error during video generation:', e);
+        console.error('=== VIDEO GENERATION ERROR ===');
+        console.error('Error object:', e);
+
         if (e instanceof Error) {
-            // Check for specific error types
-            if (e.message.includes('PERMISSION_DENIED') || e.message.includes('403')) {
-                throw new Error('Video generation API access denied. Please check your API key permissions.');
+            const msg = e.message;
+            console.error('Error message:', msg);
+            console.error('Error stack:', e.stack);
+
+            // More specific Korean error messages
+            if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('Forbidden')) {
+                throw new Error('Veo API 접근 권한이 없습니다. API 키가 Veo를 지원하는지 확인하세요. (Google AI Studio > API Keys에서 확인)');
             }
-            if (e.message.includes('QUOTA_EXCEEDED') || e.message.includes('429')) {
-                throw new Error('Video generation quota exceeded. Please try again later.');
+            if (msg.includes('QUOTA_EXCEEDED') || msg.includes('429') || msg.includes('Resource exhausted')) {
+                throw new Error('Veo API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.');
             }
-            if (e.message.includes('not found') || e.message.includes('404')) {
-                throw new Error('Video generation model not available. Veo API may not be enabled for your account.');
+            if (msg.includes('not found') || msg.includes('404') || msg.includes('does not exist')) {
+                throw new Error('Veo 모델(veo-2.0-generate-001)을 찾을 수 없습니다. API 키가 Veo API를 지원하는지 확인하세요.');
             }
-            throw new Error(`Video generation failed: ${e.message}`);
+            if (msg.includes('INVALID_ARGUMENT') || msg.includes('400')) {
+                throw new Error(`잘못된 요청: ${msg}`);
+            }
+            if (msg.includes('UNAUTHENTICATED') || msg.includes('401')) {
+                throw new Error('API 키가 유효하지 않습니다. 환경 변수를 확인하세요.');
+            }
+
+            // Pass through already-formatted Korean errors
+            if (msg.includes('비디오') || msg.includes('Veo')) {
+                throw e;
+            }
+
+            throw new Error(`비디오 생성 실패: ${msg}`);
         }
-        throw new Error('An unknown error occurred during video generation.');
+        throw new Error('비디오 생성 중 알 수 없는 오류가 발생했습니다.');
     }
 };

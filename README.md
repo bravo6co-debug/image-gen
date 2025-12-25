@@ -1,20 +1,93 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 시니어 롱폼 이미지 생성기
 
-# Run and deploy your AI Studio app
+Google Gemini AI를 활용한 한국어 숏폼/롱폼 비디오 제작용 이미지 생성 도구입니다. 캐릭터, 소품, 배경의 일관성을 유지하면서 시나리오 기반의 씬 이미지를 생성합니다.
 
-This contains everything you need to run your app locally.
+## 주요 기능
 
-View your app in AI Studio: https://ai.studio/apps/drive/1mPb3JkiOmXuy9lYS8_f1RCK8PddITxZ3
+### 캐릭터 관리
+- 참조 이미지 기반 캐릭터 라이브러리 구축
+- 캐릭터 메타데이터 관리 (이름, 나이, 성격, 의상)
+- 최대 5개 캐릭터 동시 활성화하여 씬 생성 시 참조
 
-## Run Locally
+### 소품 & 배경 에셋
+- 소품 라이브러리: 핵심 소품/일반 소품 분류, 카테고리별 관리
+- 배경 라이브러리: 장소 유형, 시간대, 날씨 설정
+- **활성화 시스템**: 최대 5개 소품 + 1개 배경을 활성화하여 이미지 생성 시 일관성 유지
 
-**Prerequisites:**  Node.js
+### 시나리오 기반 이미지 생성
+- 챕터/씬 구조로 시나리오 작성
+- 씬별 이미지 개별 생성 또는 전체 일괄 생성
+- 활성화된 캐릭터, 소품, 배경 이미지를 AI에 전달하여 일관된 스타일 유지
+- 다양한 화면 비율 지원 (1:1, 16:9, 9:16, 4:3, 3:4)
 
+### 이미지 편집
+- 생성된 이미지에 텍스트 프롬프트로 수정 적용
+- Gemini AI 기반 이미지 편집
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 기술 스택
+
+- **Frontend**: React 19, TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **AI**: Google Gemini API
+  - `gemini-2.0-flash-exp` - 씬 이미지 생성 및 편집
+  - `gemini-2.5-flash` - 캐릭터 데이터 추출
+
+## 설치 및 실행
+
+### 필수 요구사항
+- Node.js 18+
+- Google Gemini API Key
+
+### 로컬 실행
+
+```bash
+# 의존성 설치
+npm install
+
+# 환경 변수 설정
+# .env.local 파일 생성 후 아래 내용 추가
+GEMINI_API_KEY=your_api_key_here
+
+# 개발 서버 실행
+npm run dev
+```
+
+### 빌드
+
+```bash
+# 프로덕션 빌드
+npm run build
+
+# 빌드 결과 미리보기
+npm run preview
+```
+
+## 프로젝트 구조
+
+```
+├── components/
+│   ├── character/       # 캐릭터, 소품, 배경 관리 컴포넌트
+│   ├── scenario/        # 시나리오/씬 관리 컴포넌트
+│   └── ...
+├── contexts/
+│   └── ProjectContext.tsx  # 전역 상태 관리
+├── hooks/
+│   └── useScenario.ts      # 시나리오 관련 커스텀 훅
+├── services/
+│   └── geminiService.ts    # Gemini AI API 통합
+├── types.ts                # TypeScript 타입 정의
+└── App.tsx                 # 메인 애플리케이션
+```
+
+## 사용 방법
+
+1. **캐릭터 등록**: 캐릭터 탭에서 참조 이미지와 정보를 등록
+2. **에셋 준비**: 에셋 탭에서 소품과 배경 이미지 등록
+3. **활성화**: 씬에서 사용할 캐릭터(최대 5개), 소품(최대 5개), 배경(1개)을 활성화
+4. **시나리오 작성**: 시나리오 탭에서 챕터와 씬 작성
+5. **이미지 생성**: 개별 씬 또는 전체 씬의 이미지 생성
+
+## 라이선스
+
+MIT License

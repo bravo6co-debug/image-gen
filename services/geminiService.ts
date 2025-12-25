@@ -363,10 +363,13 @@ const TONE_DESCRIPTIONS: Record<ScenarioTone, string> = {
  * Generates a complete video scenario based on user input.
  */
 export const generateScenario = async (config: ScenarioConfig): Promise<Scenario> => {
-    const { topic, duration, tone } = config;
+    const { topic, duration, tone, customTone } = config;
     const minScenes = Math.floor(duration / 12);
     const maxScenes = Math.ceil(duration / 8);
-    const toneDescription = TONE_DESCRIPTIONS[tone];
+    const toneDescription = tone === 'custom'
+        ? (customTone || '사용자 지정 분위기')
+        : TONE_DESCRIPTIONS[tone];
+    const toneLabel = tone === 'custom' ? customTone : tone;
 
     const prompt = `당신은 한국 숏폼 영상 시나리오 전문 작가입니다.
 주어진 주제로 ${duration}초 분량의 영상 시나리오를 작성하세요.
@@ -374,7 +377,7 @@ export const generateScenario = async (config: ScenarioConfig): Promise<Scenario
 ## 입력 정보
 - **주제**: "${topic}"
 - **영상 길이**: ${duration}초
-- **톤/분위기**: ${tone} - ${toneDescription}
+- **톤/분위기**: ${toneLabel} - ${toneDescription}
 
 ## 시나리오 작성 규칙
 
@@ -479,6 +482,7 @@ export const generateScenario = async (config: ScenarioConfig): Promise<Scenario
             topic: topic,
             totalDuration: duration,
             tone: tone,
+            customTone: tone === 'custom' ? customTone : undefined,
             suggestedCharacters: parsed.suggestedCharacters,
             scenes: parsed.scenes.map((scene: any, index: number) => ({
                 id: crypto.randomUUID(),

@@ -123,7 +123,7 @@ export interface SceneAssets {
 // =============================================
 
 // 3탭 구조 앱 모드
-export type AppMode = 'character' | 'scenario' | 'video';
+export type AppMode = 'assets' | 'scenario' | 'video';
 
 // =============================================
 // 프로젝트 상태 (Project State)
@@ -300,7 +300,8 @@ export interface Scenario {
   synopsis: string;
   topic: string;
   totalDuration: number;
-  tone: ScenarioTone;
+  tone: ScenarioTone | 'custom';
+  customTone?: string;
   suggestedCharacters: SuggestedCharacter[];
   scenes: Scene[];
   createdAt: number;

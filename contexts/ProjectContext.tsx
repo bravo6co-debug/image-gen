@@ -99,7 +99,7 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
   const [timeline, setTimelineState] = useState<VideoTimeline | null>(null);
 
   // UI 상태
-  const [currentTab, setCurrentTab] = useState<AppMode>('character');
+  const [currentTab, setCurrentTab] = useState<AppMode>('assets');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
   const [activeCharacterIds, setActiveCharacterIds] = useState<string[]>([]);
 

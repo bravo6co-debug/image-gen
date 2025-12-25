@@ -13,7 +13,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 // ============================================
 const MODELS = {
     // 텍스트/프롬프트 생성용 모델
-    TEXT: 'gemini-3.0-flash',
+    TEXT: 'gemini-3-flash-preview',
 
     // 이미지 생성용 모델
     IMAGE_PORTRAIT: 'imagen-4.0-generate-001',  // 캐릭터/소품/배경 초상화 (참조 없이 생성)

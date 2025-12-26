@@ -95,6 +95,7 @@ interface ClipCardProps {
   onDelete: () => void;
   isGenerating: boolean;
   onPlayVideo?: () => void;
+  onDownload?: () => void;
 }
 
 const ClipCard: React.FC<ClipCardProps> = ({
@@ -106,6 +107,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
   onDelete,
   isGenerating,
   onPlayVideo,
+  onDownload,
 }) => {
   const thumbnailUrl = clip.generatedVideo?.thumbnailUrl || (clip.sourceImage ? `data:${clip.sourceImage.mimeType};base64,${clip.sourceImage.data}` : null);
   const hasVideo = clip.generatedVideo?.url;
@@ -187,6 +189,18 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
         {/* 호버 액션 */}
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+          {hasVideo && onDownload && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDownload();
+              }}
+              className="p-2 bg-green-600 rounded-full text-white hover:bg-green-700"
+              title="비디오 다운로드"
+            >
+              <DownloadIcon className="w-5 h-5" />
+            </button>
+          )}
           {clip.sourceImage && !isGenerating && (
             <button
               onClick={(e) => {
@@ -531,6 +545,48 @@ export const VideoTab: React.FC = () => {
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [playingVideoClip, setPlayingVideoClip] = useState<VideoClip | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  // 비디오 다운로드 함수
+  const downloadVideo = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('다운로드 실패:', error);
+      alert('비디오 다운로드에 실패했습니다.');
+    }
+  };
+
+  // 전체 비디오 다운로드 (개별 파일로)
+  const handleDownloadAll = async () => {
+    const completedClipsList = clips.filter(c => c.generatedVideo?.url);
+    if (completedClipsList.length === 0) return;
+
+    setIsDownloading(true);
+    try {
+      for (let i = 0; i < completedClipsList.length; i++) {
+        const clip = completedClipsList[i];
+        if (clip.generatedVideo?.url) {
+          await downloadVideo(clip.generatedVideo.url, `clip_${clip.order + 1}.mp4`);
+          // 다운로드 간 간격
+          if (i < completedClipsList.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      }
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // Veo API 상태
   const [veoApiStatus, setVeoApiStatus] = useState<VeoApiStatus>('unknown');
@@ -715,6 +771,7 @@ export const VideoTab: React.FC = () => {
                     onDelete={() => removeClip(clip.id)}
                     isGenerating={generatingClipId === clip.id}
                     onPlayVideo={() => clip.generatedVideo?.url && setPlayingVideoClip(clip)}
+                    onDownload={clip.generatedVideo?.url ? () => downloadVideo(clip.generatedVideo!.url, `clip_${clip.order + 1}.mp4`) : undefined}
                   />
                 ))}
               </div>
@@ -806,12 +863,19 @@ export const VideoTab: React.FC = () => {
                 )}
               </button>
               <button
-                onClick={() => {/* TODO: Export functionality */}}
-                disabled={completedClips === 0}
+                onClick={handleDownloadAll}
+                disabled={completedClips === 0 || isDownloading}
                 className="p-2 text-gray-400 hover:text-white disabled:opacity-30"
-                title="내보내기"
+                title={isDownloading ? '다운로드 중...' : '전체 비디오 다운로드'}
               >
-                <DownloadIcon className="w-6 h-6" />
+                {isDownloading ? (
+                  <svg className="animate-spin w-6 h-6" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <DownloadIcon className="w-6 h-6" />
+                )}
               </button>
             </div>
           </>

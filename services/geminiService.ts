@@ -19,8 +19,8 @@ const MODELS = {
     IMAGE_PORTRAIT: 'imagen-4.0-generate-001',  // 캐릭터/소품/배경 초상화 (참조 없이 생성)
     IMAGE_SCENE: 'gemini-3-pro-image-preview',  // 씬 이미지 (참조 이미지 기반)
 
-    // 비디오 생성용 모델
-    VIDEO: 'veo-3.1-generate-preview',
+    // 비디오 생성용 모델 (Veo 3.1 Fast - 더 빠른 생성 속도)
+    VIDEO: 'veo-3.1-fast-generate-001',
 } as const;
 
 // Highly specific, photography-based style prompts to ensure realism.
@@ -926,13 +926,13 @@ export const checkVeoApiAvailability = async (): Promise<{ available: boolean; e
         if (errorMessage.includes('PERMISSION_DENIED') || errorMessage.includes('403')) {
             return {
                 available: false,
-                error: 'API 키에 Veo 권한이 없습니다. Google AI Studio에서 Veo API를 활성화하세요.'
+                error: 'API 키에 Veo 3.1 Fast 권한이 없습니다. Google AI Studio에서 Veo API를 활성화하세요.'
             };
         }
         if (errorMessage.includes('not found') || errorMessage.includes('404')) {
             return {
                 available: false,
-                error: 'Veo 모델을 찾을 수 없습니다. API 키가 Veo를 지원하는지 확인하세요.'
+                error: 'Veo 3.1 Fast 모델을 찾을 수 없습니다. API 키가 Veo를 지원하는지 확인하세요.'
             };
         }
         if (errorMessage.includes('INVALID_ARGUMENT')) {
@@ -994,10 +994,12 @@ Technical Requirements:
                 },
                 config: {
                     numberOfVideos: 1,
-                    durationSeconds: Math.min(durationSeconds, 8),
+                    // Veo 3.1 Fast는 4, 6, 8초 지원
+                    durationSeconds: Math.min(Math.max(durationSeconds, 4), 8),
                     aspectRatio: '16:9',
-                    // Veo 3.1 새 옵션 (fps는 Gemini API에서 지원 안함 - 기본 24fps)
-                    includeAudio: true,  // 오디오 자동 생성
+                    // Veo 3.1 Fast 새 옵션
+                    enhancePrompt: true,  // 프롬프트 자동 최적화
+                    includeAudio: true,   // 배경음 및 효과음 자동 생성
                 },
             });
             console.log('Operation created successfully');
@@ -1094,7 +1096,7 @@ Technical Requirements:
                 throw new Error('Veo API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.');
             }
             if (msg.includes('not found') || msg.includes('404') || msg.includes('does not exist')) {
-                throw new Error(`Veo 모델(${MODELS.VIDEO})을 찾을 수 없습니다. API 키가 Veo API를 지원하는지 확인하세요.`);
+                throw new Error(`Veo 3.1 Fast 모델(${MODELS.VIDEO})을 찾을 수 없습니다. API 키가 Veo API를 지원하는지 확인하세요.`);
             }
             if (msg.includes('INVALID_ARGUMENT') || msg.includes('400')) {
                 throw new Error(`잘못된 요청: ${msg}`);

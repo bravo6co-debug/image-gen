@@ -664,7 +664,7 @@ export const VideoTab: React.FC = () => {
             <p className="font-medium mb-1">Veo API 사용 불가</p>
             <p className="text-xs text-amber-400">{veoApiError}</p>
             <p className="text-xs text-gray-400 mt-2">
-              현재 API 키로는 Veo 2.0 비디오 생성을 사용할 수 없습니다.
+              현재 API 키로는 Veo 3.1 Fast 비디오 생성을 사용할 수 없습니다.
               Google AI Studio에서 Veo API 접근 권한을 확인하세요.
             </p>
           </div>

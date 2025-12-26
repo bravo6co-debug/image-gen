@@ -1041,41 +1041,115 @@ Technical Requirements:
         console.log(`Video generation completed in ${totalTime} seconds!`);
         console.log('Operation response:', JSON.stringify(operation.response, null, 2));
 
-        // Extract video URL from response - handle multiple possible response structures
-        // Structure 1: generateVideoResponse.generatedSamples[0].video.uri (actual API response)
-        // Structure 2: generatedVideos[0].video (SDK wrapper)
+        // Extract video data from response - handle multiple possible response structures
         const response = operation.response as any;
+        console.log('Full response structure:', JSON.stringify(response, null, 2));
+
+        let videoData: string | undefined;
         let videoUrl: string | undefined;
+        let videoMimeType = 'video/mp4';
 
-        // Try actual API response structure first
-        if (response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri) {
-            videoUrl = response.generateVideoResponse.generatedSamples[0].video.uri;
-            console.log('Found video URL in generateVideoResponse.generatedSamples');
-        }
-        // Try SDK wrapper structure
-        else if (response?.generatedVideos?.[0]?.video?.uri) {
-            videoUrl = response.generatedVideos[0].video.uri;
-            console.log('Found video URL in generatedVideos');
-        }
-        // Try direct generatedSamples
-        else if (response?.generatedSamples?.[0]?.video?.uri) {
-            videoUrl = response.generatedSamples[0].video.uri;
-            console.log('Found video URL in generatedSamples');
+        // 먼저 비디오 바이트 데이터 확인 (직접 base64 데이터)
+        const videoSources = [
+            response?.generateVideoResponse?.generatedSamples?.[0]?.video,
+            response?.generatedVideos?.[0]?.video,
+            response?.generatedSamples?.[0]?.video,
+        ];
+
+        for (const video of videoSources) {
+            if (video) {
+                console.log('Video object keys:', Object.keys(video));
+                // videoBytes가 있으면 직접 사용 (base64 인코딩된 비디오)
+                if (video.videoBytes) {
+                    videoData = video.videoBytes;
+                    videoMimeType = video.mimeType || 'video/mp4';
+                    console.log('Found videoBytes data, length:', videoData.length);
+                    break;
+                }
+                // uri가 있으면 URL 저장
+                if (video.uri) {
+                    videoUrl = video.uri;
+                    console.log('Found video URI:', videoUrl);
+                }
+            }
         }
 
-        if (!videoUrl) {
-            console.error('Could not find video URL in response:', response);
-            throw new Error('비디오 생성이 완료되었지만 URL을 찾을 수 없습니다.');
+        // videoBytes가 있으면 data URL로 변환
+        if (videoData) {
+            const videoDataUrl = `data:${videoMimeType};base64,${videoData}`;
+            console.log('=== VIDEO GENERATION SUCCESS (with bytes) ===');
+            return {
+                videoUrl: videoDataUrl,
+                thumbnailUrl: `data:${sourceImage.mimeType};base64,${sourceImage.data}`,
+                duration: durationSeconds,
+            };
         }
 
-        console.log('=== VIDEO GENERATION SUCCESS ===');
-        console.log('Video URL:', videoUrl);
+        // URI만 있는 경우 - SDK를 통해 파일 다운로드 시도
+        if (videoUrl) {
+            console.log('Attempting to download video via SDK...');
+            try {
+                // 파일 이름 추출 (예: files/abc123 에서 abc123)
+                const fileMatch = videoUrl.match(/files\/([^:/?]+)/);
+                if (fileMatch) {
+                    const fileName = `files/${fileMatch[1]}`;
+                    console.log('Downloading file:', fileName);
 
-        return {
-            videoUrl: videoUrl,
-            thumbnailUrl: `data:${sourceImage.mimeType};base64,${sourceImage.data}`,
-            duration: durationSeconds,
-        };
+                    // @google/genai SDK의 files API 사용
+                    const fileResponse = await ai.files.download({ file: fileName });
+                    console.log('File download response:', fileResponse);
+
+                    if (fileResponse) {
+                        // 응답이 ReadableStream인 경우
+                        if (fileResponse instanceof ReadableStream || (fileResponse as any).body) {
+                            const stream = (fileResponse as any).body || fileResponse;
+                            const reader = stream.getReader();
+                            const chunks: Uint8Array[] = [];
+
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+                                chunks.push(value);
+                            }
+
+                            const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+                            const videoBytes = new Uint8Array(totalLength);
+                            let offset = 0;
+                            for (const chunk of chunks) {
+                                videoBytes.set(chunk, offset);
+                                offset += chunk.length;
+                            }
+
+                            // Uint8Array를 base64로 변환
+                            const base64 = btoa(String.fromCharCode(...videoBytes));
+                            const videoDataUrl = `data:video/mp4;base64,${base64}`;
+                            console.log('=== VIDEO GENERATION SUCCESS (downloaded via SDK) ===');
+                            console.log('Video data length:', videoDataUrl.length);
+
+                            return {
+                                videoUrl: videoDataUrl,
+                                thumbnailUrl: `data:${sourceImage.mimeType};base64,${sourceImage.data}`,
+                                duration: durationSeconds,
+                            };
+                        }
+                    }
+                }
+            } catch (downloadError) {
+                console.error('SDK file download failed:', downloadError);
+            }
+
+            // 최후의 수단: API 키가 포함된 URL 반환 (CORS 문제로 작동 안 할 수 있음)
+            console.warn('Falling back to authenticated URL (may not work due to CORS)');
+            const authenticatedUrl = `${videoUrl}${videoUrl.includes('?') ? '&' : '?'}key=${process.env.API_KEY}`;
+            return {
+                videoUrl: authenticatedUrl,
+                thumbnailUrl: `data:${sourceImage.mimeType};base64,${sourceImage.data}`,
+                duration: durationSeconds,
+            };
+        }
+
+        console.error('Could not find video data in response:', response);
+        throw new Error('비디오 생성이 완료되었지만 비디오 데이터를 찾을 수 없습니다.');
 
     } catch (e) {
         console.error('=== VIDEO GENERATION ERROR ===');

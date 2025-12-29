@@ -1,19 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { setCorsHeaders } from './lib/gemini';
 
 /**
- * Vercel Serverless Function - Video Download Proxy
- *
- * Google Gemini API에서 생성된 비디오를 다운로드하기 위한 프록시
- * 브라우저에서 직접 접근 불가능한 Google API URL을 서버에서 대신 호출
- *
- * 사용법: /api/download-video?fileId=abc123
+ * GET /api/download-video?fileId=xxx
+ * Video download proxy for Google Gemini API generated videos
  */
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // CORS 헤더 설정
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    setCorsHeaders(res, req.headers.origin as string);
 
     // Preflight 요청 처리
     if (req.method === 'OPTIONS') {

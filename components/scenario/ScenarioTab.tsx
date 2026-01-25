@@ -705,6 +705,7 @@ export const ScenarioTab: React.FC = () => {
   const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
   const [expandedSceneId, setExpandedSceneId] = useState<string | null>(null);
   const [ttsVoice, setTtsVoice] = useState<TTSVoice>('Kore');
+  const [isCharacterSectionCollapsed, setIsCharacterSectionCollapsed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 제안된 캐릭터가 이미 생성되었는지 확인
@@ -1069,11 +1070,21 @@ export const ScenarioTab: React.FC = () => {
             {/* Suggested Characters */}
             {scenario.suggestedCharacters && scenario.suggestedCharacters.length > 0 && (
               <div className="mt-3 pt-3 border-t border-gray-700">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-300">
-                    제안된 등장인물
-                  </h3>
+                <div
+                  className="flex items-center justify-between mb-2 cursor-pointer hover:bg-gray-700/50 -mx-2 px-2 py-1 rounded transition-colors"
+                  onClick={() => setIsCharacterSectionCollapsed(!isCharacterSectionCollapsed)}
+                >
                   <div className="flex items-center gap-2">
+                    {isCharacterSectionCollapsed ? (
+                      <ChevronDownIcon className="w-4 h-4 text-gray-400" />
+                    ) : (
+                      <ChevronUpIcon className="w-4 h-4 text-gray-400" />
+                    )}
+                    <h3 className="text-sm font-medium text-gray-300">
+                      제안된 등장인물
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <span className="text-xs text-gray-500">
                       {scenario.suggestedCharacters.filter(c => isCharacterCreated(c.name)).length}/{scenario.suggestedCharacters.length} 생성됨
                     </span>
@@ -1088,30 +1099,34 @@ export const ScenarioTab: React.FC = () => {
                     )}
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 mb-3">
-                  시나리오에 필요한 캐릭터입니다. "생성" 버튼으로 AI가 자동 생성하거나, 업로드 아이콘으로 기존 이미지를 사용할 수 있습니다.
-                </p>
-                {quickGenError && (
-                  <div className="mb-3 p-2 bg-red-900/50 border border-red-700 rounded text-xs text-red-300 flex items-center justify-between">
-                    <span>{quickGenError}</span>
-                    <button onClick={clearQuickGenError} className="text-red-400 hover:text-red-300">
-                      <ClearIcon className="w-3 h-3" />
-                    </button>
-                  </div>
+                {!isCharacterSectionCollapsed && (
+                  <>
+                    <p className="text-xs text-gray-400 mb-3">
+                      시나리오에 필요한 캐릭터입니다. "생성" 버튼으로 AI가 자동 생성하거나, 업로드 아이콘으로 기존 이미지를 사용할 수 있습니다.
+                    </p>
+                    {quickGenError && (
+                      <div className="mb-3 p-2 bg-red-900/50 border border-red-700 rounded text-xs text-red-300 flex items-center justify-between">
+                        <span>{quickGenError}</span>
+                        <button onClick={clearQuickGenError} className="text-red-400 hover:text-red-300">
+                          <ClearIcon className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {scenario.suggestedCharacters.map((char, idx) => (
+                        <SuggestedCharacterCard
+                          key={`${char.name}-${idx}`}
+                          character={char}
+                          isCreated={isCharacterCreated(char.name)}
+                          isGenerating={isQuickGenerating && generatingCharacterName === char.name}
+                          createdThumbnail={getCreatedCharacterThumbnail(char.name)}
+                          onQuickGenerate={() => quickGenerateCharacter(char)}
+                          onUpload={(imageData) => handleUploadCharacterImage(char, imageData)}
+                        />
+                      ))}
+                    </div>
+                  </>
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {scenario.suggestedCharacters.map((char, idx) => (
-                    <SuggestedCharacterCard
-                      key={`${char.name}-${idx}`}
-                      character={char}
-                      isCreated={isCharacterCreated(char.name)}
-                      isGenerating={isQuickGenerating && generatingCharacterName === char.name}
-                      createdThumbnail={getCreatedCharacterThumbnail(char.name)}
-                      onQuickGenerate={() => quickGenerateCharacter(char)}
-                      onUpload={(imageData) => handleUploadCharacterImage(char, imageData)}
-                    />
-                  ))}
-                </div>
               </div>
             )}
 

@@ -6,10 +6,7 @@
   "functions": {
     "api/*.ts": {
       "runtime": "@vercel/node@4.0.0",
-      "maxDuration": 300
-    },
-    "api/lib/*.ts": {
-      "runtime": "@vercel/node@4.0.0",
+      "maxDuration": 300,
       "includeFiles": "api/lib/**"
     }
   },

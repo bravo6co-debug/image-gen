@@ -1,62 +1,91 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, sanitizePrompt, setCorsHeaders } from './lib/gemini.js';
-import type { GeneratePropsRequest, ImageData, ApiErrorResponse } from './lib/types.js';
+import { ai, MODELS, sanitizePrompt, setCorsHeaders, getStylePrompt } from './lib/gemini.js';
+import type { GeneratePropsRequest, ImageData, ApiErrorResponse, ImageStyle } from './lib/types.js';
 
 /**
- * Generates a single prop image
+ * Generates a single prop image with specified style
  */
-const generateOnePropImage = async (prompt: string, aspectRatio: '16:9' | '9:16'): Promise<ImageData> => {
+const generateOnePropImage = async (
+    prompt: string,
+    aspectRatio: '16:9' | '9:16',
+    imageStyle?: ImageStyle
+): Promise<ImageData> => {
+    const stylePrompt = getStylePrompt(imageStyle);
+
+    // 스타일에 따른 기본 지시어 결정
+    const isPhotorealistic = !imageStyle || imageStyle === 'photorealistic' || imageStyle === 'cinematic';
+    const styleDescription = isPhotorealistic
+        ? "photorealistic product/prop photograph"
+        : imageStyle === 'animation'
+            ? "anime-style prop illustration"
+            : imageStyle === 'illustration'
+                ? "stylized prop illustration"
+                : imageStyle === 'watercolor'
+                    ? "watercolor prop painting"
+                    : imageStyle === '3d_render'
+                        ? "3D rendered prop object"
+                        : "prop image";
+
     const finalPrompt = `
-**TASK: Generate a photorealistic product/prop photograph for a reference library.**
+**TASK: Generate a ${styleDescription} for a reference library.**
+
+**ART STYLE:** ${stylePrompt}
 
 **PROP DESCRIPTION:** "${prompt}"
 
 **CRITICAL RULES:**
 1. Generate ONLY the described object/prop - NO PEOPLE, NO HANDS, NO HUMAN BODY PARTS
 2. The prop must be the sole subject of the image
-3. Clean, professional product photography style
+3. Maintain consistent art style throughout
 
 ---
 **COMPOSITION & SETUP (VERY STRICT):**
 -   **Shot Type:** Clean product shot, centered in frame
--   **Background:** Simple, non-distracting backdrop (solid white, light gray, or subtle gradient)
+-   **Background:** Simple, non-distracting backdrop appropriate for the style
 -   **Angle:** 3/4 view or front view to show the object clearly
 -   **Scale:** The object should fill approximately 60-80% of the frame
 -   **Focus:** Sharp focus on the entire object
 
 ---
-**MANDATORY PHOTOGRAPHIC STYLE (NON-NEGOTIABLE):**
--   **Style:** Professional product photography, e-commerce quality
--   **Lighting:** Clean, soft studio lighting. Even illumination with subtle shadows for depth
--   **Quality:** Ultra high resolution, sharp details, accurate colors
+**STYLE GUIDELINES:**
+-   Follow the art style instructions precisely.
+-   ${isPhotorealistic ? "Professional product photography, e-commerce quality. Clean, soft studio lighting with subtle shadows for depth." : "Consistent artistic styling matching the specified art direction."}
+-   High quality, detailed rendering with accurate proportions
 
 ---
 **ABSOLUTELY FORBIDDEN:**
 -   NO humans, hands, fingers, or any body parts
 -   NO text, watermarks, labels, or typography
 -   NO busy or distracting backgrounds
--   NO artistic filters or heavy post-processing
 `;
 
-    const response = await ai.models.generateImages({
+    // Use generateContent with Gemini native image generation model
+    const response = await ai.models.generateContent({
         model: MODELS.IMAGE_PORTRAIT,
-        prompt: finalPrompt,
-        config: {
-            numberOfImages: 1,
-            outputMimeType: 'image/jpeg',
-            aspectRatio: aspectRatio,
-        },
+        contents: finalPrompt,
     });
 
-    if (!response.generatedImages || response.generatedImages.length === 0) {
-        throw new Error("AI did not return any images.");
+    // Extract image from response parts
+    if (!response.candidates || response.candidates.length === 0) {
+        throw new Error("AI did not return any response.");
     }
 
-    const img = response.generatedImages[0];
-    return {
-        mimeType: 'image/jpeg',
-        data: img.image.imageBytes,
-    };
+    const parts = response.candidates[0].content?.parts;
+    if (!parts || parts.length === 0) {
+        throw new Error("AI did not return any content parts.");
+    }
+
+    // Find the image part
+    for (const part of parts) {
+        if (part.inlineData && part.inlineData.data) {
+            return {
+                mimeType: part.inlineData.mimeType || 'image/png',
+                data: part.inlineData.data,
+            };
+        }
+    }
+
+    throw new Error("AI did not return any images.");
 };
 
 /**
@@ -75,7 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        const { prompt, numberOfImages, aspectRatio } = req.body as GeneratePropsRequest;
+        const { prompt, numberOfImages, aspectRatio, imageStyle } = req.body as GeneratePropsRequest;
 
         if (!prompt) {
             return res.status(400).json({ error: 'prompt is required' } as ApiErrorResponse);
@@ -85,9 +114,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const count = Math.min(Math.max(numberOfImages || 1, 1), 10);
         const ratio = aspectRatio === '9:16' ? '9:16' : '16:9';
 
+        // Generate images in parallel with specified style
         const generationPromises: Promise<ImageData>[] = [];
         for (let i = 0; i < count; i++) {
-            generationPromises.push(generateOnePropImage(sanitizedPrompt, ratio));
+            generationPromises.push(generateOnePropImage(sanitizedPrompt, ratio, imageStyle));
         }
 
         const results = await Promise.all(generationPromises);

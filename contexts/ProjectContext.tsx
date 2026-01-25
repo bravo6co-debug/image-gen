@@ -9,6 +9,7 @@ import {
   VideoTimeline,
   AppMode,
   AspectRatio,
+  ImageStyle,
 } from '../types';
 
 // =============================================
@@ -57,6 +58,8 @@ interface ProjectContextValue {
   setCurrentTab: (tab: AppMode) => void;
   aspectRatio: AspectRatio;
   setAspectRatio: (ratio: AspectRatio) => void;
+  imageStyle: ImageStyle;
+  setImageStyle: (style: ImageStyle) => void;
 
   // 활성화된 에셋 (시나리오 이미지 생성용)
   activeCharacterIds: string[];
@@ -106,6 +109,7 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
   // UI 상태
   const [currentTab, setCurrentTab] = useState<AppMode>('character');
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
+  const [imageStyle, setImageStyle] = useState<ImageStyle>('photorealistic');
   const [activeCharacterIds, setActiveCharacterIds] = useState<string[]>([]);
   const [activePropIds, setActivePropIds] = useState<string[]>([]);
   const [activeBackgroundId, setActiveBackgroundId] = useState<string | null>(null);
@@ -432,6 +436,8 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
     setCurrentTab,
     aspectRatio,
     setAspectRatio,
+    imageStyle,
+    setImageStyle,
 
     // 활성화된 에셋
     activeCharacterIds,

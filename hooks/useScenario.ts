@@ -197,7 +197,15 @@ export function useScenario(): UseScenarioReturn {
     setError(null);
 
     try {
-      const imageData = await apiGenerateSceneImage(scene, characterImages, propImages, backgroundImage, aspectRatio);
+      // 시나리오의 imageStyle을 전달
+      const imageData = await apiGenerateSceneImage(
+        scene,
+        characterImages,
+        propImages,
+        backgroundImage,
+        aspectRatio,
+        scenario.imageStyle
+      );
       contextUpdateScene(sceneId, {
         generatedImage: imageData,
         imageSource: 'ai',
@@ -230,7 +238,15 @@ export function useScenario(): UseScenarioReturn {
     for (const scene of scenesWithoutImages) {
       setGeneratingImageSceneId(scene.id);
       try {
-        const imageData = await apiGenerateSceneImage(scene, characterImages, propImages, backgroundImage, aspectRatio);
+        // 시나리오의 imageStyle을 전달
+        const imageData = await apiGenerateSceneImage(
+          scene,
+          characterImages,
+          propImages,
+          backgroundImage,
+          aspectRatio,
+          scenario.imageStyle
+        );
         contextUpdateScene(scene.id, {
           generatedImage: imageData,
           imageSource: 'ai',

@@ -4,7 +4,7 @@
  * to keep API keys secure on the server side.
  */
 
-import { Character, ImageData, AspectRatio, ScenarioConfig, Scenario, Scene, ImageStyle } from '../types';
+import { Character, ImageData, AspectRatio, ScenarioConfig, Scenario, Scene, ImageStyle, NarrationAudio } from '../types';
 import {
     ApiError,
     QuotaExceededError,
@@ -300,4 +300,67 @@ export const checkVeoApiAvailability = async (): Promise<{ available: boolean; e
             error: e instanceof Error ? e.message : 'Unknown error',
         };
     }
+};
+
+// ============================================
+// TTS NARRATION GENERATION
+// ============================================
+
+// TTS 음성 타입
+export type TTSVoice = 'Kore' | 'Aoede' | 'Charon' | 'Fenrir' | 'Puck';
+
+interface GenerateNarrationResponse {
+    audioData: string;
+    mimeType: string;
+    durationMs?: number;
+    sceneId?: string;
+}
+
+/**
+ * Generate TTS audio for narration text
+ */
+export const generateNarration = async (
+    text: string,
+    voice: TTSVoice = 'Kore',
+    sceneId?: string
+): Promise<NarrationAudio> => {
+    const response = await post<GenerateNarrationResponse>('/api/generate-narration', {
+        text,
+        voice,
+        sceneId,
+    }, 'tts');
+
+    return {
+        data: response.audioData,
+        mimeType: response.mimeType,
+        durationMs: response.durationMs,
+        voice,
+    };
+};
+
+/**
+ * Generate narration audio for all scenes in a scenario
+ */
+export const generateAllNarrations = async (
+    scenes: Scene[],
+    voice: TTSVoice = 'Kore',
+    onProgress?: (sceneId: string, index: number, total: number) => void
+): Promise<Map<string, NarrationAudio>> => {
+    const results = new Map<string, NarrationAudio>();
+
+    for (let i = 0; i < scenes.length; i++) {
+        const scene = scenes[i];
+        if (!scene.narration?.trim()) continue;
+
+        try {
+            onProgress?.(scene.id, i, scenes.length);
+            const audio = await generateNarration(scene.narration, voice, scene.id);
+            results.set(scene.id, audio);
+        } catch (error) {
+            console.error(`Failed to generate narration for scene ${scene.id}:`, error);
+            // Continue with other scenes even if one fails
+        }
+    }
+
+    return results;
 };

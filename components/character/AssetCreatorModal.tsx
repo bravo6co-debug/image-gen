@@ -46,7 +46,7 @@ export const AssetCreatorModal: React.FC<AssetCreatorModalProps> = ({
   category,
   mode,
 }) => {
-  const { addCharacter, addProp, addBackground, aspectRatio } = useProject();
+  const { addCharacter, addProp, addBackground, aspectRatio, imageStyle: projectImageStyle, setImageStyle: setProjectImageStyle } = useProject();
 
   // 공통 상태
   const [isLoading, setIsLoading] = useState(false);
@@ -58,8 +58,14 @@ export const AssetCreatorModal: React.FC<AssetCreatorModalProps> = ({
   // 이미지 상태
   const [uploadedImage, setUploadedImage] = useState<ImageData | null>(null);
   const [generatedCount, setGeneratedCount] = useState<1 | 2 | 3 | 4 | 5>(1);
-  const [imageStyle, setImageStyle] = useState<ImageStyle>('photorealistic');
+  const [imageStyle, setImageStyleLocal] = useState<ImageStyle>(projectImageStyle);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 이미지 스타일 변경 시 프로젝트에도 반영
+  const setImageStyle = (style: ImageStyle) => {
+    setImageStyleLocal(style);
+    setProjectImageStyle(style);
+  };
 
   // 캐릭터 관련 상태
   const [characterRole, setCharacterRole] = useState<CharacterRole>('protagonist');
@@ -254,7 +260,7 @@ export const AssetCreatorModal: React.FC<AssetCreatorModalProps> = ({
     setMaintainContext(true);
     setUploadedImage(null);
     setGeneratedCount(1);
-    setImageStyle('photorealistic');
+    setImageStyleLocal(projectImageStyle);
     setCharacterRole('protagonist');
     setAge('');
     setPersonality('');

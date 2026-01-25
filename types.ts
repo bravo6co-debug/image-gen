@@ -284,6 +284,14 @@ export type CameraAngle =
   | 'High angle'
   | 'Bird\'s eye';
 
+// 나레이션 오디오 데이터
+export interface NarrationAudio {
+  data: string;           // Base64 인코딩된 오디오 데이터
+  mimeType: string;       // audio/wav, audio/mp3 등
+  durationMs?: number;    // 오디오 길이 (밀리초)
+  voice?: string;         // 사용된 음성 이름
+}
+
 export interface Scene {
   id: string;
   sceneNumber: number;
@@ -299,6 +307,7 @@ export interface Scene {
   imageSource?: 'ai' | 'custom';   // 이미지 소스 구분
   imageHistory?: ImageData[];     // 이미지 변경 히스토리
   assets?: SceneAssetPlacement[]; // 장면에 등장하는 에셋 목록
+  narrationAudio?: NarrationAudio;  // 나레이션 TTS 오디오
 }
 
 export interface SuggestedCharacter {
@@ -314,18 +323,64 @@ export interface Scenario {
   topic: string;
   totalDuration: number;
   tone: ScenarioTone;
+  mode: ScenarioMode;             // 시나리오 모드
+  imageStyle: ImageStyle;         // 이미지 스타일
   suggestedCharacters: SuggestedCharacter[];
   scenes: Scene[];
+  chapters?: ScenarioChapter[];   // 장편용 챕터 구조 (3분+ 시나리오)
   createdAt: number;
   updatedAt: number;
+}
+
+// =============================================
+// 시나리오 모드 (Scenario Mode)
+// =============================================
+
+// 시나리오 모드 타입
+export type ScenarioMode =
+  | 'character'    // 캐릭터 중심 (기존)
+  | 'environment'  // 환경/풍경 중심
+  | 'abstract'     // 추상적/개념적
+  | 'narration';   // 나레이션 중심
+
+// 시나리오 모드 옵션
+export const SCENARIO_MODE_OPTIONS: { value: ScenarioMode; label: string; description: string; emoji: string }[] = [
+  { value: 'character', label: '캐릭터 중심', description: '인물이 등장하는 이야기', emoji: '👤' },
+  { value: 'environment', label: '환경/풍경', description: '장소와 분위기 중심', emoji: '🏞️' },
+  { value: 'abstract', label: '추상/개념', description: '개념적인 시각화', emoji: '🎨' },
+  { value: 'narration', label: '나레이션', description: '음성 해설 중심', emoji: '🎙️' },
+];
+
+// =============================================
+// 시나리오 챕터 (Scenario Chapter) - 장편용
+// =============================================
+
+export interface ScenarioChapter {
+  id: string;
+  title: string;
+  order: number;
+  scenes: Scene[];
+  duration: number;
+}
+
+// =============================================
+// 프로젝트 설정 (Project Settings)
+// =============================================
+
+export interface ProjectSettings {
+  imageStyle: ImageStyle;
+  scenarioMode: ScenarioMode;
+  aspectRatio: AspectRatio;
 }
 
 export interface ScenarioConfig {
   topic: string;
   duration: number;              // 숫자로 변경 (자유 입력)
-  durationPreset?: 30 | 60 | 90 | 120;  // 프리셋 선택 시
+  durationPreset?: 30 | 60 | 90 | 120 | 180 | 300 | 600;  // 프리셋 선택 시 (10분까지)
   tone: ScenarioTone | 'custom'; // custom 추가
   customTone?: string;           // 직접 입력한 톤/분위기
+  mode: ScenarioMode;            // 시나리오 모드
+  imageStyle: ImageStyle;        // 이미지 스타일
 }
 
 export const TONE_OPTIONS: { value: ScenarioTone; label: string; description: string }[] = [

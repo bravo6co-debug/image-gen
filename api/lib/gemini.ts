@@ -21,13 +21,30 @@ export const MODELS = {
     // Text/prompt generation model
     TEXT: 'gemini-2.5-flash',
 
-    // Image generation models
-    IMAGE_PORTRAIT: 'gemini-2.0-flash-exp',  // Character/prop/background portraits
-    IMAGE_SCENE: 'gemini-2.0-flash-exp',  // Scene images (with references)
+    // Image generation models (Gemini native image generation)
+    IMAGE_PORTRAIT: 'gemini-2.5-flash-image',  // Character/prop/background portraits
+    IMAGE_SCENE: 'gemini-2.5-flash-image',     // Scene images (with references)
 
     // Video generation model
     VIDEO: 'veo-3.1-fast-generate-preview',
+
+    // Text-to-Speech (TTS) model for narration
+    TTS: 'gemini-2.5-flash-preview-tts',
 } as const;
+
+// ============================================
+// TTS VOICE CONFIGURATION
+// ============================================
+export const TTS_VOICES = {
+    // Korean voices
+    KORE: 'Kore',      // 한국어 여성 목소리
+    AOEDE: 'Aoede',    // 여성 목소리 (다국어)
+    CHARON: 'Charon',  // 남성 목소리
+    FENRIR: 'Fenrir',  // 남성 목소리 (깊은)
+    PUCK: 'Puck',      // 중성적 목소리
+} as const;
+
+export type TTSVoice = typeof TTS_VOICES[keyof typeof TTS_VOICES];
 
 // Re-export runtime values and types
 export { Modality, Type };

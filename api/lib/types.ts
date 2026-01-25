@@ -13,6 +13,8 @@ export type ImageStyle = 'photorealistic' | 'animation' | 'illustration' | 'cine
 
 export type ScenarioTone = 'emotional' | 'dramatic' | 'inspirational' | 'romantic' | 'comedic' | 'mysterious' | 'nostalgic';
 
+export type ScenarioMode = 'character' | 'environment' | 'abstract' | 'narration';
+
 export type StoryBeat = 'Hook' | 'Setup' | 'Development' | 'Climax' | 'Resolution';
 
 export type CameraAngle =
@@ -29,7 +31,10 @@ export type CameraAngle =
 export interface ScenarioConfig {
     topic: string;
     duration: number;
-    tone: ScenarioTone;
+    tone: ScenarioTone | 'custom';
+    customTone?: string;
+    mode: ScenarioMode;
+    imageStyle: ImageStyle;
 }
 
 export interface Scene {
@@ -45,6 +50,14 @@ export interface Scene {
     generatedImage?: ImageData;
 }
 
+export interface ScenarioChapter {
+    id: string;
+    title: string;
+    order: number;
+    scenes: Scene[];
+    duration: number;
+}
+
 export interface Scenario {
     id: string;
     title: string;
@@ -52,12 +65,15 @@ export interface Scenario {
     topic: string;
     totalDuration: number;
     tone: ScenarioTone;
+    mode: ScenarioMode;
+    imageStyle: ImageStyle;
     suggestedCharacters: Array<{
         name: string;
         role: string;
         description: string;
     }>;
     scenes: Scene[];
+    chapters?: ScenarioChapter[];
     createdAt: number;
     updatedAt: number;
 }

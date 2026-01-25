@@ -1,7 +1,17 @@
 import React, { useState, useRef } from 'react';
 import { useProject } from '../../contexts/ProjectContext';
 import { useScenario } from '../../hooks/useScenario';
-import { ScenarioConfig, Scene, ImageData, ScenarioTone, TONE_OPTIONS } from '../../types';
+import {
+  ScenarioConfig,
+  Scene,
+  ImageData,
+  ScenarioTone,
+  ScenarioMode,
+  ImageStyle,
+  TONE_OPTIONS,
+  SCENARIO_MODE_OPTIONS,
+  IMAGE_STYLE_OPTIONS,
+} from '../../types';
 import {
   SparklesIcon,
   TrashIcon,
@@ -342,6 +352,7 @@ interface ScenarioGeneratorModalProps {
   onClose: () => void;
   onGenerate: (config: ScenarioConfig) => void;
   isLoading: boolean;
+  defaultImageStyle: ImageStyle;
 }
 
 const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
@@ -349,12 +360,15 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
   onClose,
   onGenerate,
   isLoading,
+  defaultImageStyle,
 }) => {
   const [topic, setTopic] = useState('');
-  const [durationPreset, setDurationPreset] = useState<30 | 60 | 90 | 120 | null>(60);
+  const [durationPreset, setDurationPreset] = useState<30 | 60 | 90 | 120 | 180 | 300 | 600 | null>(60);
   const [customDuration, setCustomDuration] = useState('');
   const [tone, setTone] = useState<ScenarioTone | 'custom'>('emotional');
   const [customTone, setCustomTone] = useState('');
+  const [mode, setMode] = useState<ScenarioMode>('character');
+  const [imageStyle, setImageStyle] = useState<ImageStyle>(defaultImageStyle);
 
   if (!isOpen) return null;
 
@@ -368,6 +382,8 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
       durationPreset: durationPreset || undefined,
       tone,
       customTone: tone === 'custom' ? customTone : undefined,
+      mode,
+      imageStyle,
     };
     onGenerate(config);
   };
@@ -379,6 +395,8 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
       setCustomDuration('');
       setTone('emotional');
       setCustomTone('');
+      setMode('character');
+      setImageStyle(defaultImageStyle);
       onClose();
     }
   };
@@ -404,7 +422,7 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
           {/* Topic Input */}
           <div>
             <label className="text-sm font-medium text-gray-300 mb-2 block">
@@ -414,48 +432,124 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="예: 30대 여성이 퇴사 후 제주도에서 카페를 열며 새로운 삶을 시작하는 이야기"
-              className="w-full h-28 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent focus:outline-none text-sm resize-none"
+              className="w-full h-24 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent focus:outline-none text-sm resize-none"
               disabled={isLoading}
             />
+          </div>
+
+          {/* Scenario Mode Selection */}
+          <div>
+            <label className="text-sm font-medium text-gray-300 mb-2 block">시나리오 모드</label>
+            <div className="grid grid-cols-2 gap-2">
+              {SCENARIO_MODE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setMode(option.value)}
+                  disabled={isLoading}
+                  className={`flex items-center gap-2 py-2.5 px-3 rounded-lg text-sm font-medium transition-all text-left ${
+                    mode === option.value
+                      ? 'bg-purple-600 text-white ring-2 ring-purple-400'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  } disabled:opacity-50`}
+                >
+                  <span className="text-lg">{option.emoji}</span>
+                  <div>
+                    <div className="font-medium">{option.label}</div>
+                    <div className="text-xs opacity-70">{option.description}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Image Style Selection */}
+          <div>
+            <label className="text-sm font-medium text-gray-300 mb-2 block">이미지 스타일</label>
+            <div className="grid grid-cols-3 gap-2">
+              {IMAGE_STYLE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setImageStyle(option.value)}
+                  disabled={isLoading}
+                  className={`flex items-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                    imageStyle === option.value
+                      ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  } disabled:opacity-50`}
+                >
+                  <span>{option.emoji}</span>
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Duration Selection */}
           <div>
             <label className="text-sm font-medium text-gray-300 mb-2 block">영상 길이</label>
-            <div className="grid grid-cols-5 gap-2">
-              {([30, 60, 90, 120] as const).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => {
-                    setDurationPreset(d);
-                    setCustomDuration('');
-                  }}
-                  disabled={isLoading}
-                  className={`py-2.5 px-2 rounded-lg text-sm font-medium transition-all ${
-                    durationPreset === d
-                      ? 'bg-purple-600 text-white ring-2 ring-purple-400'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  } disabled:opacity-50`}
-                >
-                  {d}초
-                </button>
-              ))}
-              <div className="relative">
-                <input
-                  type="number"
-                  value={customDuration}
-                  onChange={(e) => {
-                    setCustomDuration(e.target.value);
-                    setDurationPreset(null);
-                  }}
-                  placeholder="직접"
-                  className={`w-full h-full py-2.5 px-2 rounded-lg text-sm text-center bg-gray-700 border transition-all ${
-                    customDuration && !durationPreset
-                      ? 'border-purple-500 ring-2 ring-purple-400'
-                      : 'border-gray-600'
-                  } focus:outline-none`}
-                  disabled={isLoading}
-                />
+            <div className="space-y-2">
+              {/* 숏폼 (30초 ~ 2분) */}
+              <div>
+                <p className="text-xs text-gray-500 mb-1.5">숏폼</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {([30, 60, 90, 120] as const).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => {
+                        setDurationPreset(d);
+                        setCustomDuration('');
+                      }}
+                      disabled={isLoading}
+                      className={`py-2 px-2 rounded-lg text-sm font-medium transition-all ${
+                        durationPreset === d
+                          ? 'bg-purple-600 text-white ring-2 ring-purple-400'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      } disabled:opacity-50`}
+                    >
+                      {d}초
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* 장편 (3분 ~ 10분) */}
+              <div>
+                <p className="text-xs text-gray-500 mb-1.5">장편 (챕터 구조)</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {([180, 300, 600] as const).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => {
+                        setDurationPreset(d);
+                        setCustomDuration('');
+                      }}
+                      disabled={isLoading}
+                      className={`py-2 px-2 rounded-lg text-sm font-medium transition-all ${
+                        durationPreset === d
+                          ? 'bg-amber-600 text-white ring-2 ring-amber-400'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      } disabled:opacity-50`}
+                    >
+                      {d >= 60 ? `${d / 60}분` : `${d}초`}
+                    </button>
+                  ))}
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={customDuration}
+                      onChange={(e) => {
+                        setCustomDuration(e.target.value);
+                        setDurationPreset(null);
+                      }}
+                      placeholder="직접(초)"
+                      className={`w-full h-full py-2 px-2 rounded-lg text-xs text-center bg-gray-700 border transition-all ${
+                        customDuration && !durationPreset
+                          ? 'border-purple-500 ring-2 ring-purple-400'
+                          : 'border-gray-600'
+                      } focus:outline-none`}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -470,7 +564,7 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
                   onClick={() => setTone(option.value)}
                   disabled={isLoading}
                   title={option.description}
-                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                  className={`py-2 px-2 rounded-lg text-xs font-medium transition-all ${
                     tone === option.value
                       ? 'bg-purple-600 text-white ring-2 ring-purple-400'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
@@ -555,6 +649,7 @@ export const ScenarioTab: React.FC = () => {
     setActiveBackgroundId,
     aspectRatio,
     setAspectRatio,
+    imageStyle: projectImageStyle,
   } = useProject();
   const {
     scenario,
@@ -629,6 +724,14 @@ export const ScenarioTab: React.FC = () => {
     ? TONE_OPTIONS.find((t) => t.value === scenario.tone)?.label || scenario.tone
     : '';
 
+  const modeInfo = scenario
+    ? SCENARIO_MODE_OPTIONS.find((m) => m.value === scenario.mode)
+    : null;
+
+  const styleInfo = scenario
+    ? IMAGE_STYLE_OPTIONS.find((s) => s.value === scenario.imageStyle)
+    : null;
+
   const totalGeneratedImages = scenario?.scenes.filter((s) => s.generatedImage || s.customImage).length || 0;
 
   return (
@@ -681,12 +784,29 @@ export const ScenarioTab: React.FC = () => {
                 <p className="text-sm text-gray-400 mt-1 line-clamp-2">{scenario.synopsis}</p>
                 <div className="flex flex-wrap gap-2 mt-2 text-xs">
                   <span className="px-2 py-1 bg-gray-700 rounded text-gray-300">
-                    {scenario.totalDuration}초
+                    {scenario.totalDuration >= 60
+                      ? `${Math.floor(scenario.totalDuration / 60)}분 ${scenario.totalDuration % 60}초`
+                      : `${scenario.totalDuration}초`}
                   </span>
+                  {modeInfo && (
+                    <span className="px-2 py-1 bg-indigo-900/50 rounded text-indigo-300">
+                      {modeInfo.emoji} {modeInfo.label}
+                    </span>
+                  )}
+                  {styleInfo && (
+                    <span className="px-2 py-1 bg-cyan-900/50 rounded text-cyan-300">
+                      {styleInfo.emoji} {styleInfo.label}
+                    </span>
+                  )}
                   <span className="px-2 py-1 bg-purple-900/50 rounded text-purple-300">{toneLabel}</span>
                   <span className="px-2 py-1 bg-gray-700 rounded text-gray-300">
                     {scenario.scenes.length}개 씬
                   </span>
+                  {scenario.chapters && scenario.chapters.length > 1 && (
+                    <span className="px-2 py-1 bg-amber-900/50 rounded text-amber-300">
+                      {scenario.chapters.length}개 챕터
+                    </span>
+                  )}
                   <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">
                     {totalGeneratedImages}/{scenario.scenes.length} 이미지
                   </span>
@@ -842,6 +962,7 @@ export const ScenarioTab: React.FC = () => {
         onClose={() => setIsGeneratorOpen(false)}
         onGenerate={handleGenerateScenario}
         isLoading={isGenerating}
+        defaultImageStyle={projectImageStyle}
       />
     </div>
   );

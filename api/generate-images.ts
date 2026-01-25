@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, Modality, Part, sanitizePrompt, setCorsHeaders, getStylePrompt } from './lib/gemini.js';
+import { ai, MODELS, Part, sanitizePrompt, setCorsHeaders, getStylePrompt } from './lib/gemini.js';
 import type { GenerateImagesRequest, ImageData, ApiErrorResponse, ImageStyle } from './lib/types.js';
 
 /**
@@ -120,18 +120,17 @@ ${variationPrompt}
 
     parts.push({ text: finalPrompt });
 
+    // Use generateContent with Gemini native image generation model
     const response = await ai.models.generateContent({
         model: MODELS.IMAGE_SCENE,
-        contents: { parts },
-        config: {
-            responseModalities: [Modality.IMAGE, Modality.TEXT],
-        },
+        contents: parts,
     });
 
+    // Extract image from response parts
     const imagePart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
     if (imagePart && imagePart.inlineData) {
         return {
-            mimeType: imagePart.inlineData.mimeType,
+            mimeType: imagePart.inlineData.mimeType || 'image/png',
             data: imagePart.inlineData.data,
         };
     }

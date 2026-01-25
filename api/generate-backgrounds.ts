@@ -1,19 +1,38 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, sanitizePrompt, setCorsHeaders } from './lib/gemini.js';
-import type { GenerateBackgroundsRequest, ImageData, ApiErrorResponse } from './lib/types.js';
+import { ai, MODELS, sanitizePrompt, setCorsHeaders, getStylePrompt } from './lib/gemini.js';
+import type { GenerateBackgroundsRequest, ImageData, ApiErrorResponse, ImageStyle } from './lib/types.js';
 
 /**
- * Generates a single background/environment image
+ * Generates a single background/environment image with specified style
  */
 const generateOneBackgroundImage = async (
     prompt: string,
     locationType: string,
     timeOfDay: string,
     weather: string,
-    aspectRatio: '16:9' | '9:16'
+    aspectRatio: '16:9' | '9:16',
+    imageStyle?: ImageStyle
 ): Promise<ImageData> => {
+    const stylePrompt = getStylePrompt(imageStyle);
+
+    // 스타일에 따른 기본 지시어 결정
+    const isPhotorealistic = !imageStyle || imageStyle === 'photorealistic' || imageStyle === 'cinematic';
+    const styleDescription = isPhotorealistic
+        ? "photorealistic background/environment photograph"
+        : imageStyle === 'animation'
+            ? "anime-style background illustration"
+            : imageStyle === 'illustration'
+                ? "stylized background illustration"
+                : imageStyle === 'watercolor'
+                    ? "watercolor landscape/scene painting"
+                    : imageStyle === '3d_render'
+                        ? "3D rendered environment"
+                        : "background image";
+
     const finalPrompt = `
-**TASK: Generate a photorealistic background/environment photograph for a reference library.**
+**TASK: Generate a ${styleDescription} for a reference library.**
+
+**ART STYLE:** ${stylePrompt}
 
 **SCENE DESCRIPTION:** "${prompt}"
 **Location Type:** ${locationType}
@@ -23,49 +42,55 @@ const generateOneBackgroundImage = async (
 **CRITICAL RULES:**
 1. Generate ONLY the environment/background - ABSOLUTELY NO PEOPLE, NO CHARACTERS, NO HUMAN FIGURES
 2. This is a pure landscape/interior shot - empty of any human presence
-3. The scene should look like a location scout photograph or empty film set
+3. The scene should be rendered in the specified art style consistently
 
 ---
 **COMPOSITION (VERY STRICT):**
 -   **Shot Type:** Wide establishing shot or medium wide shot
 -   **Perspective:** Eye-level or slightly elevated angle
 -   **Depth:** Show depth and layers in the environment
--   **Focus:** Deep focus - everything should be relatively sharp
+-   **Focus:** Deep focus - all elements should be well-defined
 
 ---
-**MANDATORY PHOTOGRAPHIC STYLE (NON-NEGOTIABLE):**
--   **Style:** Cinematic location photography, film production quality
--   **Lighting:** Natural lighting appropriate for the time of day specified
--   **Atmosphere:** Capture the mood and atmosphere of the location
--   **Quality:** High resolution, professional grade
+**STYLE GUIDELINES:**
+-   Follow the art style instructions precisely.
+-   ${isPhotorealistic ? "Cinematic location photography, film production quality. Natural lighting appropriate for the time of day." : "Consistent artistic styling matching the specified art direction. Beautiful atmospheric effects."}
+-   Capture the mood and atmosphere of the location
 
 ---
 **ABSOLUTELY FORBIDDEN:**
 -   NO humans, silhouettes, or any human figures (even distant ones)
 -   NO animals unless specifically mentioned
 -   NO text, watermarks, or typography
--   NO obvious CGI or artificial elements
 `;
 
-    const response = await ai.models.generateImages({
+    // Use generateContent with Gemini native image generation model
+    const response = await ai.models.generateContent({
         model: MODELS.IMAGE_PORTRAIT,
-        prompt: finalPrompt,
-        config: {
-            numberOfImages: 1,
-            outputMimeType: 'image/jpeg',
-            aspectRatio: aspectRatio,
-        },
+        contents: finalPrompt,
     });
 
-    if (!response.generatedImages || response.generatedImages.length === 0) {
-        throw new Error("AI did not return any images.");
+    // Extract image from response parts
+    if (!response.candidates || response.candidates.length === 0) {
+        throw new Error("AI did not return any response.");
     }
 
-    const img = response.generatedImages[0];
-    return {
-        mimeType: 'image/jpeg',
-        data: img.image.imageBytes,
-    };
+    const parts = response.candidates[0].content?.parts;
+    if (!parts || parts.length === 0) {
+        throw new Error("AI did not return any content parts.");
+    }
+
+    // Find the image part
+    for (const part of parts) {
+        if (part.inlineData && part.inlineData.data) {
+            return {
+                mimeType: part.inlineData.mimeType || 'image/png',
+                data: part.inlineData.data,
+            };
+        }
+    }
+
+    throw new Error("AI did not return any images.");
 };
 
 /**
@@ -84,7 +109,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        const { prompt, locationType, timeOfDay, weather, numberOfImages, aspectRatio } = req.body as GenerateBackgroundsRequest;
+        const { prompt, locationType, timeOfDay, weather, numberOfImages, aspectRatio, imageStyle } = req.body as GenerateBackgroundsRequest;
 
         if (!prompt) {
             return res.status(400).json({ error: 'prompt is required' } as ApiErrorResponse);
@@ -94,6 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const count = Math.min(Math.max(numberOfImages || 1, 1), 10);
         const ratio = aspectRatio === '9:16' ? '9:16' : '16:9';
 
+        // Generate images in parallel with specified style
         const generationPromises: Promise<ImageData>[] = [];
         for (let i = 0; i < count; i++) {
             generationPromises.push(generateOneBackgroundImage(
@@ -101,7 +127,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 locationType || 'exterior',
                 timeOfDay || 'day',
                 weather || 'clear',
-                ratio
+                ratio,
+                imageStyle
             ));
         }
 

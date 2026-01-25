@@ -1,9 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useProject } from '../../contexts/ProjectContext';
 import { useVideo } from '../../hooks/useVideo';
 import { useScenario } from '../../hooks/useScenario';
-import { VideoClip, Scene } from '../../types';
+import { VideoClip, Scene, NarrationAudio } from '../../types';
 import { checkVeoApiAvailability } from '../../services/geminiService';
+import { generateNarration, type TTSVoice } from '../../services/apiClient';
+import { RemotionPlayer } from './RemotionPlayer';
+import { VideoExportModal, type ExportConfig } from './VideoExportModal';
+import { renderVideo, downloadVideo } from '../../services/videoService';
 import {
   SparklesIcon,
   TrashIcon,
@@ -11,6 +15,9 @@ import {
   ClearIcon,
   LayersIcon,
 } from '../Icons';
+
+// 비디오 생성 모드
+type VideoMode = 'remotion' | 'veo';
 
 // Veo API 상태 타입
 type VeoApiStatus = 'unknown' | 'checking' | 'available' | 'unavailable';
@@ -547,8 +554,91 @@ export const VideoTab: React.FC = () => {
   const [playingVideoClip, setPlayingVideoClip] = useState<VideoClip | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // 비디오 다운로드 함수
-  const downloadVideo = async (url: string, filename: string) => {
+  // 비디오 생성 모드 (Remotion 또는 Veo API)
+  const [videoMode, setVideoMode] = useState<VideoMode>('remotion');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isRendering, setIsRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
+
+  // TTS 나레이션 상태
+  const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
+  const [ttsProgress, setTtsProgress] = useState({ current: 0, total: 0 });
+  const [ttsVoice, setTtsVoice] = useState<TTSVoice>('Kore');
+  const { updateScene } = useProject();
+
+  // Remotion 비디오 내보내기
+  const handleRemotionExport = useCallback(async (config: ExportConfig) => {
+    if (!scenario) return;
+
+    setIsRendering(true);
+    setRenderProgress(0);
+
+    try {
+      const result = await renderVideo(
+        scenario.scenes,
+        config,
+        (progress) => {
+          setRenderProgress(progress.progress);
+        }
+      );
+
+      if (result.success && result.videoBlob) {
+        const filename = `${scenario.title || 'video'}_${Date.now()}.${config.format}`;
+        downloadVideo(result.videoBlob, filename);
+      } else {
+        throw new Error(result.error || '렌더링 실패');
+      }
+    } catch (err) {
+      console.error('Export error:', err);
+      throw err;
+    } finally {
+      setIsRendering(false);
+      setRenderProgress(0);
+    }
+  }, [scenario]);
+
+  // TTS 나레이션 생성
+  const handleGenerateTTS = useCallback(async () => {
+    if (!scenario) return;
+
+    const scenesWithNarration = scenario.scenes.filter(s => s.narration?.trim());
+    if (scenesWithNarration.length === 0) {
+      alert('나레이션 텍스트가 있는 씬이 없습니다.');
+      return;
+    }
+
+    setIsGeneratingTTS(true);
+    setTtsProgress({ current: 0, total: scenesWithNarration.length });
+
+    try {
+      for (let i = 0; i < scenesWithNarration.length; i++) {
+        const scene = scenesWithNarration[i];
+        setTtsProgress({ current: i + 1, total: scenesWithNarration.length });
+
+        try {
+          const audio = await generateNarration(scene.narration, ttsVoice, scene.id);
+          updateScene(scene.id, { narrationAudio: audio });
+        } catch (err) {
+          console.error(`TTS generation failed for scene ${scene.id}:`, err);
+          // 개별 씬 실패해도 계속 진행
+        }
+      }
+    } finally {
+      setIsGeneratingTTS(false);
+      setTtsProgress({ current: 0, total: 0 });
+    }
+  }, [scenario, ttsVoice, updateScene]);
+
+  // 씬의 TTS 상태 확인
+  const getTTSStatus = useCallback(() => {
+    if (!scenario) return { generated: 0, total: 0 };
+    const scenesWithNarration = scenario.scenes.filter(s => s.narration?.trim());
+    const scenesWithAudio = scenesWithNarration.filter(s => s.narrationAudio);
+    return { generated: scenesWithAudio.length, total: scenesWithNarration.length };
+  }, [scenario]);
+
+  // 비디오 다운로드 함수 (Veo용)
+  const downloadVeoVideo = async (url: string, filename: string) => {
     try {
       const response = await fetch(url);
       const blob = await response.blob();
@@ -566,7 +656,7 @@ export const VideoTab: React.FC = () => {
     }
   };
 
-  // 전체 비디오 다운로드 (개별 파일로)
+  // 전체 비디오 다운로드 (개별 파일로 - Veo용)
   const handleDownloadAll = async () => {
     const completedClipsList = clips.filter(c => c.generatedVideo?.url);
     if (completedClipsList.length === 0) return;
@@ -576,7 +666,7 @@ export const VideoTab: React.FC = () => {
       for (let i = 0; i < completedClipsList.length; i++) {
         const clip = completedClipsList[i];
         if (clip.generatedVideo?.url) {
-          await downloadVideo(clip.generatedVideo.url, `clip_${clip.order + 1}.mp4`);
+          await downloadVeoVideo(clip.generatedVideo.url, `clip_${clip.order + 1}.mp4`);
           // 다운로드 간 간격
           if (i < completedClipsList.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -657,41 +747,90 @@ export const VideoTab: React.FC = () => {
           <div>
             <h2 className="text-xl font-bold text-white">영상 제작</h2>
             <p className="text-sm text-gray-400 mt-1">
-              {clips.length}개 클립 · {totalDuration}초 · {completedClips}/{clips.length} 완료
+              {videoMode === 'remotion'
+                ? `${scenario?.scenes.filter(s => s.generatedImage || s.customImage).length || 0}개 씬 · ${scenario?.scenes.reduce((acc, s) => acc + (s.generatedImage || s.customImage ? s.duration : 0), 0) || 0}초`
+                : `${clips.length}개 클립 · ${totalDuration}초 · ${completedClips}/${clips.length} 완료`}
             </p>
           </div>
           <div className="flex gap-2">
-            {scenario && scenario.scenes.some(s => s.generatedImage || s.customImage) && (
+            {videoMode === 'remotion' ? (
               <button
-                onClick={() => setIsImportModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600"
+                onClick={() => setIsExportModalOpen(true)}
+                disabled={!scenario || scenario.scenes.every(s => !s.generatedImage && !s.customImage)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg hover:from-green-500 hover:to-emerald-500 disabled:opacity-50"
               >
-                <LayersIcon className="w-4 h-4" />
-                시나리오에서 가져오기
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                비디오 내보내기
               </button>
+            ) : (
+              <>
+                {scenario && scenario.scenes.some(s => s.generatedImage || s.customImage) && (
+                  <button
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600"
+                  >
+                    <LayersIcon className="w-4 h-4" />
+                    시나리오에서 가져오기
+                  </button>
+                )}
+                <button
+                  onClick={handleGenerateAllClips}
+                  disabled={isGenerating || clips.length === 0 || clips.every(c => c.generatedVideo) || veoApiStatus === 'unavailable'}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50"
+                >
+                  <SparklesIcon className="w-4 h-4" />
+                  {isGenerating ? '생성 중...' : '전체 비디오 생성'}
+                </button>
+              </>
             )}
-            <button
-              onClick={handleGenerateAllClips}
-              disabled={isGenerating || clips.length === 0 || clips.every(c => c.generatedVideo) || veoApiStatus === 'unavailable'}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50"
-            >
-              <SparklesIcon className="w-4 h-4" />
-              {isGenerating ? '생성 중...' : '전체 비디오 생성'}
-            </button>
           </div>
         </div>
 
-        {/* Veo API 상태 표시 */}
-        <div className="mt-3 flex items-center justify-between bg-gray-900/50 rounded-lg px-3 py-2">
-          <ApiStatusIcon status={veoApiStatus} error={veoApiError} />
-          <button
-            onClick={checkApiStatus}
-            disabled={veoApiStatus === 'checking'}
-            className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50"
-          >
-            {veoApiStatus === 'checking' ? '확인 중...' : 'API 상태 확인'}
-          </button>
+        {/* 모드 토글 */}
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-xs text-gray-500">생성 방식:</span>
+          <div className="flex bg-gray-900 rounded-lg p-1">
+            <button
+              onClick={() => setVideoMode('remotion')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                videoMode === 'remotion'
+                  ? 'bg-green-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Remotion (무료)
+            </button>
+            <button
+              onClick={() => setVideoMode('veo')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                videoMode === 'veo'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Veo API (AI)
+            </button>
+          </div>
+          {videoMode === 'remotion' && (
+            <span className="text-xs text-green-400">99% 비용 절감</span>
+          )}
         </div>
+
+        {/* Veo API 상태 표시 (Veo 모드일 때만) */}
+        {videoMode === 'veo' && (
+          <div className="mt-3 flex items-center justify-between bg-gray-900/50 rounded-lg px-3 py-2">
+            <ApiStatusIcon status={veoApiStatus} error={veoApiError} />
+            <button
+              onClick={checkApiStatus}
+              disabled={veoApiStatus === 'checking'}
+              className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50"
+            >
+              {veoApiStatus === 'checking' ? '확인 중...' : 'API 상태 확인'}
+            </button>
+          </div>
+        )}
 
         {/* Error Display */}
         {error && (
@@ -729,8 +868,165 @@ export const VideoTab: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-grow flex flex-col overflow-hidden p-4 gap-4">
-        {clips.length === 0 ? (
-          /* 클립이 없을 때 */
+        {videoMode === 'remotion' ? (
+          /* Remotion 모드 */
+          <div className="flex-grow flex flex-col items-center justify-center">
+            {scenario && scenario.scenes.some(s => s.generatedImage || s.customImage) ? (
+              <div className="w-full max-w-md mx-auto">
+                <RemotionPlayer
+                  scenes={scenario.scenes}
+                  aspectRatio="9:16"
+                  transitionType="fade"
+                  showSubtitles={true}
+                  className="rounded-lg overflow-hidden shadow-2xl"
+                />
+
+                {/* TTS 나레이션 생성 섹션 */}
+                <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
+                      <span className="text-sm font-medium text-white">AI 나레이션</span>
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {getTTSStatus().generated}/{getTTSStatus().total} 생성됨
+                    </span>
+                  </div>
+
+                  {/* 음성 선택 */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs text-gray-400">음성:</span>
+                    <select
+                      value={ttsVoice}
+                      onChange={(e) => setTtsVoice(e.target.value as TTSVoice)}
+                      disabled={isGeneratingTTS}
+                      className="flex-1 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded text-white"
+                    >
+                      <option value="Kore">Kore (한국어 여성)</option>
+                      <option value="Aoede">Aoede (여성)</option>
+                      <option value="Charon">Charon (남성)</option>
+                      <option value="Fenrir">Fenrir (남성, 깊은)</option>
+                      <option value="Puck">Puck (중성)</option>
+                    </select>
+                  </div>
+
+                  {/* TTS 생성 버튼 */}
+                  <button
+                    onClick={handleGenerateTTS}
+                    disabled={isGeneratingTTS || getTTSStatus().total === 0}
+                    className="w-full px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGeneratingTTS ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        나레이션 생성 중... ({ttsProgress.current}/{ttsProgress.total})
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        <SparklesIcon className="w-4 h-4" />
+                        {getTTSStatus().generated > 0 ? '나레이션 재생성' : '나레이션 생성'}
+                      </span>
+                    )}
+                  </button>
+                  {getTTSStatus().total === 0 && (
+                    <p className="mt-2 text-xs text-gray-500 text-center">
+                      나레이션 텍스트가 있는 씬이 없습니다
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-gray-400 mb-3">
+                    시나리오의 이미지를 기반으로 비디오를 미리볼 수 있습니다
+                  </p>
+                  <button
+                    onClick={() => setIsExportModalOpen(true)}
+                    className="px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg hover:from-green-500 hover:to-emerald-500"
+                  >
+                    <svg className="w-4 h-4 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    MP4로 내보내기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center max-w-md">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl flex items-center justify-center">
+                  <FilmIcon className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">시나리오 이미지 필요</h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  먼저 시나리오 탭에서 씬별 이미지를 생성하세요.<br />
+                  Remotion은 생성된 이미지를 영상으로 변환합니다.
+                </p>
+
+                {/* TTS 나레이션 섹션 - 이미지 없이도 사용 가능 */}
+                {scenario && getTTSStatus().total > 0 && (
+                  <div className="mt-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700 text-left">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                        </svg>
+                        <span className="text-sm font-medium text-white">AI 나레이션</span>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {getTTSStatus().generated}/{getTTSStatus().total} 생성됨
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs text-gray-400">음성:</span>
+                      <select
+                        value={ttsVoice}
+                        onChange={(e) => setTtsVoice(e.target.value as TTSVoice)}
+                        disabled={isGeneratingTTS}
+                        className="flex-1 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded text-white"
+                      >
+                        <option value="Kore">Kore (한국어 여성)</option>
+                        <option value="Aoede">Aoede (여성)</option>
+                        <option value="Charon">Charon (남성)</option>
+                        <option value="Fenrir">Fenrir (남성, 깊은)</option>
+                        <option value="Puck">Puck (중성)</option>
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={handleGenerateTTS}
+                      disabled={isGeneratingTTS}
+                      className="w-full px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isGeneratingTTS ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          나레이션 생성 중... ({ttsProgress.current}/{ttsProgress.total})
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center gap-2">
+                          <SparklesIcon className="w-4 h-4" />
+                          {getTTSStatus().generated > 0 ? '나레이션 재생성' : '나레이션 생성'}
+                        </span>
+                      )}
+                    </button>
+                    <p className="mt-2 text-xs text-gray-500 text-center">
+                      이미지 없이도 나레이션 음성을 미리 생성할 수 있습니다
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : clips.length === 0 ? (
+          /* Veo 모드 - 클립이 없을 때 */
           <div className="flex-grow flex flex-col items-center justify-center">
             <div className="text-center max-w-md">
               <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center">
@@ -756,6 +1052,7 @@ export const VideoTab: React.FC = () => {
             </div>
           </div>
         ) : (
+          /* Veo 모드 - 클립이 있을 때 */
           <>
             {/* 클립 그리드 */}
             <div className="flex-grow overflow-y-auto">
@@ -771,7 +1068,7 @@ export const VideoTab: React.FC = () => {
                     onDelete={() => removeClip(clip.id)}
                     isGenerating={generatingClipId === clip.id}
                     onPlayVideo={() => clip.generatedVideo?.url && setPlayingVideoClip(clip)}
-                    onDownload={clip.generatedVideo?.url ? () => downloadVideo(clip.generatedVideo!.url, `clip_${clip.order + 1}.mp4`) : undefined}
+                    onDownload={clip.generatedVideo?.url ? () => downloadVeoVideo(clip.generatedVideo!.url, `clip_${clip.order + 1}.mp4`) : undefined}
                   />
                 ))}
               </div>
@@ -899,6 +1196,16 @@ export const VideoTab: React.FC = () => {
           onClose={() => setPlayingVideoClip(null)}
           videoUrl={playingVideoClip.generatedVideo.url}
           clipNumber={playingVideoClip.order + 1}
+        />
+      )}
+
+      {/* Remotion Export Modal */}
+      {scenario && (
+        <VideoExportModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          scenes={scenario.scenes}
+          onExport={handleRemotionExport}
         />
       )}
     </div>

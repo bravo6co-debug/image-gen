@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, Modality, Part, sanitizePrompt, setCorsHeaders } from './lib/gemini.js';
+import { ai, MODELS, Part, sanitizePrompt, setCorsHeaders } from './lib/gemini.js';
 import type { EditImageRequest, ImageData, ApiErrorResponse } from './lib/types.js';
 
 /**
@@ -68,18 +68,16 @@ Your primary task is to intelligently modify the provided base image according t
 
         parts.push({ text: finalPrompt });
 
+        // Use generateContent with Gemini native image generation model
         const response = await ai.models.generateContent({
             model: MODELS.IMAGE_SCENE,
-            contents: { parts },
-            config: {
-                responseModalities: [Modality.IMAGE, Modality.TEXT],
-            },
+            contents: parts,
         });
 
         const imagePart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
         if (imagePart && imagePart.inlineData) {
             const result: ImageData = {
-                mimeType: imagePart.inlineData.mimeType,
+                mimeType: imagePart.inlineData.mimeType || 'image/png',
                 data: imagePart.inlineData.data,
             };
             return res.status(200).json({ image: result });

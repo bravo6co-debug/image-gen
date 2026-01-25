@@ -11,7 +11,7 @@ export type AspectRatio = '16:9' | '9:16';
 
 export type ImageStyle = 'photorealistic' | 'animation' | 'illustration' | 'cinematic' | 'watercolor' | '3d_render';
 
-export type ScenarioTone = 'emotional' | 'dramatic' | 'inspirational' | 'romantic' | 'comedic' | 'mysterious' | 'nostalgic';
+export type ScenarioTone = 'emotional' | 'dramatic' | 'inspirational' | 'romantic' | 'comedic' | 'mysterious' | 'nostalgic' | 'educational';
 
 export type ScenarioMode = 'character' | 'environment' | 'abstract' | 'narration';
 

@@ -10,6 +10,61 @@ const TONE_DESCRIPTIONS: Record<ScenarioTone, string> = {
     comedic: '유쾌하고 웃긴, 밝은 에너지의 코믹 스토리',
     mysterious: '호기심을 자극하고, 궁금증을 유발하는 미스터리 스토리',
     nostalgic: '그리움과 추억, 과거를 회상하는 향수 어린 스토리',
+    educational: '지식과 정보 전달, 학습과 인사이트를 제공하는 교육적 스토리. 역사, 과학, 경영, 심리학 등 다양한 학문적 주제 포함.',
+};
+
+// 톤별 Hook 예시 (바이럴 콘텐츠 참고용)
+const HOOK_EXAMPLES: Record<ScenarioTone, string[]> = {
+    emotional: [
+        '"엄마가 마지막으로 해준 도시락을 열었을 때..."',
+        '"10년 만에 고향에 돌아온 날, 그 골목은 그대로였다"',
+        '"아버지의 낡은 지갑에서 발견한 사진 한 장"',
+    ],
+    dramatic: [
+        '"그 문자를 본 순간, 모든 게 달라졌습니다"',
+        '"CCTV에 찍힌 그 장면을 보고 소름이 돋았다"',
+        '"아무도 몰랐던 진실이 밝혀지는 순간"',
+    ],
+    inspirational: [
+        '"모두가 불가능하다고 했던 그 일을 해냈습니다"',
+        '"포기하려던 그 순간, 한 통의 전화가 왔다"',
+        '"실패를 100번 겪은 후에야 알게 된 것"',
+    ],
+    romantic: [
+        '"우연히 마주친 그 사람이 운명이었을까"',
+        '"7년 동안 짝사랑했던 그에게 고백한 날"',
+        '"헤어지자는 말 대신 그가 건넨 것"',
+    ],
+    comedic: [
+        '"한국 직장인의 월요일 아침 (현실버전)"',
+        '"엄마가 내 방에 갑자기 들어왔을 때 나의 반응"',
+        '"처음 자취할 때 vs 자취 3년차"',
+    ],
+    mysterious: [
+        '"이 영상의 마지막 3초를 보면 소름이 돋습니다"',
+        '"아무도 설명하지 못하는 이 현상"',
+        '"밤 12시에 절대 하면 안 되는 것"',
+    ],
+    nostalgic: [
+        '"2000년대 초등학생이라면 공감할 기억들"',
+        '"그때는 몰랐는데, 그게 마지막이었다"',
+        '"어릴 때 할머니 집 가면 꼭 있던 것들"',
+    ],
+    educational: [
+        '"한국인의 90%가 모르는 경제 상식"',
+        '"역사가 숨긴 충격적인 진실"',
+        '"심리학자들이 밝힌 성공하는 사람들의 공통점"',
+        '"이 한 가지만 알면 인생이 달라집니다"',
+    ],
+};
+
+// 스토리비트별 감정 목표
+const STORYBEAT_EMOTIONS: Record<string, string> = {
+    Hook: '호기심, 충격, 또는 공감 중 하나를 강하게 자극. "뭐지?" 또는 "나도 그래!" 반응 유도. 시청자가 스크롤을 멈추게 만드는 강력한 첫 인상.',
+    Setup: '캐릭터/상황에 감정 이입 유도. 시청자가 주인공의 편이 되게 만들기. "이 사람이 어떻게 될까?" 궁금증 형성.',
+    Development: '긴장감 상승. 장애물과 도전 제시. "어떻게 될까?" 기대감 극대화. 다음 씬을 보지 않으면 안 될 것 같은 느낌.',
+    Climax: '가장 강렬한 감정의 정점. 모든 것이 터지는 순간. 눈물, 웃음, 놀라움 등 최고조의 감정 경험.',
+    Resolution: '만족스러운 해소 또는 여운 있는 마무리. 공유하고 싶은 마지막 인상. "이거 친구한테 보여줘야겠다" 충동 유발.',
 };
 
 const MODE_DESCRIPTIONS: Record<ScenarioMode, { name: string; focus: string; visualGuidelines: string }> = {
@@ -194,8 +249,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 - 챕터 간 자연스러운 연결과 전체 스토리 아크 유지`
             : '';
 
-        const prompt = `당신은 한국 숏폼/미드폼 영상 시나리오 전문 작가입니다.
-주어진 주제로 ${duration}초 분량의 영상 시나리오를 작성하세요.
+        // 톤에 맞는 Hook 예시 가져오기
+        const toneKey = (tone === 'custom' ? 'emotional' : tone) as ScenarioTone;
+        const hookExamples = HOOK_EXAMPLES[toneKey] || HOOK_EXAMPLES.emotional;
+
+        const prompt = `당신은 한국 숏폼/미드폼 영상 시나리오 전문 작가이자 바이럴 콘텐츠 전략가입니다.
+수백만 조회수를 기록하는 숏폼 영상의 패턴을 완벽히 이해하고 있으며, 시청자의 심리를 꿰뚫는 스토리텔링 전문가입니다.
+당신의 시나리오는 시청자가 첫 3초 안에 사로잡히고, 끝까지 시청하며, 공유하고 싶어집니다.
+
+## 바이럴 콘텐츠의 핵심 원칙 (반드시 적용)
+
+### 1. 3초 룰 - Hook의 중요성
+첫 번째 씬(Hook)에서 반드시 시청자를 사로잡아야 합니다. 스크롤을 멈추게 만드는 강력한 오프닝이 필수입니다.
+
+**효과적인 Hook 유형:**
+- **질문형**: "왜 한국인들은 ~할까요?" → 답을 알고 싶게 만듦
+- **충격형**: 예상치 못한 상황이나 이미지로 시작 → 호기심 유발
+- **공감형**: "이런 경험 있으시죠?" → 즉각적인 정서적 연결
+- **미스터리형**: "마지막에 반전이 있습니다" → 끝까지 보게 만듦
+- **대비형**: Before/After, 기대 vs 현실 → 변화에 대한 궁금증
+
+**이 톤(${tone})에 맞는 Hook 예시:**
+${hookExamples.map(ex => `- ${ex}`).join('\n')}
+
+### 2. 감정 곡선 설계
+시청자의 감정을 의도적으로 조절해야 합니다. 평탄한 전개는 이탈을 유발합니다.
+
+**스토리비트별 감정 목표:**
+- **Hook**: ${STORYBEAT_EMOTIONS.Hook}
+- **Setup**: ${STORYBEAT_EMOTIONS.Setup}
+- **Development**: ${STORYBEAT_EMOTIONS.Development}
+- **Climax**: ${STORYBEAT_EMOTIONS.Climax}
+- **Resolution**: ${STORYBEAT_EMOTIONS.Resolution}
+
+### 3. Open Loop 기법
+시청자가 끝까지 보게 만드는 장치를 설계하세요:
+- 초반에 던진 질문/상황을 마지막에 해결
+- 매 씬 끝에서 "그런데...", "하지만..." 등으로 다음 씬 암시
+- 결말을 알기 전에는 이탈할 수 없게 만드는 구조
+
+### 4. 공유 트리거
+시청자가 다른 사람에게 보여주고 싶게 만드는 요소를 포함하세요:
+- 강렬한 감정 (감동, 놀라움, 웃음, 공분)
+- 정체성 표현 ("이게 바로 나야", "우리 세대 공감")
+- 유용한 정보나 새로운 인사이트
+- 논쟁거리 (의견을 말하고 싶게 만드는 요소)
+
+---
 
 ## 입력 정보
 - **주제**: "${sanitizedTopic}"
@@ -203,6 +303,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 - **톤/분위기**: ${tone === 'custom' ? '커스텀' : tone} - ${toneDescription}
 - **시나리오 모드**: ${modeInfo.name} - ${modeInfo.focus}
 - **이미지 스타일**: ${imageStyle} - ${styleDescription}
+
+---
 
 ## 시나리오 작성 규칙
 
@@ -216,17 +318,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 - **포커스**: ${modeInfo.focus}
 - **비주얼 가이드**: ${modeInfo.visualGuidelines}
 
-### 3. 각 씬 작성 시 포함할 내용
+### 3. 나레이션 작성 핵심 (매우 중요!)
+- **첫 문장은 반드시 주의를 끌어야 함** (질문, 반전, 공감 유도로 시작)
+- 정보를 한 번에 다 주지 말고 **조금씩 공개** (궁금증 유지)
+- 시청자에게 직접 말하는 듯한 **2인칭 톤** ("당신도 이런 적 있죠?", "여러분")
+- **감정을 자극하는 구체적 디테일** 포함 (추상적 표현 금지)
+- 마지막 문장은 **여운을 남기거나 행동을 유도**
+- 최대 ${durationConfig.narrationMaxLength}자 이내로 간결하게
+
+### 4. 각 씬 작성 시 포함할 내용
 - **sceneNumber**: 씬 번호 (1부터 시작)
 - **duration**: 예상 길이(초, ${durationConfig.perSceneMin}-${durationConfig.perSceneMax} 사이)
 - **storyBeat**: "Hook", "Setup", "Development", "Climax", "Resolution" 중 하나
 - **visualDescription**: 화면에 보이는 것 (한국어, 구체적인 시각 묘사)
-- **narration**: 내레이션 텍스트 (한국어, 자연스러운 구어체, **최대 ${durationConfig.narrationMaxLength}자 이내**, 씬 길이에 맞게 간결하게)
+- **narration**: 내레이션 텍스트 (위 나레이션 작성 핵심 참고)
 - **cameraAngle**: "Close-up", "Extreme Close-up", "Medium shot", "Wide shot", "POV", "Over-the-shoulder", "Low angle", "High angle", "Bird's eye" 중 하나
 - **mood**: 장면의 감정/분위기 (한국어, 2-3단어)
 - **imagePrompt**: 이미지 생성용 영어 프롬프트${durationConfig.chapters > 1 ? '\n- **chapterIndex**: 소속 챕터 번호 (0부터 시작)\n- **chapterTitle**: 챕터 제목' : ''}
 
-### 4. 이미지 프롬프트 작성 규칙 (imagePrompt)
+### 5. 이미지 프롬프트 작성 규칙 (imagePrompt)
 - 반드시 영어로 작성
 - 아트 스타일 프리픽스 추가: "${stylePromptText.substring(0, 100)}..."
 ${imagePromptGuidelines}

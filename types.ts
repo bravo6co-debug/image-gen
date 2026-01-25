@@ -269,7 +269,8 @@ export type ScenarioTone =
   | 'romantic'
   | 'comedic'
   | 'mysterious'
-  | 'nostalgic';
+  | 'nostalgic'
+  | 'educational';
 
 export type StoryBeat = 'Hook' | 'Setup' | 'Development' | 'Climax' | 'Resolution';
 
@@ -391,4 +392,5 @@ export const TONE_OPTIONS: { value: ScenarioTone; label: string; description: st
   { value: 'comedic', label: '코믹', description: '유쾌하고 웃긴' },
   { value: 'mysterious', label: '미스터리', description: '호기심 자극' },
   { value: 'nostalgic', label: '향수/추억', description: '그리움과 회상' },
+  { value: 'educational', label: '정보/지식', description: '학습과 인사이트' },
 ];

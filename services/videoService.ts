@@ -177,7 +177,6 @@ export function getResolutionDimensions(
   const resolutionMap = {
     '720p': { width: 720, height: 1280 },
     '1080p': { width: 1080, height: 1920 },
-    '4k': { width: 2160, height: 3840 },
   };
 
   const base = resolutionMap[resolution];
@@ -309,8 +308,7 @@ export async function renderVideo(
 
     const mediaRecorder = new MediaRecorder(combinedStream, {
       mimeType,
-      videoBitsPerSecond: config.resolution === '4k' ? 20000000 :
-                          config.resolution === '1080p' ? 10000000 : 5000000,
+      videoBitsPerSecond: config.resolution === '1080p' ? 10000000 : 5000000,
       audioBitsPerSecond: audioDestination ? 128000 : undefined,
     });
 

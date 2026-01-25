@@ -12,8 +12,8 @@ interface VideoExportModalProps {
 
 export interface ExportConfig {
   aspectRatio: AspectRatio;
-  resolution: '720p' | '1080p' | '4k';
-  fps: 24 | 30 | 60;
+  resolution: '720p' | '1080p';
+  fps: 24 | 30;
   transitionType: TransitionConfig['type'];
   transitionDuration: number;
   showSubtitles: boolean;
@@ -24,7 +24,6 @@ export interface ExportConfig {
 const RESOLUTION_OPTIONS = [
   { value: '720p', label: 'HD (720p)', width: 720, height: 1280 },
   { value: '1080p', label: 'Full HD (1080p)', width: 1080, height: 1920 },
-  { value: '4k', label: '4K UHD', width: 2160, height: 3840 },
 ] as const;
 
 const TRANSITION_OPTIONS = [
@@ -180,10 +179,10 @@ export const VideoExportModal: React.FC<VideoExportModalProps> = ({
               프레임 레이트
             </label>
             <div className="flex gap-2">
-              {[24, 30, 60].map((fps) => (
+              {[24, 30].map((fps) => (
                 <button
                   key={fps}
-                  onClick={() => updateConfig('fps', fps as 24 | 30 | 60)}
+                  onClick={() => updateConfig('fps', fps as 24 | 30)}
                   className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
                     config.fps === fps
                       ? 'bg-blue-600 text-white'

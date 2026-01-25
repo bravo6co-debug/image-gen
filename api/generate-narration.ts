@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ai, MODELS, TTS_VOICES, setCorsHeaders } from './lib/gemini.js';
 import type { TTSVoice } from './lib/gemini.js';
 import type { ApiErrorResponse } from './lib/types.js';
+import { WaveFile } from 'wavefile';
 
 interface GenerateNarrationRequest {
     text: string;           // 나레이션 텍스트
@@ -10,10 +11,37 @@ interface GenerateNarrationRequest {
 }
 
 interface GenerateNarrationResponse {
-    audioData: string;      // Base64 인코딩된 오디오 데이터
+    audioData: string;      // Base64 인코딩된 오디오 데이터 (WAV 포맷)
     mimeType: string;       // audio/wav
     durationMs?: number;    // 오디오 길이 (밀리초)
     sceneId?: string;       // 씬 ID
+}
+
+/**
+ * Raw PCM 데이터를 WAV 파일로 변환
+ * Gemini TTS API는 헤더가 없는 Raw PCM (24kHz, 16-bit, Mono)을 반환하므로
+ * 브라우저에서 재생 가능한 WAV 파일로 변환해야 함
+ */
+function convertPcmToWav(base64PcmData: string, sampleRate: number = 24000): { wavBase64: string; durationMs: number } {
+    // Base64 PCM 데이터를 Buffer로 변환
+    const pcmBuffer = Buffer.from(base64PcmData, 'base64');
+
+    // 16-bit PCM이므로 Int16Array로 변환
+    const samples = new Int16Array(pcmBuffer.buffer, pcmBuffer.byteOffset, pcmBuffer.length / 2);
+
+    // WaveFile 객체 생성 및 PCM 데이터로 WAV 파일 구성
+    // 1채널(Mono), 24kHz, 16비트
+    const wav = new WaveFile();
+    wav.fromScratch(1, sampleRate, '16', samples);
+
+    // WAV 파일을 Buffer로 변환 후 Base64 인코딩
+    const wavBuffer = wav.toBuffer();
+    const wavBase64 = Buffer.from(wavBuffer).toString('base64');
+
+    // 오디오 길이 계산 (샘플 수 / 샘플레이트 * 1000ms)
+    const durationMs = Math.round((samples.length / sampleRate) * 1000);
+
+    return { wavBase64, durationMs };
 }
 
 /**
@@ -67,6 +95,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
+        // 안전 필터 차단 확인
+        if (response.promptFeedback?.blockReason) {
+            throw new Error(`Content blocked by safety filter: ${response.promptFeedback.blockReason}`);
+        }
+
         // 응답에서 오디오 데이터 추출
         const candidate = response.candidates?.[0];
         if (!candidate?.content?.parts?.[0]) {
@@ -80,14 +113,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             throw new Error('No inline audio data found');
         }
 
-        const audioData = audioPart.inlineData.data;
-        const mimeType = audioPart.inlineData.mimeType || 'audio/wav';
+        const rawAudioData = audioPart.inlineData.data;
+        const rawMimeType = audioPart.inlineData.mimeType || '';
 
-        console.log(`[TTS] Generated audio: ${mimeType}, ${Math.round(audioData.length / 1024)}KB`);
+        console.log(`[TTS] Raw audio received: ${rawMimeType}, ${Math.round(rawAudioData.length / 1024)}KB`);
+
+        // 데이터 검증: 너무 작은 데이터는 오류로 처리 (침묵 또는 생성 실패)
+        // 최소 1KB 이상이어야 유효한 오디오로 간주
+        if (rawAudioData.length < 1000) {
+            throw new Error('Generated audio data is too small - may be silence or generation failed');
+        }
+
+        // Gemini TTS는 Raw PCM (헤더 없음)을 반환하므로 WAV로 변환 필요
+        // mimeType이 audio/wav가 아니거나, 실제로 WAV 헤더가 없는 경우 변환
+        let audioData: string;
+        let mimeType: string;
+        let durationMs: number | undefined;
+
+        // WAV 파일인지 확인 (RIFF 헤더 체크)
+        const headerCheck = Buffer.from(rawAudioData.substring(0, 8), 'base64').toString('ascii');
+        const isAlreadyWav = headerCheck.startsWith('RIFF');
+
+        if (isAlreadyWav) {
+            // 이미 유효한 WAV 파일이면 그대로 사용
+            console.log('[TTS] Audio is already in WAV format');
+            audioData = rawAudioData;
+            mimeType = 'audio/wav';
+        } else {
+            // Raw PCM을 WAV로 변환
+            console.log('[TTS] Converting Raw PCM to WAV format...');
+            const converted = convertPcmToWav(rawAudioData, 24000);
+            audioData = converted.wavBase64;
+            durationMs = converted.durationMs;
+            mimeType = 'audio/wav';
+            console.log(`[TTS] Converted to WAV: ${Math.round(audioData.length / 1024)}KB, duration: ${durationMs}ms`);
+        }
 
         return res.status(200).json({
             audioData,
             mimeType,
+            durationMs,
             sceneId
         } as GenerateNarrationResponse);
 

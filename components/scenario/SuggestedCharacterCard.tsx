@@ -34,6 +34,13 @@ const UploadIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+// 다운로드 아이콘
+const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  </svg>
+);
+
 export const SuggestedCharacterCard: React.FC<SuggestedCharacterCardProps> = ({
   character,
   isCreated,
@@ -59,6 +66,18 @@ export const SuggestedCharacterCard: React.FC<SuggestedCharacterCardProps> = ({
     if (e.target) {
       e.target.value = '';
     }
+  };
+
+  const handleDownload = () => {
+    if (!createdThumbnail) return;
+
+    const extension = createdThumbnail.mimeType.split('/')[1] || 'png';
+    const link = document.createElement('a');
+    link.href = `data:${createdThumbnail.mimeType};base64,${createdThumbnail.data}`;
+    link.download = `${character.name}.${extension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -107,7 +126,18 @@ export const SuggestedCharacterCard: React.FC<SuggestedCharacterCardProps> = ({
         {/* 액션 버튼 */}
         <div className="flex-shrink-0">
           {isCreated ? (
-            <CheckCircleIcon className="w-5 h-5 text-green-500" />
+            <div className="flex items-center gap-1">
+              <CheckCircleIcon className="w-5 h-5 text-green-500" />
+              {createdThumbnail && (
+                <button
+                  onClick={handleDownload}
+                  className="p-1 text-gray-400 hover:text-white hover:bg-gray-600 rounded transition-colors"
+                  title="이미지 다운로드"
+                >
+                  <DownloadIcon className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           ) : isGenerating ? (
             <span className="text-xs text-purple-400">생성중...</span>
           ) : (

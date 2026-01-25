@@ -19,11 +19,11 @@ export const ai = new GoogleGenAI({ apiKey });
 // ============================================
 export const MODELS = {
     // Text/prompt generation model
-    TEXT: 'gemini-3-flash-preview',
+    TEXT: 'gemini-2.5-flash',
 
     // Image generation models
     IMAGE_PORTRAIT: 'imagen-4.0-generate-001',  // Character/prop/background portraits
-    IMAGE_SCENE: 'gemini-3-pro-image-preview',  // Scene images (with references)
+    IMAGE_SCENE: 'gemini-2.5-flash-preview-image-generation',  // Scene images (with references)
 
     // Video generation model
     VIDEO: 'veo-3.1-fast-generate-preview',

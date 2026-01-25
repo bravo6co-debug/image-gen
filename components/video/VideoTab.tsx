@@ -561,10 +561,14 @@ export const VideoTab: React.FC = () => {
   const [renderProgress, setRenderProgress] = useState(0);
 
   // TTS 나레이션 상태
-  const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
-  const [ttsProgress, setTtsProgress] = useState({ current: 0, total: 0 });
   const [ttsVoice, setTtsVoice] = useState<TTSVoice>('Kore');
   const { updateScene } = useProject();
+
+  // 나레이션 미리듣기 상태
+  const [previewingSceneId, setPreviewingSceneId] = useState<string | null>(null);
+  const [previewAudios, setPreviewAudios] = useState<Map<string, NarrationAudio>>(new Map());
+  const [generatingPreviewSceneId, setGeneratingPreviewSceneId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Remotion 비디오 내보내기
   const handleRemotionExport = useCallback(async (config: ExportConfig) => {
@@ -597,38 +601,6 @@ export const VideoTab: React.FC = () => {
     }
   }, [scenario]);
 
-  // TTS 나레이션 생성
-  const handleGenerateTTS = useCallback(async () => {
-    if (!scenario) return;
-
-    const scenesWithNarration = scenario.scenes.filter(s => s.narration?.trim());
-    if (scenesWithNarration.length === 0) {
-      alert('나레이션 텍스트가 있는 씬이 없습니다.');
-      return;
-    }
-
-    setIsGeneratingTTS(true);
-    setTtsProgress({ current: 0, total: scenesWithNarration.length });
-
-    try {
-      for (let i = 0; i < scenesWithNarration.length; i++) {
-        const scene = scenesWithNarration[i];
-        setTtsProgress({ current: i + 1, total: scenesWithNarration.length });
-
-        try {
-          const audio = await generateNarration(scene.narration, ttsVoice, scene.id);
-          updateScene(scene.id, { narrationAudio: audio });
-        } catch (err) {
-          console.error(`TTS generation failed for scene ${scene.id}:`, err);
-          // 개별 씬 실패해도 계속 진행
-        }
-      }
-    } finally {
-      setIsGeneratingTTS(false);
-      setTtsProgress({ current: 0, total: 0 });
-    }
-  }, [scenario, ttsVoice, updateScene]);
-
   // 씬의 TTS 상태 확인
   const getTTSStatus = useCallback(() => {
     if (!scenario) return { generated: 0, total: 0 };
@@ -636,6 +608,87 @@ export const VideoTab: React.FC = () => {
     const scenesWithAudio = scenesWithNarration.filter(s => s.narrationAudio);
     return { generated: scenesWithAudio.length, total: scenesWithNarration.length };
   }, [scenario]);
+
+  // 나레이션 미리듣기 생성
+  const handleGeneratePreview = useCallback(async (sceneId: string, narrationText: string) => {
+    if (!narrationText?.trim()) return;
+
+    setGeneratingPreviewSceneId(sceneId);
+    try {
+      const audio = await generateNarration(narrationText, ttsVoice, sceneId);
+      setPreviewAudios(prev => new Map(prev).set(sceneId, audio));
+    } catch (err) {
+      console.error(`Preview generation failed for scene ${sceneId}:`, err);
+      alert('미리듣기 생성에 실패했습니다.');
+    } finally {
+      setGeneratingPreviewSceneId(null);
+    }
+  }, [ttsVoice]);
+
+  // 미리듣기 재생/정지
+  const handlePlayPreview = useCallback((sceneId: string) => {
+    const audio = previewAudios.get(sceneId);
+    if (!audio?.data) return;
+
+    // 다른 오디오가 재생 중이면 정지
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    if (previewingSceneId === sceneId) {
+      // 같은 씬이면 정지
+      setPreviewingSceneId(null);
+      return;
+    }
+
+    // 새 오디오 재생
+    const audioUrl = `data:${audio.mimeType || 'audio/wav'};base64,${audio.data}`;
+    const audioElement = new Audio(audioUrl);
+    audioRef.current = audioElement;
+
+    audioElement.onended = () => {
+      setPreviewingSceneId(null);
+      audioRef.current = null;
+    };
+
+    audioElement.play();
+    setPreviewingSceneId(sceneId);
+  }, [previewAudios, previewingSceneId]);
+
+  // 미리듣기 오디오를 비디오에 적용
+  const handleApplyPreview = useCallback((sceneId: string) => {
+    const audio = previewAudios.get(sceneId);
+    if (!audio) return;
+
+    updateScene(sceneId, { narrationAudio: audio });
+
+    // 적용 후 미리듣기에서 제거
+    setPreviewAudios(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(sceneId);
+      return newMap;
+    });
+
+    // 재생 중이면 정지
+    if (previewingSceneId === sceneId) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setPreviewingSceneId(null);
+    }
+  }, [previewAudios, previewingSceneId, updateScene]);
+
+  // 컴포넌트 언마운트 시 오디오 정리
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   // 비디오 다운로드 함수 (Veo용)
   const downloadVeoVideo = async (url: string, filename: string) => {
@@ -894,7 +947,7 @@ export const VideoTab: React.FC = () => {
                       <span className="text-sm font-medium text-white">AI 나레이션</span>
                     </div>
                     <span className="text-xs text-gray-400">
-                      {getTTSStatus().generated}/{getTTSStatus().total} 생성됨
+                      {getTTSStatus().generated}/{getTTSStatus().total} 적용됨
                     </span>
                   </div>
 
@@ -904,7 +957,7 @@ export const VideoTab: React.FC = () => {
                     <select
                       value={ttsVoice}
                       onChange={(e) => setTtsVoice(e.target.value as TTSVoice)}
-                      disabled={isGeneratingTTS}
+                      disabled={!!generatingPreviewSceneId}
                       className="flex-1 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded text-white"
                     >
                       <option value="Kore">Kore (한국어 여성)</option>
@@ -915,29 +968,89 @@ export const VideoTab: React.FC = () => {
                     </select>
                   </div>
 
-                  {/* TTS 생성 버튼 */}
-                  <button
-                    onClick={handleGenerateTTS}
-                    disabled={isGeneratingTTS || getTTSStatus().total === 0}
-                    className="w-full px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isGeneratingTTS ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        나레이션 생성 중... ({ttsProgress.current}/{ttsProgress.total})
-                      </span>
-                    ) : (
-                      <span className="flex items-center justify-center gap-2">
-                        <SparklesIcon className="w-4 h-4" />
-                        {getTTSStatus().generated > 0 ? '나레이션 재생성' : '나레이션 생성'}
-                      </span>
-                    )}
-                  </button>
-                  {getTTSStatus().total === 0 && (
-                    <p className="mt-2 text-xs text-gray-500 text-center">
+                  {/* 씬별 나레이션 리스트 */}
+                  {getTTSStatus().total > 0 ? (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {scenario?.scenes.filter(s => s.narration?.trim()).map((scene) => {
+                        const hasPreview = previewAudios.has(scene.id);
+                        const hasApplied = !!scene.narrationAudio;
+                        const isGenerating = generatingPreviewSceneId === scene.id;
+                        const isPlaying = previewingSceneId === scene.id;
+
+                        return (
+                          <div
+                            key={scene.id}
+                            className="p-2 bg-gray-700/50 rounded-lg border border-gray-600"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-medium text-white">
+                                씬 {scene.sceneNumber}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                {hasApplied && (
+                                  <span className="text-xs text-green-400 flex items-center gap-1">
+                                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    적용됨
+                                  </span>
+                                )}
+                                {hasPreview && !hasApplied && (
+                                  <span className="text-xs text-yellow-400">미리듣기 가능</span>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-400 mb-2 line-clamp-2">
+                              {scene.narration}
+                            </p>
+                            <div className="flex gap-1.5">
+                              {/* 미리듣기 생성 버튼 */}
+                              <button
+                                onClick={() => handleGeneratePreview(scene.id, scene.narration)}
+                                disabled={isGenerating}
+                                className="flex-1 px-2 py-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isGenerating ? (
+                                  <span className="flex items-center justify-center gap-1">
+                                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                    생성 중
+                                  </span>
+                                ) : hasPreview || hasApplied ? '다시 생성' : '미리듣기 생성'}
+                              </button>
+
+                              {/* 재생/정지 버튼 (미리듣기가 있을 때만) */}
+                              {hasPreview && (
+                                <button
+                                  onClick={() => handlePlayPreview(scene.id)}
+                                  className={`px-2 py-1 text-xs font-medium rounded ${
+                                    isPlaying
+                                      ? 'text-white bg-red-600 hover:bg-red-500'
+                                      : 'text-white bg-blue-600 hover:bg-blue-500'
+                                  }`}
+                                >
+                                  {isPlaying ? '정지' : '재생'}
+                                </button>
+                              )}
+
+                              {/* 비디오에 적용 버튼 (미리듣기가 있을 때만) */}
+                              {hasPreview && (
+                                <button
+                                  onClick={() => handleApplyPreview(scene.id)}
+                                  className="px-2 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-500 rounded"
+                                >
+                                  적용
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center py-2">
                       나레이션 텍스트가 있는 씬이 없습니다
                     </p>
                   )}
@@ -954,7 +1067,7 @@ export const VideoTab: React.FC = () => {
                     <svg className="w-4 h-4 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    MP4로 내보내기
+                    비디오 내보내기
                   </button>
                 </div>
               </div>
@@ -980,7 +1093,7 @@ export const VideoTab: React.FC = () => {
                         <span className="text-sm font-medium text-white">AI 나레이션</span>
                       </div>
                       <span className="text-xs text-gray-400">
-                        {getTTSStatus().generated}/{getTTSStatus().total} 생성됨
+                        {getTTSStatus().generated}/{getTTSStatus().total} 적용됨
                       </span>
                     </div>
 
@@ -989,7 +1102,7 @@ export const VideoTab: React.FC = () => {
                       <select
                         value={ttsVoice}
                         onChange={(e) => setTtsVoice(e.target.value as TTSVoice)}
-                        disabled={isGeneratingTTS}
+                        disabled={!!generatingPreviewSceneId}
                         className="flex-1 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded text-white"
                       >
                         <option value="Kore">Kore (한국어 여성)</option>
@@ -1000,26 +1113,57 @@ export const VideoTab: React.FC = () => {
                       </select>
                     </div>
 
-                    <button
-                      onClick={handleGenerateTTS}
-                      disabled={isGeneratingTTS}
-                      className="w-full px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isGeneratingTTS ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          나레이션 생성 중... ({ttsProgress.current}/{ttsProgress.total})
-                        </span>
-                      ) : (
-                        <span className="flex items-center justify-center gap-2">
-                          <SparklesIcon className="w-4 h-4" />
-                          {getTTSStatus().generated > 0 ? '나레이션 재생성' : '나레이션 생성'}
-                        </span>
-                      )}
-                    </button>
+                    {/* 씬별 나레이션 리스트 */}
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {scenario.scenes.filter(s => s.narration?.trim()).map((scene) => {
+                        const hasPreview = previewAudios.has(scene.id);
+                        const hasApplied = !!scene.narrationAudio;
+                        const isGenerating = generatingPreviewSceneId === scene.id;
+                        const isPlaying = previewingSceneId === scene.id;
+
+                        return (
+                          <div
+                            key={scene.id}
+                            className="p-2 bg-gray-700/50 rounded-lg border border-gray-600"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-medium text-white">씬 {scene.sceneNumber}</span>
+                              {hasApplied && (
+                                <span className="text-xs text-green-400">적용됨</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-400 mb-2 line-clamp-1">{scene.narration}</p>
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => handleGeneratePreview(scene.id, scene.narration)}
+                                disabled={isGenerating}
+                                className="flex-1 px-2 py-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50"
+                              >
+                                {isGenerating ? '생성 중...' : hasPreview || hasApplied ? '다시 생성' : '미리듣기'}
+                              </button>
+                              {hasPreview && (
+                                <>
+                                  <button
+                                    onClick={() => handlePlayPreview(scene.id)}
+                                    className={`px-2 py-1 text-xs font-medium rounded ${
+                                      isPlaying ? 'bg-red-600' : 'bg-blue-600'
+                                    } text-white`}
+                                  >
+                                    {isPlaying ? '정지' : '재생'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleApplyPreview(scene.id)}
+                                    className="px-2 py-1 text-xs font-medium text-white bg-green-600 rounded"
+                                  >
+                                    적용
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                     <p className="mt-2 text-xs text-gray-500 text-center">
                       이미지 없이도 나레이션 음성을 미리 생성할 수 있습니다
                     </p>

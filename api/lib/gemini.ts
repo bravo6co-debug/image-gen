@@ -22,8 +22,8 @@ export const MODELS = {
     TEXT: 'gemini-2.5-flash',
 
     // Image generation models
-    IMAGE_PORTRAIT: 'imagen-4.0-generate-001',  // Character/prop/background portraits
-    IMAGE_SCENE: 'gemini-2.5-flash-preview-image-generation',  // Scene images (with references)
+    IMAGE_PORTRAIT: 'gemini-2.0-flash-exp',  // Character/prop/background portraits
+    IMAGE_SCENE: 'gemini-2.0-flash-exp',  // Scene images (with references)
 
     // Video generation model
     VIDEO: 'veo-3.1-fast-generate-preview',
@@ -46,6 +46,28 @@ export const PHOTOREALISTIC_STYLES = [
     "Golden hour portrait. The lighting is warm, soft, and directional, creating long, gentle shadows and a beautiful glow on the subject. The depth of field is very shallow, isolating the character from the background.",
     "Atmospheric and moody photograph taken in a dimly lit interior setting. High ISO is used, resulting in noticeable but aesthetically pleasing film grain. Shallow depth of field isolates the subject from the surrounding darkness."
 ];
+
+// ============================================
+// IMAGE STYLE PROMPTS
+// ============================================
+import type { ImageStyle } from './types.js';
+
+export const STYLE_PROMPTS: Record<ImageStyle, string> = {
+    photorealistic: "Ultra-realistic DSLR photograph with cinematic lighting. Shot with professional camera, tack-sharp focus, natural skin texture, realistic shadows and highlights. 8K hyper-detailed, film grain texture.",
+    animation: "High-quality Japanese anime style illustration. Clean linework, vibrant colors, expressive eyes, dynamic poses. Studio Ghibli or Makoto Shinkai inspired aesthetics with beautiful lighting and atmospheric effects.",
+    illustration: "Professional digital illustration art style. Clean vector-like artwork with bold colors, stylized proportions, and artistic shading. Modern character design with appealing aesthetics.",
+    cinematic: "Cinematic film still from a Hollywood blockbuster. Dramatic lighting with strong contrast, anamorphic lens flare, shallow depth of field. Color graded with teal and orange tones, epic composition.",
+    watercolor: "Beautiful traditional watercolor painting style. Soft blended edges, transparent color washes, visible paper texture. Delicate brushstrokes with organic color bleeding and artistic imperfections.",
+    '3d_render': "High-quality 3D rendered character. Pixar/Disney animation style with subsurface scattering on skin, detailed textures, professional studio lighting. Clean, polished CGI look with appealing stylization."
+};
+
+export const getStylePrompt = (style?: ImageStyle): string => {
+    if (!style || !STYLE_PROMPTS[style]) {
+        // 기본값: photorealistic 스타일 중 랜덤 선택
+        return PHOTOREALISTIC_STYLES[Math.floor(Math.random() * PHOTOREALISTIC_STYLES.length)];
+    }
+    return STYLE_PROMPTS[style];
+};
 
 // ============================================
 // INPUT VALIDATION & SANITIZATION

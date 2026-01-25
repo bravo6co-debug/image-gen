@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, Modality, Part, sanitizePrompt, setCorsHeaders, PHOTOREALISTIC_STYLES } from './lib/gemini.js';
-import type { GenerateImagesRequest, ImageData, ApiErrorResponse } from './lib/types.js';
+import { ai, MODELS, Modality, Part, sanitizePrompt, setCorsHeaders, getStylePrompt } from './lib/gemini.js';
+import type { GenerateImagesRequest, ImageData, ApiErrorResponse, ImageStyle } from './lib/types.js';
 
 /**
  * Generates a single scene image with character/prop/background references
@@ -11,7 +11,8 @@ const generateOneImage = async (
     propImages: ImageData[],
     backgroundImage: ImageData | null,
     addVariation: boolean,
-    aspectRatio: '16:9' | '9:16'
+    aspectRatio: '16:9' | '9:16',
+    imageStyle?: ImageStyle
 ): Promise<ImageData> => {
     const parts: Part[] = [];
 
@@ -45,14 +46,15 @@ const generateOneImage = async (
         });
     }
 
-    // Pick a random photorealistic style
-    const randomStyle = PHOTOREALISTIC_STYLES[Math.floor(Math.random() * PHOTOREALISTIC_STYLES.length)];
+    // Get style prompt based on user selection
+    const stylePrompt = getStylePrompt(imageStyle);
+    const isPhotorealistic = !imageStyle || imageStyle === 'photorealistic' || imageStyle === 'cinematic';
     const styleReferencePromptPart = `
 ---
 **2. ART STYLE (MANDATORY & STRICT)**
-**ACTION:** You MUST generate the image in the following photographic style. This is a critical instruction. The result MUST look like a real photograph, not an illustration, painting, or 3D render.
-**STYLE:** ${randomStyle}
-**ABSOLUTE RESTRICTIONS:** Avoid any and all artistic stylization. No illustrated features, no airbrushed skin, no cartoonish proportions, no painterly textures. The image must appear as if it was captured by a high-end camera.
+**ACTION:** You MUST generate the image in the following style. This is a critical instruction.
+**STYLE:** ${stylePrompt}
+${isPhotorealistic ? '**ABSOLUTE RESTRICTIONS:** Avoid any and all artistic stylization. No illustrated features, no airbrushed skin, no cartoonish proportions, no painterly textures. The image must appear as if it was captured by a high-end camera.' : '**STYLE CONSISTENCY:** Maintain this artistic style throughout the entire image while ensuring character consistency.'}
 `;
 
     const variationPrompt = addVariation ? "\n**VARIATION:** Create a different composition, pose, or camera angle from previous generations for this prompt." : "";
@@ -155,7 +157,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        const { prompt, characterImages, propImages, backgroundImage, numberOfImages, aspectRatio } = req.body as GenerateImagesRequest;
+        const { prompt, characterImages, propImages, backgroundImage, numberOfImages, aspectRatio, imageStyle } = req.body as GenerateImagesRequest;
 
         if (!prompt) {
             return res.status(400).json({ error: 'prompt is required' } as ApiErrorResponse);
@@ -173,7 +175,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 propImages || [],
                 backgroundImage || null,
                 i > 0,
-                ratio
+                ratio,
+                imageStyle
             ));
         }
 

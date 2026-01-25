@@ -9,6 +9,8 @@ export interface ImageData {
 
 export type AspectRatio = '16:9' | '9:16';
 
+export type ImageStyle = 'photorealistic' | 'animation' | 'illustration' | 'cinematic' | 'watercolor' | '3d_render';
+
 export type ScenarioTone = 'emotional' | 'dramatic' | 'inspirational' | 'romantic' | 'comedic' | 'mysterious' | 'nostalgic';
 
 export type StoryBeat = 'Hook' | 'Setup' | 'Development' | 'Climax' | 'Resolution';
@@ -83,12 +85,14 @@ export interface GeneratePortraitsRequest {
     prompt: string;
     numberOfImages: number;
     aspectRatio: AspectRatio;
+    imageStyle?: ImageStyle;
 }
 
 export interface GeneratePropsRequest {
     prompt: string;
     numberOfImages: number;
     aspectRatio: AspectRatio;
+    imageStyle?: ImageStyle;
 }
 
 export interface GenerateBackgroundsRequest {
@@ -98,6 +102,7 @@ export interface GenerateBackgroundsRequest {
     weather: string;
     numberOfImages: number;
     aspectRatio: AspectRatio;
+    imageStyle?: ImageStyle;
 }
 
 export interface GenerateImagesRequest {
@@ -107,6 +112,7 @@ export interface GenerateImagesRequest {
     backgroundImage: ImageData | null;
     numberOfImages: number;
     aspectRatio: AspectRatio;
+    imageStyle?: ImageStyle;
 }
 
 export interface EditImageRequest {
@@ -130,6 +136,7 @@ export interface GenerateSceneImageRequest {
     propImages: ImageData[];
     backgroundImage: ImageData | null;
     aspectRatio: AspectRatio;
+    imageStyle?: ImageStyle;
 }
 
 export interface GenerateVideoRequest {

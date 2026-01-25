@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
 import { TabNavigation, TabNavigationCompact } from './components/common/TabNavigation';
-import { AssetTab } from './components/character/AssetTab';
 import { ScenarioTab } from './components/scenario/ScenarioTab';
 import { VideoTab } from './components/video/VideoTab';
 import { GeneratedItem, ImageData, Chapter, DragItem, Character, Scenario, ScenarioConfig, Scene, AppMode, IMAGE_STYLE_OPTIONS, ImageStyle } from './types';
@@ -294,8 +293,6 @@ const AppContent: React.FC = () => {
     // 탭별 콘텐츠 렌더링
     const renderTabContent = () => {
         switch (currentTab) {
-            case 'character':
-                return <AssetTab />;
             case 'scenario':
                 return <ScenarioTab />;
             case 'video':

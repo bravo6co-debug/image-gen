@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useProject } from '../../contexts/ProjectContext';
 import { useScenario } from '../../hooks/useScenario';
+import { useQuickCharacterGeneration } from '../../hooks/useQuickCharacterGeneration';
 import { TTSVoice } from '../../services/apiClient';
 import {
   ScenarioConfig,
@@ -15,6 +16,7 @@ import {
   IMAGE_STYLE_OPTIONS,
 } from '../../types';
 import { SuggestedCharacterCard } from './SuggestedCharacterCard';
+import { AssetManagementSection } from './AssetManagementSection';
 
 // TTS 음성 옵션
 const TTS_VOICE_OPTIONS: { value: TTSVoice; label: string }[] = [
@@ -662,9 +664,17 @@ export const ScenarioTab: React.FC = () => {
     aspectRatio,
     setAspectRatio,
     imageStyle: projectImageStyle,
-    setCurrentTab,
-    setPendingCharacterCreation,
   } = useProject();
+
+  // Quick character generation hook
+  const {
+    isGenerating: isQuickGenerating,
+    generatingCharacterName,
+    error: quickGenError,
+    generateCharacter: quickGenerateCharacter,
+    generateAllMissing,
+    clearError: clearQuickGenError,
+  } = useQuickCharacterGeneration();
   const {
     scenario,
     isGenerating,
@@ -700,10 +710,27 @@ export const ScenarioTab: React.FC = () => {
     );
   };
 
-  // 제안된 캐릭터 생성 핸들러
-  const handleCreateSuggestedCharacter = (char: SuggestedCharacter) => {
-    setPendingCharacterCreation(char);
-    setCurrentTab('character');
+  // 생성된 캐릭터 썸네일 찾기
+  const getCreatedCharacterThumbnail = (characterName: string) => {
+    const char = characters.find(
+      (c) => c.name.toLowerCase() === characterName.toLowerCase()
+    );
+    return char?.image;
+  };
+
+  // 미생성 캐릭터 목록
+  const missingCharacters = useMemo(() => {
+    if (!scenario?.suggestedCharacters) return [];
+    return scenario.suggestedCharacters.filter(
+      (char) => !isCharacterCreated(char.name)
+    );
+  }, [scenario?.suggestedCharacters, characters]);
+
+  // 모든 미생성 캐릭터 일괄 생성
+  const handleGenerateAllMissingCharacters = async () => {
+    if (!scenario?.suggestedCharacters) return;
+    const existingNames = characters.map((c) => c.name);
+    await generateAllMissing(scenario.suggestedCharacters, existingNames);
   };
 
   // 활성화된 캐릭터 목록
@@ -1000,25 +1027,49 @@ export const ScenarioTab: React.FC = () => {
                   <h3 className="text-sm font-medium text-gray-300">
                     제안된 등장인물
                   </h3>
-                  <span className="text-xs text-gray-500">
-                    {scenario.suggestedCharacters.filter(c => isCharacterCreated(c.name)).length}/{scenario.suggestedCharacters.length} 생성됨
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">
+                      {scenario.suggestedCharacters.filter(c => isCharacterCreated(c.name)).length}/{scenario.suggestedCharacters.length} 생성됨
+                    </span>
+                    {missingCharacters.length > 0 && (
+                      <button
+                        onClick={handleGenerateAllMissingCharacters}
+                        disabled={isQuickGenerating}
+                        className="px-2 py-1 text-xs font-medium text-white bg-purple-600 rounded hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isQuickGenerating ? '생성중...' : `모두 생성 (${missingCharacters.length})`}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <p className="text-xs text-gray-400 mb-3">
-                  시나리오에 필요한 캐릭터입니다. 클릭하여 에셋 탭에서 생성하세요.
+                  시나리오에 필요한 캐릭터입니다. "생성" 버튼으로 AI가 자동으로 생성합니다.
                 </p>
+                {quickGenError && (
+                  <div className="mb-3 p-2 bg-red-900/50 border border-red-700 rounded text-xs text-red-300 flex items-center justify-between">
+                    <span>{quickGenError}</span>
+                    <button onClick={clearQuickGenError} className="text-red-400 hover:text-red-300">
+                      <ClearIcon className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {scenario.suggestedCharacters.map((char, idx) => (
                     <SuggestedCharacterCard
                       key={`${char.name}-${idx}`}
                       character={char}
                       isCreated={isCharacterCreated(char.name)}
-                      onCreateClick={() => handleCreateSuggestedCharacter(char)}
+                      isGenerating={isQuickGenerating && generatingCharacterName === char.name}
+                      createdThumbnail={getCreatedCharacterThumbnail(char.name)}
+                      onQuickGenerate={() => quickGenerateCharacter(char)}
                     />
                   ))}
                 </div>
               </div>
             )}
+
+            {/* Asset Management Section */}
+            <AssetManagementSection />
           </div>
 
           {/* Scene List */}

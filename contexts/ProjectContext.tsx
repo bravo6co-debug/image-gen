@@ -10,7 +10,6 @@ import {
   AppMode,
   AspectRatio,
   ImageStyle,
-  SuggestedCharacter,
 } from '../types';
 
 // =============================================
@@ -75,10 +74,6 @@ interface ProjectContextValue {
   // 유틸리티
   isDirty: boolean;
   setIsDirty: (dirty: boolean) => void;
-
-  // 시나리오에서 제안된 캐릭터 생성용
-  pendingCharacterCreation: SuggestedCharacter | null;
-  setPendingCharacterCreation: (char: SuggestedCharacter | null) => void;
 }
 
 // =============================================
@@ -118,7 +113,6 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
   const [activeCharacterIds, setActiveCharacterIds] = useState<string[]>([]);
   const [activePropIds, setActivePropIds] = useState<string[]>([]);
   const [activeBackgroundId, setActiveBackgroundId] = useState<string | null>(null);
-  const [pendingCharacterCreation, setPendingCharacterCreation] = useState<SuggestedCharacter | null>(null);
 
   // =============================================
   // 프로젝트 관리
@@ -458,10 +452,6 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
     // 유틸리티
     isDirty,
     setIsDirty,
-
-    // 시나리오에서 제안된 캐릭터 생성용
-    pendingCharacterCreation,
-    setPendingCharacterCreation,
   };
 
   return (

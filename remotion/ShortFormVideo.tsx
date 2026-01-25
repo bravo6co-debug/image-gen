@@ -13,6 +13,7 @@ export interface ShortFormVideoProps {
   transitionDuration?: number; // 프레임 단위
   showSubtitles?: boolean;
   playAudio?: boolean;  // 나레이션 오디오 재생 여부
+  audioVolume?: number;  // 오디오 볼륨 (0-1)
 }
 
 export const ShortFormVideo: React.FC<ShortFormVideoProps> = ({
@@ -22,6 +23,7 @@ export const ShortFormVideo: React.FC<ShortFormVideoProps> = ({
   transitionDuration = 15, // 기본 0.5초 (30fps 기준)
   showSubtitles = true,
   playAudio = true,  // 기본적으로 오디오 재생
+  audioVolume = 1,  // 기본 볼륨 1
 }) => {
   const { fps } = useVideoConfig();
 
@@ -72,7 +74,7 @@ export const ShortFormVideo: React.FC<ShortFormVideoProps> = ({
               <Sequence from={startFrame} durationInFrames={durationInFrames}>
                 <NarrationAudio
                   audio={scene.narrationAudio}
-                  volume={1}
+                  volume={audioVolume}
                   fadeIn={true}
                   fadeOut={true}
                 />

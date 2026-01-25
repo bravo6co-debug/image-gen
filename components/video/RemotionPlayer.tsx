@@ -158,6 +158,7 @@ export const RemotionPlayer: React.FC<RemotionPlayerProps> = ({
             transitionDuration,
             showSubtitles,
             playAudio: !isMuted && volume > 0,
+            audioVolume: isMuted ? 0 : volume,
           }}
           durationInFrames={Math.max(1, totalDurationInFrames)}
           compositionWidth={videoDimensions.width}

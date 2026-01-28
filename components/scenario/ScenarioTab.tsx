@@ -391,6 +391,7 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
   const [tone, setTone] = useState<ScenarioTone | 'custom'>('emotional');
   const [customTone, setCustomTone] = useState('');
   const [mode, setMode] = useState<ScenarioMode>('character');
+  const [includeCharacters, setIncludeCharacters] = useState(false);  // 환경 모드에서 캐릭터 포함 여부
   const [imageStyle, setImageStyle] = useState<ImageStyle>(defaultImageStyle);
 
   if (!isOpen) return null;
@@ -407,6 +408,7 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
       customTone: tone === 'custom' ? customTone : undefined,
       mode,
       imageStyle,
+      includeCharacters: mode === 'environment' ? includeCharacters : undefined,
     };
     onGenerate(config);
   };
@@ -419,6 +421,7 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
       setTone('emotional');
       setCustomTone('');
       setMode('character');
+      setIncludeCharacters(false);
       setImageStyle(defaultImageStyle);
       onClose();
     }
@@ -483,6 +486,27 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
                 </button>
               ))}
             </div>
+
+            {/* 환경/풍경 모드일 때 캐릭터 포함 옵션 */}
+            {mode === 'environment' && (
+              <div className="mt-3 p-3 bg-gray-700/50 rounded-lg border border-gray-600">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeCharacters}
+                    onChange={(e) => setIncludeCharacters(e.target.checked)}
+                    disabled={isLoading}
+                    className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-500 rounded focus:ring-purple-500 focus:ring-2"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-200">캐릭터를 조연으로 가끔 등장</span>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      풍경 중심이지만 캐릭터가 작게 또는 실루엣으로 등장합니다
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Image Style Selection */}

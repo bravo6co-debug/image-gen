@@ -35,6 +35,7 @@ export interface ScenarioConfig {
     customTone?: string;
     mode: ScenarioMode;
     imageStyle: ImageStyle;
+    includeCharacters?: boolean;   // 환경/풍경 모드에서 캐릭터 포함 여부 (조연으로)
 }
 
 export interface Scene {

@@ -191,7 +191,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: 'config.topic is required' } as ApiErrorResponse);
         }
 
-        const { topic, duration, tone, mode = 'character', imageStyle = 'photorealistic', customTone } = config;
+        const { topic, duration, tone, mode = 'character', imageStyle = 'photorealistic', customTone, includeCharacters = false } = config;
         const sanitizedTopic = sanitizePrompt(topic, 5000);
         const durationConfig = getDurationConfig(duration);
         const toneDescription = tone === 'custom' && customTone ? customTone : (TONE_DESCRIPTIONS[tone as ScenarioTone] || TONE_DESCRIPTIONS.emotional);
@@ -199,23 +199,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const styleDescription = STYLE_DESCRIPTIONS[imageStyle] || STYLE_DESCRIPTIONS.photorealistic;
         const stylePromptText = STYLE_PROMPTS[imageStyle] || STYLE_PROMPTS.photorealistic;
 
+        // 환경 모드 + 캐릭터 포함 (하이브리드 모드)
+        const isHybridMode = mode === 'environment' && includeCharacters;
+
         // 모드에 따른 캐릭터 관련 지시문
         const characterGuidelines = mode === 'character'
             ? `### 5. 등장인물 제안
 - 시나리오에 필요한 주요 등장인물들을 제안
 - 각 인물의 이름, 역할, 외형/성격 설명 포함
 - 한국인 인물 묘사 시 "Korean" 명시`
-            : mode === 'environment'
-                ? `### 5. 등장인물 (환경 중심 모드)
+            : isHybridMode
+                ? `### 5. 등장인물 (하이브리드 모드 - 환경 중심 + 조연 캐릭터)
+- **풍경/환경이 주인공, 캐릭터는 조연 역할**
+- 전체 씬의 약 30~40%에만 캐릭터 등장 (나머지는 풍경만)
+- 캐릭터 등장 시 특징:
+  * 화면 구석이나 작게 배치 (Wide shot에서 작은 인물)
+  * 뒷모습, 실루엣, 부분(손, 발 등)으로 표현
+  * 풍경을 바라보거나 걷는 모습
+  * 환경의 스케일을 강조하는 대비 효과
+- suggestedCharacters에 1~2명의 가이드 캐릭터 제안
+- 캐릭터가 등장하는 씬의 characters 배열에 이름 포함
+- 한국인 인물 묘사 시 "Korean" 명시`
+                : mode === 'environment'
+                    ? `### 5. 등장인물 (환경 중심 모드)
 - 인물이 필요하지 않은 환경 중심 시나리오
 - suggestedCharacters는 빈 배열로 반환
 - 모든 이미지 프롬프트에서 인물/사람 제외`
-                : mode === 'abstract'
-                    ? `### 5. 등장인물 (추상 모드)
+                    : mode === 'abstract'
+                        ? `### 5. 등장인물 (추상 모드)
 - 추상적/개념적 시각화에 집중
 - suggestedCharacters는 빈 배열로 반환
 - 인물 대신 상징적 이미지와 오브젝트 활용`
-                    : `### 5. 등장인물 (나레이션 모드)
+                        : `### 5. 등장인물 (나레이션 모드)
 - 해설 중심이므로 인물이 최소화됨
 - suggestedCharacters는 선택적 (필요시 제안)
 - 비주얼보다 내레이션이 우선`;
@@ -226,17 +241,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 - 인물의 표정, 자세, 시선 방향 구체적으로
 - 배경, 조명, 시간대 명시
 - 감정과 분위기를 시각적으로 표현`
-            : mode === 'environment'
-                ? `- 풍경, 배경, 환경만 묘사 (인물 제외)
+            : isHybridMode
+                ? `- **풍경이 메인, 캐릭터는 보조적으로만 등장**
+- 캐릭터가 등장하는 씬에서:
+  * "a small figure in the distance" 또는 "silhouette of a person"
+  * "person from behind looking at the scenery"
+  * 인물은 화면의 1/5 이하 크기로
+  * Wide shot으로 환경의 스케일 강조
+- 캐릭터가 없는 씬: 순수 풍경/환경만 묘사
+- 빛, 날씨, 시간대, 계절 명시
+- 장소의 분위기와 질감 상세히
+- 한국인 인물 묘사 시 "Korean" 명시`
+                : mode === 'environment'
+                    ? `- 풍경, 배경, 환경만 묘사 (인물 제외)
 - 빛, 날씨, 시간대, 계절 명시
 - 장소의 분위기와 질감 상세히
 - 공간의 깊이감과 레이어 표현`
-                : mode === 'abstract'
-                    ? `- 추상적 개념을 시각화
+                    : mode === 'abstract'
+                        ? `- 추상적 개념을 시각화
 - 색상, 형태, 질감, 패턴 중심
 - 상징적 오브젝트와 메타포 활용
 - 감정을 색과 형태로 표현`
-                    : `- 내레이션 내용을 보조하는 이미지
+                        : `- 내레이션 내용을 보조하는 이미지
 - 정보 전달에 적합한 구도
 - 필요시 텍스트/타이포그래피 포함 가능
 - 설명적이고 명확한 시각화`;
@@ -314,7 +340,7 @@ ${hookExamples.map(ex => `- ${ex}`).join('\n')}
 - **주제**: "${sanitizedTopic}"
 - **영상 길이**: ${duration}초
 - **톤/분위기**: ${tone === 'custom' ? '커스텀' : tone} - ${toneDescription}
-- **시나리오 모드**: ${modeInfo.name} - ${modeInfo.focus}
+- **시나리오 모드**: ${isHybridMode ? '하이브리드 (환경 중심 + 조연 캐릭터)' : modeInfo.name} - ${isHybridMode ? '풍경이 주인공, 캐릭터는 조연으로 가끔 등장' : modeInfo.focus}
 - **이미지 스타일**: ${imageStyle} - ${styleDescription}
 
 ---
@@ -327,9 +353,9 @@ ${hookExamples.map(ex => `- ${ex}`).join('\n')}
 - 스토리 구조: ${durationConfig.storyStructure}
 - 스토리비트: "Hook", "Setup", "Development", "Climax", "Resolution"
 
-### 2. 시나리오 모드 지침: ${modeInfo.name}
-- **포커스**: ${modeInfo.focus}
-- **비주얼 가이드**: ${modeInfo.visualGuidelines}
+### 2. 시나리오 모드 지침: ${isHybridMode ? '하이브리드 (환경 중심 + 조연 캐릭터)' : modeInfo.name}
+- **포커스**: ${isHybridMode ? '풍경/환경이 주인공, 캐릭터는 조연으로 30-40% 씬에만 등장' : modeInfo.focus}
+- **비주얼 가이드**: ${isHybridMode ? '와이드샷 풍경 위주. 캐릭터 등장 시 작게/뒷모습/실루엣으로. 환경의 스케일 강조.' : modeInfo.visualGuidelines}
 
 ### 3. 나레이션 작성 핵심 (매우 중요!)
 - **첫 문장은 반드시 주의를 끌어야 함** (질문, 반전, 공감 유도로 시작)

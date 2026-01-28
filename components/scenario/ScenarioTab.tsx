@@ -928,6 +928,40 @@ export const ScenarioTab: React.FC = () => {
                     {totalGeneratedImages}/{scenario.scenes.length} 이미지
                   </span>
                 </div>
+                {/* AI 추천 이미지 스타일 */}
+                {scenario.recommendedImageStyle && scenario.recommendedImageStyle !== scenario.imageStyle && (
+                  <div className="mt-2 p-2 bg-gradient-to-r from-yellow-900/30 to-amber-900/30 border border-yellow-700/50 rounded-lg">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-yellow-300 font-medium">AI 추천 스타일:</span>
+                      {(() => {
+                        const recommendedInfo = IMAGE_STYLE_OPTIONS.find(s => s.value === scenario.recommendedImageStyle);
+                        return recommendedInfo ? (
+                          <span className="px-2 py-0.5 bg-yellow-600/50 rounded text-yellow-200 text-xs font-medium">
+                            {recommendedInfo.emoji} {recommendedInfo.label}
+                          </span>
+                        ) : null;
+                      })()}
+                      <button
+                        onClick={() => {
+                          if (scenario.recommendedImageStyle) {
+                            setScenario({
+                              ...scenario,
+                              imageStyle: scenario.recommendedImageStyle,
+                              updatedAt: Date.now(),
+                            });
+                            setProjectImageStyle(scenario.recommendedImageStyle);
+                          }
+                        }}
+                        className="px-2 py-0.5 text-xs font-medium text-white bg-yellow-600 rounded hover:bg-yellow-500 transition-colors"
+                      >
+                        적용
+                      </button>
+                    </div>
+                    {scenario.recommendedImageStyleReason && (
+                      <p className="text-xs text-yellow-200/70 mt-1">{scenario.recommendedImageStyleReason}</p>
+                    )}
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => setScenario(null)}

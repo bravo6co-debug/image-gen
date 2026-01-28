@@ -362,7 +362,24 @@ ${hookExamples.map(ex => `- ${ex}`).join('\n')}
 ${imagePromptGuidelines}
 
 ${characterGuidelines}
-${chapterGuidelines}`;
+${chapterGuidelines}
+
+### 7. 이미지 스타일 추천 (필수!)
+주제, 톤, 시나리오 내용을 분석하여 가장 적합한 이미지 스타일을 추천하세요.
+
+**각 스타일 특징과 적합한 상황:**
+- **photorealistic**: 실사 사진 스타일. 다큐멘터리, 실제 이야기, 현실 기반 콘텐츠에 적합.
+- **animation**: 일본 애니메이션 스타일. 감성적, 로맨틱, 청춘 스토리에 적합.
+- **illustration**: 디지털 일러스트. 교육, 설명 콘텐츠, 밝고 깔끔한 분위기에 적합.
+- **cinematic**: 영화적 스타일. 드라마틱, 미스터리, 긴장감 있는 스토리에 적합.
+- **watercolor**: 수채화 스타일. 향수, 감성, 동화적 분위기에 적합.
+- **3d_render**: 픽사/디즈니 3D 스타일. 코미디, 밝은 분위기, 캐릭터 중심 스토리에 적합.
+
+추천 시 고려사항:
+1. 톤과의 조화 (emotional → animation/watercolor, dramatic → cinematic 등)
+2. 타겟 시청자층의 취향
+3. 주제의 특성 (역사 → photorealistic, 판타지 → animation)
+4. 바이럴 가능성 (시각적 임팩트)`;
 
         // 장편일 경우 챕터 필드 추가
         const sceneProperties: Record<string, any> = {
@@ -404,6 +421,14 @@ ${chapterGuidelines}`;
                             type: Type.STRING,
                             description: "시나리오의 한 줄 요약",
                         },
+                        recommendedImageStyle: {
+                            type: Type.STRING,
+                            description: "AI가 추천하는 이미지 스타일 (photorealistic, animation, illustration, cinematic, watercolor, 3d_render 중 하나)",
+                        },
+                        recommendedImageStyleReason: {
+                            type: Type.STRING,
+                            description: "이미지 스타일 추천 이유 (한국어, 1-2문장)",
+                        },
                         suggestedCharacters: {
                             type: Type.ARRAY,
                             items: {
@@ -425,7 +450,7 @@ ${chapterGuidelines}`;
                             },
                         },
                     },
-                    required: ["title", "synopsis", "suggestedCharacters", "scenes"],
+                    required: ["title", "synopsis", "recommendedImageStyle", "recommendedImageStyleReason", "suggestedCharacters", "scenes"],
                 },
             },
         });
@@ -472,6 +497,12 @@ ${chapterGuidelines}`;
                 }));
         }
 
+        // Validate recommended style
+        const validStyles: ImageStyle[] = ['photorealistic', 'animation', 'illustration', 'cinematic', 'watercolor', '3d_render'];
+        const recommendedStyle = validStyles.includes(parsed.recommendedImageStyle)
+            ? parsed.recommendedImageStyle as ImageStyle
+            : imageStyle;
+
         // Transform to full Scenario object with IDs
         const scenario: Scenario = {
             id: crypto.randomUUID(),
@@ -482,6 +513,8 @@ ${chapterGuidelines}`;
             tone: tone as ScenarioTone,
             mode: mode,
             imageStyle: imageStyle,
+            recommendedImageStyle: recommendedStyle,
+            recommendedImageStyleReason: parsed.recommendedImageStyleReason || '',
             suggestedCharacters: parsed.suggestedCharacters || [],
             scenes,
             chapters,

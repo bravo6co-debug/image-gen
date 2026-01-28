@@ -160,6 +160,29 @@ function audioBufferToStream(
 }
 
 /**
+ * 모든 씬의 이미지를 미리 로딩하여 렌더링 시 비동기 대기를 제거
+ */
+async function preloadSceneImages(
+  scenes: RemotionSceneData[]
+): Promise<Map<string, HTMLImageElement>> {
+  const imageMap = new Map<string, HTMLImageElement>();
+
+  await Promise.all(scenes.map(scene => {
+    return new Promise<void>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        imageMap.set(scene.id, img);
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = `data:${scene.imageData.mimeType};base64,${scene.imageData.data}`;
+    });
+  }));
+
+  return imageMap;
+}
+
+/**
  * 총 비디오 길이 계산 (초)
  */
 export function calculateTotalDuration(scenes: Scene[]): number {
@@ -287,6 +310,21 @@ export async function renderVideo(
       totalFrames,
     });
 
+    // 이미지 프리로딩 (비동기 대기 제거로 렌더링 속도 향상)
+    onProgress?.({
+      status: 'preparing',
+      progress: 12,
+      totalFrames,
+    });
+
+    const imageMap = await preloadSceneImages(remotionScenes);
+
+    onProgress?.({
+      status: 'preparing',
+      progress: 15,
+      totalFrames,
+    });
+
     // 비디오 스트림 생성
     const videoStream = canvas.captureStream(fps);
 
@@ -351,6 +389,10 @@ export async function renderVideo(
         });
       };
 
+      // 렌더링 시작 시간 및 최대 렌더링 시간 설정
+      const renderStartTime = performance.now();
+      const maxRenderTime = totalDuration * 1000; // ms 단위로 변환
+
       // 오디오 재생 시작 (있는 경우)
       if (audioSource) {
         audioSource.start(0);
@@ -365,13 +407,16 @@ export async function renderVideo(
         currentFrame: 0,
       });
 
-      // 각 씬을 순차적으로 렌더링
+      // 프레임 렌더링 (프리로딩된 이미지 사용으로 비동기 대기 제거)
       let currentFrame = 0;
       let sceneIndex = 0;
       let frameInScene = 0;
 
       const renderFrame = () => {
-        if (currentFrame >= totalFrames || sceneIndex >= remotionScenes.length) {
+        const elapsed = performance.now() - renderStartTime;
+
+        // 총 duration이 지나면 강제 종료 (핵심 수정: 시간 기반 종료)
+        if (elapsed >= maxRenderTime || currentFrame >= totalFrames || sceneIndex >= remotionScenes.length) {
           mediaRecorder.stop();
           return;
         }
@@ -379,9 +424,10 @@ export async function renderVideo(
         const scene = remotionScenes[sceneIndex];
         const sceneDurationFrames = Math.round(scene.duration * fps);
 
-        // 이미지 그리기
-        const img = new Image();
-        img.onload = () => {
+        // 프리로딩된 이미지 사용 (비동기 로딩 제거)
+        const img = imageMap.get(scene.id);
+
+        if (img) {
           // 배경 클리어
           ctx.fillStyle = '#000';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -432,32 +478,30 @@ export async function renderVideo(
             ctx.fillStyle = '#fff';
             ctx.fillText(scene.narration, textX, textY);
           }
+        }
 
-          frameInScene++;
-          currentFrame++;
+        frameInScene++;
+        currentFrame++;
 
-          if (frameInScene >= sceneDurationFrames) {
-            sceneIndex++;
-            frameInScene = 0;
-          }
+        if (frameInScene >= sceneDurationFrames) {
+          sceneIndex++;
+          frameInScene = 0;
+        }
 
-          // 진행률 업데이트
-          const progressPercent = 20 + (currentFrame / totalFrames) * 70;
-          onProgress?.({
-            status: 'rendering',
-            progress: progressPercent,
-            currentFrame,
-            totalFrames,
-          });
+        // 진행률 업데이트 (시간 기반)
+        const progressPercent = 20 + (elapsed / maxRenderTime) * 70;
+        onProgress?.({
+          status: 'rendering',
+          progress: Math.min(progressPercent, 90),
+          currentFrame,
+          totalFrames,
+        });
 
-          // 다음 프레임 요청 (FPS에 맞춰)
-          setTimeout(renderFrame, 1000 / fps);
-        };
-
-        img.src = `data:${scene.imageData.mimeType};base64,${scene.imageData.data}`;
+        // 다음 프레임 요청 (requestAnimationFrame 사용)
+        requestAnimationFrame(renderFrame);
       };
 
-      renderFrame();
+      requestAnimationFrame(renderFrame);
     });
   } catch (error) {
     onProgress?.({

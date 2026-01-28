@@ -15,6 +15,7 @@ import {
     withRetry,
 } from './errors';
 import { getAudioDurationFromBase64 } from './audioUtils';
+import { compressImage, getBase64Size } from './imageCompression';
 
 // API base URL - empty for same-origin requests
 const API_BASE = '';
@@ -242,6 +243,24 @@ export const regenerateScene = async (
     return response.scene;
 };
 
+// 이미지 데이터 압축 헬퍼 함수
+const compressImageData = async (imageData: ImageData): Promise<ImageData> => {
+    // 이미지 크기 확인 (300KB 초과 시 압축)
+    const currentSize = getBase64Size(imageData.data);
+    if (currentSize <= 300 * 1024) {
+        return imageData;
+    }
+
+    try {
+        const dataUrl = `data:${imageData.mimeType};base64,${imageData.data}`;
+        const compressed = await compressImage(dataUrl);
+        return { mimeType: compressed.mimeType, data: compressed.data };
+    } catch (e) {
+        console.warn('Image compression failed, using original:', e);
+        return imageData;
+    }
+};
+
 export const generateSceneImage = async (
     scene: Scene,
     characterImages: ImageData[],
@@ -255,6 +274,32 @@ export const generateSceneImage = async (
     const charactersInScene = scene.characters && scene.characters.length > 0
         ? `**Characters in this scene:** ${scene.characters.join(', ')}`
         : '';
+
+    // namedCharacters 이미지 압축 (페이로드 크기 초과 방지)
+    let compressedNamedCharacters: NamedCharacterImage[] | undefined;
+    if (namedCharacters && namedCharacters.length > 0) {
+        compressedNamedCharacters = await Promise.all(
+            namedCharacters.map(async (char) => ({
+                name: char.name,
+                image: await compressImageData(char.image),
+            }))
+        );
+    }
+
+    // characterImages 압축
+    const compressedCharacterImages = await Promise.all(
+        characterImages.map(compressImageData)
+    );
+
+    // propImages 압축
+    const compressedPropImages = await Promise.all(
+        propImages.map(compressImageData)
+    );
+
+    // backgroundImage 압축
+    const compressedBackgroundImage = backgroundImage
+        ? await compressImageData(backgroundImage)
+        : null;
 
     // Use the generate-images endpoint with the scene's imagePrompt
     const enhancedPrompt = `
@@ -274,10 +319,10 @@ ${charactersInScene}
 
     const response = await post<GenerateImagesResponse>('/api/generate-images', {
         prompt: enhancedPrompt,
-        characterImages,
-        namedCharacters,  // 이름이 포함된 캐릭터 전달
-        propImages,
-        backgroundImage,
+        characterImages: compressedCharacterImages,
+        namedCharacters: compressedNamedCharacters,  // 압축된 캐릭터 전달
+        propImages: compressedPropImages,
+        backgroundImage: compressedBackgroundImage,
         numberOfImages: 1,
         aspectRatio,
         imageStyle,

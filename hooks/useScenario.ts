@@ -330,6 +330,8 @@ export function useScenario(): UseScenarioReturn {
     setIsGeneratingAllImages(true);
     setError(null);
 
+    let imageGenerationFailed = false;
+
     // 1. 이미지 생성
     if (hasImagesToGenerate) {
       for (const scene of scenesWithoutImages) {
@@ -355,12 +357,21 @@ export function useScenario(): UseScenarioReturn {
           });
         } catch (e) {
           console.error(`Failed to generate image for scene ${scene.sceneNumber}:`, e);
+          const errorMessage = e instanceof Error ? e.message : '이미지 생성에 실패했습니다.';
+          setError(`씬 ${scene.sceneNumber} 이미지 생성 실패: ${errorMessage}`);
+          imageGenerationFailed = true;
+          break;  // 에러 발생 시 즉시 중단
         }
       }
       setGeneratingImageSceneId(null);
     }
 
     setIsGeneratingAllImages(false);
+
+    // 이미지 생성 실패 시 TTS 생성 건너뛰기
+    if (imageGenerationFailed) {
+      return;
+    }
 
     // 2. TTS 생성 (옵션이 활성화된 경우)
     if (options?.includeTTS) {
@@ -385,6 +396,7 @@ export function useScenario(): UseScenarioReturn {
             contextUpdateScene(scene.id, { narrationAudio: audio });
           } catch (e) {
             console.error(`TTS failed for scene ${scene.sceneNumber}:`, e);
+            // TTS 실패는 치명적이지 않으므로 계속 진행
           }
         }
 

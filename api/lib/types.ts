@@ -68,6 +68,8 @@ export interface Scenario {
     tone: ScenarioTone;
     mode: ScenarioMode;
     imageStyle: ImageStyle;
+    recommendedImageStyle?: ImageStyle;  // AI가 추천한 이미지 스타일
+    recommendedImageStyleReason?: string;  // 추천 이유
     suggestedCharacters: Array<{
         name: string;
         role: string;

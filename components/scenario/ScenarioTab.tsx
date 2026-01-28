@@ -928,6 +928,39 @@ export const ScenarioTab: React.FC = () => {
                     {totalGeneratedImages}/{scenario.scenes.length} 이미지
                   </span>
                 </div>
+                {/* AI 추천 톤/분위기 */}
+                {scenario.recommendedTone && scenario.recommendedTone !== scenario.tone && (
+                  <div className="mt-2 p-2 bg-gradient-to-r from-purple-900/30 to-indigo-900/30 border border-purple-700/50 rounded-lg">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-purple-300 font-medium">AI 추천 톤:</span>
+                      {(() => {
+                        const recommendedToneInfo = TONE_OPTIONS.find(t => t.value === scenario.recommendedTone);
+                        return recommendedToneInfo ? (
+                          <span className="px-2 py-0.5 bg-purple-600/50 rounded text-purple-200 text-xs font-medium">
+                            {recommendedToneInfo.label}
+                          </span>
+                        ) : null;
+                      })()}
+                      <button
+                        onClick={() => {
+                          if (scenario.recommendedTone) {
+                            setScenario({
+                              ...scenario,
+                              tone: scenario.recommendedTone,
+                              updatedAt: Date.now(),
+                            });
+                          }
+                        }}
+                        className="px-2 py-0.5 text-xs font-medium text-white bg-purple-600 rounded hover:bg-purple-500 transition-colors"
+                      >
+                        적용
+                      </button>
+                    </div>
+                    {scenario.recommendedToneReason && (
+                      <p className="text-xs text-purple-200/70 mt-1">{scenario.recommendedToneReason}</p>
+                    )}
+                  </div>
+                )}
                 {/* AI 추천 이미지 스타일 */}
                 {scenario.recommendedImageStyle && scenario.recommendedImageStyle !== scenario.imageStyle && (
                   <div className="mt-2 p-2 bg-gradient-to-r from-yellow-900/30 to-amber-900/30 border border-yellow-700/50 rounded-lg">

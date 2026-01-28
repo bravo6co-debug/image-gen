@@ -329,6 +329,8 @@ export interface Scenario {
   imageStyle: ImageStyle;         // 이미지 스타일
   recommendedImageStyle?: ImageStyle;     // AI 추천 이미지 스타일
   recommendedImageStyleReason?: string;   // 추천 이유
+  recommendedTone?: ScenarioTone;         // AI 추천 톤/분위기
+  recommendedToneReason?: string;         // 톤 추천 이유
   suggestedCharacters: SuggestedCharacter[];
   scenes: Scene[];
   chapters?: ScenarioChapter[];   // 장편용 챕터 구조 (3분+ 시나리오)

@@ -364,7 +364,25 @@ ${imagePromptGuidelines}
 ${characterGuidelines}
 ${chapterGuidelines}
 
-### 7. 이미지 스타일 추천 (필수!)
+### 7. 톤/분위기 추천 (필수!)
+주제를 분석하여 가장 적합한 톤/분위기를 추천하세요.
+
+**각 톤의 특징과 적합한 주제:**
+- **emotional**: 감성/힐링. 따뜻한 이야기, 가족, 우정, 일상의 소소한 감동에 적합.
+- **dramatic**: 드라마틱. 긴장감, 반전, 갈등이 있는 이야기에 적합.
+- **inspirational**: 동기부여. 도전, 성장, 성공 스토리에 적합.
+- **romantic**: 로맨틱. 사랑, 설렘, 연애 이야기에 적합.
+- **comedic**: 코믹. 유머, 재미, 밝은 분위기의 이야기에 적합.
+- **mysterious**: 미스터리. 호기심, 궁금증, 스릴러 요소가 있는 이야기에 적합.
+- **nostalgic**: 향수/추억. 과거 회상, 그리움, 추억 이야기에 적합.
+- **educational**: 정보/지식. 학습, 역사, 과학, 인사이트 전달에 적합.
+
+추천 시 고려사항:
+1. 주제의 핵심 감정과 메시지
+2. 타겟 시청자가 기대하는 감정
+3. 바이럴 가능성 (공유 욕구를 자극하는 톤)
+
+### 8. 이미지 스타일 추천 (필수!)
 주제, 톤, 시나리오 내용을 분석하여 가장 적합한 이미지 스타일을 추천하세요.
 
 **각 스타일 특징과 적합한 상황:**
@@ -429,6 +447,14 @@ ${chapterGuidelines}
                             type: Type.STRING,
                             description: "이미지 스타일 추천 이유 (한국어, 1-2문장)",
                         },
+                        recommendedTone: {
+                            type: Type.STRING,
+                            description: "AI가 추천하는 톤/분위기 (emotional, dramatic, inspirational, romantic, comedic, mysterious, nostalgic, educational 중 하나)",
+                        },
+                        recommendedToneReason: {
+                            type: Type.STRING,
+                            description: "톤/분위기 추천 이유 (한국어, 1-2문장)",
+                        },
                         suggestedCharacters: {
                             type: Type.ARRAY,
                             items: {
@@ -450,7 +476,7 @@ ${chapterGuidelines}
                             },
                         },
                     },
-                    required: ["title", "synopsis", "recommendedImageStyle", "recommendedImageStyleReason", "suggestedCharacters", "scenes"],
+                    required: ["title", "synopsis", "recommendedImageStyle", "recommendedImageStyleReason", "recommendedTone", "recommendedToneReason", "suggestedCharacters", "scenes"],
                 },
             },
         });
@@ -503,6 +529,12 @@ ${chapterGuidelines}
             ? parsed.recommendedImageStyle as ImageStyle
             : imageStyle;
 
+        // Validate recommended tone
+        const validTones: ScenarioTone[] = ['emotional', 'dramatic', 'inspirational', 'romantic', 'comedic', 'mysterious', 'nostalgic', 'educational'];
+        const recommendedTone = validTones.includes(parsed.recommendedTone)
+            ? parsed.recommendedTone as ScenarioTone
+            : (tone === 'custom' ? 'emotional' : tone as ScenarioTone);
+
         // Transform to full Scenario object with IDs
         const scenario: Scenario = {
             id: crypto.randomUUID(),
@@ -515,6 +547,8 @@ ${chapterGuidelines}
             imageStyle: imageStyle,
             recommendedImageStyle: recommendedStyle,
             recommendedImageStyleReason: parsed.recommendedImageStyleReason || '',
+            recommendedTone: recommendedTone,
+            recommendedToneReason: parsed.recommendedToneReason || '',
             suggestedCharacters: parsed.suggestedCharacters || [],
             scenes,
             chapters,

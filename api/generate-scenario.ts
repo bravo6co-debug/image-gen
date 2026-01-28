@@ -110,59 +110,62 @@ interface DurationConfig {
 }
 
 const getDurationConfig = (duration: number): DurationConfig => {
+    // 씬 개수 계산: 총 길이 / 10초 (씬당 고정 10초)
+    const sceneCount = Math.max(2, Math.round(duration / 10));
+
     if (duration <= 30) {
         return {
             minScenes: 2,
-            maxScenes: 4,
-            perSceneMin: 5,
+            maxScenes: 3,
+            perSceneMin: 10,
             perSceneMax: 10,
             chapters: 1,
             storyStructure: 'Hook → Resolution (간소화된 구조, 임팩트 있는 시작과 끝)',
-            narrationMaxLength: 80,  // 5-10초 씬 → 최대 80자 (TTS 최적화)
+            narrationMaxLength: 38,  // 10초 씬 → 최대 38자
         };
     }
     if (duration <= 90) {
         return {
-            minScenes: 4,
-            maxScenes: 10,
-            perSceneMin: 7,
-            perSceneMax: 12,
+            minScenes: Math.max(4, sceneCount - 1),
+            maxScenes: sceneCount + 1,
+            perSceneMin: 10,
+            perSceneMax: 10,
             chapters: 1,
             storyStructure: 'Hook → Setup → Development → Climax → Resolution (표준 5단계 구조)',
-            narrationMaxLength: 100,  // 7-12초 씬 → 최대 100자 (TTS 최적화)
+            narrationMaxLength: 38,  // 10초 씬 → 최대 38자
         };
     }
     if (duration <= 180) {
         return {
-            minScenes: 10,
-            maxScenes: 20,
-            perSceneMin: 7,
-            perSceneMax: 12,
+            minScenes: Math.max(10, sceneCount - 2),
+            maxScenes: sceneCount + 2,
+            perSceneMin: 10,
+            perSceneMax: 10,
             chapters: 2,
             storyStructure: '2개 챕터로 구성. 각 챕터별로 미니 기승전결 구조.',
-            narrationMaxLength: 100,  // 7-12초 씬 → 최대 100자 (TTS 최적화)
+            narrationMaxLength: 38,  // 10초 씬 → 최대 38자
         };
     }
     if (duration <= 300) {
         return {
-            minScenes: 20,
-            maxScenes: 40,
-            perSceneMin: 8,
-            perSceneMax: 12,
+            minScenes: Math.max(20, sceneCount - 3),
+            maxScenes: sceneCount + 3,
+            perSceneMin: 10,
+            perSceneMax: 10,
             chapters: 3,
             storyStructure: '3개 챕터로 구성. 시작-발전-결말의 대단락 구조.',
-            narrationMaxLength: 110,  // 8-12초 씬 → 최대 110자 (TTS 최적화)
+            narrationMaxLength: 38,  // 10초 씬 → 최대 38자
         };
     }
     // 5분 이상 (최대 10분)
     return {
-        minScenes: 40,
-        maxScenes: 80,
-        perSceneMin: 8,
-        perSceneMax: 15,
+        minScenes: Math.max(30, sceneCount - 5),
+        maxScenes: sceneCount + 5,
+        perSceneMin: 10,
+        perSceneMax: 10,
         chapters: 6,
         storyStructure: '4-6개 챕터로 구성. 에피소드형 구조로 각 챕터가 독립적인 미니 스토리.',
-        narrationMaxLength: 120,  // 8-15초 씬 → 최대 120자 (TTS 최적화)
+        narrationMaxLength: 38,  // 10초 씬 → 최대 38자
     };
 };
 

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders } from './lib/gemini';
-import { requireAuth } from './lib/auth';
-import { getUserSettings, saveUserSettings, DEFAULT_SETTINGS } from './lib/mongodb';
+import { setCorsHeaders } from './lib/gemini.js';
+import { requireAuth } from './lib/auth.js';
+import { getUserSettings, saveUserSettings, DEFAULT_SETTINGS } from './lib/mongodb.js';
 
 /**
  * GET /api/settings - 사용자 설정 조회 (인증 필요)

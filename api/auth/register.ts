@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders } from '../lib/gemini';
-import { createUser } from '../lib/mongodb';
-import { generateToken } from '../lib/auth';
+import { setCorsHeaders } from '../lib/gemini.js';
+import { createUser } from '../lib/mongodb.js';
+import { generateToken } from '../lib/auth.js';
 
 /**
  * POST /api/auth/register

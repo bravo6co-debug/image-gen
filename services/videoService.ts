@@ -496,27 +496,82 @@ export async function renderVideo(
 
           ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
 
-          // 자막 그리기 (선택적)
+          // 자막 그리기 (선택적) - 2줄 지원, 폰트 크기 2.5배
           if (config.showSubtitles && scene.narration) {
-            const fontSize = Math.round(canvas.height * 0.025);
-            ctx.font = `${fontSize}px Pretendard, sans-serif`;
+            // 폰트 크기 2.5배 증가 (0.025 * 2.5 = 0.0625)
+            const fontSize = Math.round(canvas.height * 0.0625);
+            ctx.font = `bold ${fontSize}px Pretendard, sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
 
-            const textWidth = ctx.measureText(scene.narration).width;
-            const padding = 20;
+            // 자막 텍스트를 2줄로 분리하는 함수
+            const splitSubtitle = (text: string): string[] => {
+              if (text.length <= 25) {
+                return [text];
+              }
+
+              // 25자 이후 첫 번째 구두점(., !, ,, ?) 위치 찾기
+              const punctuationMarks = ['.', '!', ',', '?', '。', '！', '，', '？'];
+              let breakIndex = -1;
+
+              for (let i = 25; i < text.length; i++) {
+                if (punctuationMarks.includes(text[i])) {
+                  breakIndex = i + 1; // 구두점 포함
+                  break;
+                }
+              }
+
+              // 구두점이 없으면 25자 이후 첫 번째 공백에서 분리
+              if (breakIndex === -1) {
+                for (let i = 25; i < text.length; i++) {
+                  if (text[i] === ' ') {
+                    breakIndex = i;
+                    break;
+                  }
+                }
+              }
+
+              // 여전히 없으면 25자에서 강제 분리
+              if (breakIndex === -1) {
+                breakIndex = 25;
+              }
+
+              const line1 = text.substring(0, breakIndex).trim();
+              const line2 = text.substring(breakIndex).trim();
+
+              return line2 ? [line1, line2] : [line1];
+            };
+
+            const lines = splitSubtitle(scene.narration);
+            const lineHeight = fontSize * 1.3;
+            const padding = 24;
             const textX = canvas.width / 2;
-            const textY = canvas.height * 0.9;
 
-            ctx.fillRect(
-              textX - textWidth / 2 - padding,
-              textY - fontSize - padding / 2,
-              textWidth + padding * 2,
-              fontSize + padding
-            );
+            // 배경 박스 크기 계산
+            let maxWidth = 0;
+            lines.forEach(line => {
+              const w = ctx.measureText(line).width;
+              if (w > maxWidth) maxWidth = w;
+            });
 
+            const boxHeight = lines.length * lineHeight + padding;
+            const boxY = canvas.height * 0.88 - (lines.length > 1 ? lineHeight / 2 : 0);
+
+            // 배경 박스 그리기 (둥근 모서리)
+            const boxX = textX - maxWidth / 2 - padding;
+            const boxWidth = maxWidth + padding * 2;
+            const radius = 12;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY - lineHeight, boxWidth, boxHeight, radius);
+            ctx.fill();
+
+            // 텍스트 그리기
             ctx.fillStyle = '#fff';
-            ctx.fillText(scene.narration, textX, textY);
+            lines.forEach((line, index) => {
+              const textY = boxY + (index * lineHeight);
+              ctx.fillText(line, textX, textY);
+            });
           }
         }
 

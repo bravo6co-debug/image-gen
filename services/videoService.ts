@@ -496,54 +496,39 @@ export async function renderVideo(
 
           ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
 
-          // 자막 그리기 (선택적) - 2줄 지원, 폰트 크기 2.5배
+          // 자막 그리기 (선택적) - 큰 폰트, 자동 줄바꿈
           if (config.showSubtitles && scene.narration) {
-            // 폰트 크기 2.5배 증가 (0.025 * 2.5 = 0.0625)
-            const fontSize = Math.round(canvas.height * 0.0625);
+            // 폰트 크기: 화면 높이의 6% (2.5배 크기)
+            const fontSize = Math.round(canvas.height * 0.06);
             ctx.font = `bold ${fontSize}px Pretendard, sans-serif`;
             ctx.textAlign = 'center';
 
-            // 자막 텍스트를 2줄로 분리하는 함수
-            const splitSubtitle = (text: string): string[] => {
-              if (text.length <= 25) {
-                return [text];
-              }
+            // 최대 너비 기준 자동 줄바꿈
+            const maxLineWidth = canvas.width * 0.9;
+            const wrapText = (text: string): string[] => {
+              const words = text.split('');
+              const lines: string[] = [];
+              let currentLine = '';
 
-              // 25자 이후 첫 번째 구두점(., !, ,, ?) 위치 찾기
-              const punctuationMarks = ['.', '!', ',', '?', '。', '！', '，', '？'];
-              let breakIndex = -1;
-
-              for (let i = 25; i < text.length; i++) {
-                if (punctuationMarks.includes(text[i])) {
-                  breakIndex = i + 1; // 구두점 포함
-                  break;
+              for (const char of words) {
+                const testLine = currentLine + char;
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > maxLineWidth && currentLine) {
+                  lines.push(currentLine);
+                  currentLine = char;
+                } else {
+                  currentLine = testLine;
                 }
               }
-
-              // 구두점이 없으면 25자 이후 첫 번째 공백에서 분리
-              if (breakIndex === -1) {
-                for (let i = 25; i < text.length; i++) {
-                  if (text[i] === ' ') {
-                    breakIndex = i;
-                    break;
-                  }
-                }
+              if (currentLine) {
+                lines.push(currentLine);
               }
-
-              // 여전히 없으면 25자에서 강제 분리
-              if (breakIndex === -1) {
-                breakIndex = 25;
-              }
-
-              const line1 = text.substring(0, breakIndex).trim();
-              const line2 = text.substring(breakIndex).trim();
-
-              return line2 ? [line1, line2] : [line1];
+              return lines;
             };
 
-            const lines = splitSubtitle(scene.narration);
-            const lineHeight = fontSize * 1.3;
-            const padding = 24;
+            const lines = wrapText(scene.narration);
+            const lineHeight = fontSize * 1.5;
+            const padding = 28;
             const textX = canvas.width / 2;
 
             // 배경 박스 크기 계산
@@ -554,24 +539,30 @@ export async function renderVideo(
             });
 
             const boxHeight = lines.length * lineHeight + padding;
-            const boxY = canvas.height * 0.88 - (lines.length > 1 ? lineHeight / 2 : 0);
+            const boxY = canvas.height * 0.92 - boxHeight;
 
             // 배경 박스 그리기 (둥근 모서리)
             const boxX = textX - maxWidth / 2 - padding;
             const boxWidth = maxWidth + padding * 2;
-            const radius = 12;
+            const radius = 16;
 
             ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
             ctx.beginPath();
-            ctx.roundRect(boxX, boxY - lineHeight, boxWidth, boxHeight, radius);
+            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
             ctx.fill();
 
             // 텍스트 그리기
             ctx.fillStyle = '#fff';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+            ctx.shadowBlur = 6;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
             lines.forEach((line, index) => {
-              const textY = boxY + (index * lineHeight);
+              const textY = boxY + padding / 2 + fontSize + (index * lineHeight);
               ctx.fillText(line, textX, textY);
             });
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
           }
         }
 

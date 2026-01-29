@@ -9,31 +9,24 @@ interface SubtitlesProps {
   position?: 'top' | 'center' | 'bottom';
   fadeIn?: boolean;
   fadeOut?: boolean;
-  scrollMode?: 'none' | 'scroll' | 'auto';  // 스크롤 모드
-  letterSpacing?: number;  // 글자 간격 (em 단위, 기본값 0.05)
 }
-
-// 한국어 기준 초당 읽을 수 있는 글자 수
-const CHARS_PER_SECOND = 5;
 
 export const Subtitles: React.FC<SubtitlesProps> = ({
   text,
-  fontSize = 96,  // 48 → 96 증가
+  fontSize = 72,  // 기본 폰트 크기 (height 기준으로 조정됨)
   fontColor = '#ffffff',
   backgroundColor = 'rgba(0, 0, 0, 0.75)',
   position = 'bottom',
   fadeIn = true,
   fadeOut = true,
-  scrollMode = 'auto',
-  letterSpacing = 0.1,  // 기본 글자 간격 (em 단위)
 }) => {
   const frame = useCurrentFrame();
-  const { durationInFrames, fps, width } = useVideoConfig();
+  const { durationInFrames, fps, height } = useVideoConfig();
 
   if (!text) return null;
 
   // 페이드 인/아웃 효과
-  const fadeFrames = Math.round(fps * 0.3); // 0.3초
+  const fadeFrames = Math.round(fps * 0.3);
   let opacity = 1;
 
   if (fadeIn && fadeOut) {
@@ -59,67 +52,48 @@ export const Subtitles: React.FC<SubtitlesProps> = ({
 
   // 위치 스타일
   const positionStyles: React.CSSProperties = {
-    top: position === 'top' ? '8%' : position === 'center' ? '50%' : undefined,
-    bottom: position === 'bottom' ? '10%' : undefined,
+    top: position === 'top' ? '5%' : position === 'center' ? '50%' : undefined,
+    bottom: position === 'bottom' ? '8%' : undefined,
     transform: position === 'center' ? 'translateY(-50%)' : undefined,
   };
 
-  // 스크롤이 필요한지 계산 (auto 모드)
-  const durationInSeconds = durationInFrames / fps;
-  const maxReadableChars = durationInSeconds * CHARS_PER_SECOND;
-  const needsScroll = scrollMode === 'scroll' ||
-    (scrollMode === 'auto' && text.length > maxReadableChars * 1.5);
-
-  // 스크롤 애니메이션 계산
-  const containerWidth = width * 0.94;  // 화면 너비의 94%
-  const estimatedTextWidth = text.length * fontSize * 0.6;  // 글자 너비 추정
-
-  // 스크롤 시 translateX 계산 (오른쪽에서 왼쪽으로)
-  const scrollTranslateX = needsScroll
-    ? interpolate(
-        frame,
-        [0, durationInFrames],
-        [containerWidth * 0.3, -estimatedTextWidth],
-        { extrapolateRight: 'clamp' }
-      )
-    : 0;
+  // 화면 높이 기준으로 폰트 크기 계산 (6% of height, 2.5배 큰 크기)
+  const dynamicFontSize = Math.round(height * 0.06);
 
   return (
     <AbsoluteFill
       style={{
         display: 'flex',
         justifyContent: 'center',
-        alignItems: needsScroll ? 'flex-end' : 'flex-end',
+        alignItems: 'flex-end',
         padding: '0 3%',
-        zIndex: 100,  // 자막이 항상 위에 표시되도록
-        pointerEvents: 'none',  // 클릭 이벤트 통과
+        zIndex: 100,
+        pointerEvents: 'none',
         ...positionStyles,
       }}
     >
       <div
         style={{
           backgroundColor,
-          padding: '16px 32px',
-          borderRadius: 12,
-          maxWidth: needsScroll ? '100%' : '94%',
-          overflow: needsScroll ? 'hidden' : 'visible',
+          padding: '20px 36px',
+          borderRadius: 16,
+          maxWidth: '94%',
           opacity,
         }}
       >
         <p
           style={{
-            fontSize,
-            fontWeight: 600,
+            fontSize: dynamicFontSize,
+            fontWeight: 700,
             color: fontColor,
-            textAlign: needsScroll ? 'left' : 'center',
+            textAlign: 'center',
             margin: 0,
-            lineHeight: 1.4,
-            letterSpacing: `${letterSpacing}em`,
+            lineHeight: 1.5,
+            letterSpacing: '0.02em',
             fontFamily: 'Pretendard, -apple-system, BlinkMacSystemFont, sans-serif',
-            wordBreak: needsScroll ? 'keep-all' : 'keep-all',
-            whiteSpace: needsScroll ? 'nowrap' : 'normal',
-            transform: needsScroll ? `translateX(${scrollTranslateX}px)` : undefined,
-            textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)',
+            wordBreak: 'keep-all',
+            whiteSpace: 'pre-wrap',
+            textShadow: '2px 2px 6px rgba(0, 0, 0, 0.9)',
           }}
         >
           {text}

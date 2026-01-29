@@ -20,6 +20,15 @@ import { compressImage, getBase64Size } from './imageCompression';
 // API base URL - empty for same-origin requests
 const API_BASE = '';
 
+// 인증 토큰 키
+const TOKEN_KEY = 's2v_auth_token';
+
+// 인증 토큰 가져오기
+function getAuthToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(TOKEN_KEY);
+}
+
 // Generic API response handler with structured error handling
 async function handleResponse<T>(response: Response, context: string): Promise<T> {
     if (!response.ok) {
@@ -65,11 +74,18 @@ async function post<T>(endpoint: string, data: unknown, context: string = 'api')
         async () => {
             let response: Response;
             try {
+                // 인증 토큰 포함
+                const token = getAuthToken();
+                const headers: Record<string, string> = {
+                    'Content-Type': 'application/json',
+                };
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
                 response = await fetch(`${API_BASE}${endpoint}`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers,
                     body: JSON.stringify(data),
                 });
             } catch (e) {

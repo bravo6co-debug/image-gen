@@ -422,9 +422,10 @@ export const AVAILABLE_TEXT_MODELS: { value: string; label: string }[] = [
 
 // 사용 가능한 이미지 모델
 export const AVAILABLE_IMAGE_MODELS: { value: string; label: string }[] = [
+  { value: 'gemini-3-pro-image-preview', label: 'Gemini 3 Pro Image (최고품질, 4K)' },
   { value: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image (기본)' },
   { value: 'imagen-4.0-generate-001', label: 'Imagen 4.0 (고품질)' },
-  { value: 'imagen-3.0-generate-002', label: 'Imagen 3.0' },
+  { value: 'imagen-4.0-fast-generate-001', label: 'Imagen 4.0 Fast (빠름)' },
 ];
 
 // 사용 가능한 비디오 모델

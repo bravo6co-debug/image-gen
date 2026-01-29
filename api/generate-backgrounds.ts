@@ -1,11 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, sanitizePrompt, setCorsHeaders, getStylePrompt } from './lib/gemini.js';
+import { GoogleGenAI } from "@google/genai";
+import { sanitizePrompt, setCorsHeaders, getStylePrompt, getAIClientForUser, getUserImageModel, MODELS } from './lib/gemini.js';
+import { requireAuth } from './lib/auth.js';
 import type { GenerateBackgroundsRequest, ImageData, ApiErrorResponse, ImageStyle } from './lib/types.js';
 
 /**
  * Generates a single background/environment image with specified style
  */
 const generateOneBackgroundImage = async (
+    aiClient: GoogleGenAI,
+    imageModel: string,
     prompt: string,
     locationType: string,
     timeOfDay: string,
@@ -64,9 +68,9 @@ const generateOneBackgroundImage = async (
 -   NO text, watermarks, or typography
 `;
 
-    // Use generateContent with Gemini native image generation model
-    const response = await ai.models.generateContent({
-        model: MODELS.IMAGE_PORTRAIT,
+    // Use generateContent with user's selected image model
+    const response = await aiClient.models.generateContent({
+        model: imageModel,
         contents: finalPrompt,
     });
 
@@ -108,7 +112,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: 'Method not allowed' } as ApiErrorResponse);
     }
 
+    // 인증 체크
+    const auth = requireAuth(req);
+    if (!auth.authenticated || !auth.userId) {
+        return res.status(401).json({
+            error: auth.error || '로그인이 필요합니다.',
+            code: 'UNAUTHORIZED'
+        } as ApiErrorResponse);
+    }
+
     try {
+        // 사용자별 AI 클라이언트 및 모델 가져오기
+        const aiClient = await getAIClientForUser(auth.userId);
+        const imageModel = await getUserImageModel(auth.userId);
+
+        console.log(`[generate-backgrounds] User: ${auth.userId}, Model: ${imageModel}`);
+
         const { prompt, locationType, timeOfDay, weather, numberOfImages, aspectRatio, imageStyle } = req.body as GenerateBackgroundsRequest;
 
         if (!prompt) {
@@ -123,6 +142,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const generationPromises: Promise<ImageData>[] = [];
         for (let i = 0; i < count; i++) {
             generationPromises.push(generateOneBackgroundImage(
+                aiClient,
+                imageModel,
                 sanitizedPrompt,
                 locationType || 'exterior',
                 timeOfDay || 'day',

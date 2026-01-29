@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, Part, sanitizePrompt, setCorsHeaders } from './lib/gemini.js';
+import { Part, sanitizePrompt, setCorsHeaders, getAIClientForUser, getUserImageModel } from './lib/gemini.js';
+import { requireAuth } from './lib/auth.js';
 import type { EditImageRequest, ImageData, ApiErrorResponse } from './lib/types.js';
 
 /**
@@ -17,7 +18,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: 'Method not allowed' } as ApiErrorResponse);
     }
 
+    // 인증 체크
+    const auth = requireAuth(req);
+    if (!auth.authenticated || !auth.userId) {
+        return res.status(401).json({
+            error: auth.error || '로그인이 필요합니다.',
+            code: 'UNAUTHORIZED'
+        } as ApiErrorResponse);
+    }
+
     try {
+        // 사용자별 AI 클라이언트 및 모델 가져오기
+        const aiClient = await getAIClientForUser(auth.userId);
+        const imageModel = await getUserImageModel(auth.userId);
+
+        console.log(`[edit-image] User: ${auth.userId}, Model: ${imageModel}`);
+
         const { baseImage, modificationPrompt } = req.body as EditImageRequest;
 
         if (!baseImage || !baseImage.data) {
@@ -68,9 +84,9 @@ Your primary task is to intelligently modify the provided base image according t
 
         parts.push({ text: finalPrompt });
 
-        // Use generateContent with Gemini native image generation model
-        const response = await ai.models.generateContent({
-            model: MODELS.IMAGE_SCENE,
+        // Use generateContent with user's selected image model
+        const response = await aiClient.models.generateContent({
+            model: imageModel,
             contents: parts,
         });
 

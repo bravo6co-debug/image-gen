@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenAI, Modality, Part, Type } from "@google/genai";
-import { getSettings as getSettingsFromDB, findUserById, type UserSettings } from './mongodb.js';
+import { getSettings as getSettingsFromDB, findUserById, getUserSettings, type UserSettings } from './mongodb.js';
 
 // Default API key from environment
 const defaultApiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
@@ -137,6 +137,34 @@ export async function getTTSModel(): Promise<string> {
 
 export async function getTTSVoice(): Promise<string> {
     const settings = await getAppSettings();
+    return settings.ttsVoice || TTS_VOICES.KORE;
+}
+
+/**
+ * 사용자별 모델명 가져오기
+ */
+export async function getUserImageModel(userId: string): Promise<string> {
+    const settings = await getUserSettings(userId);
+    return settings.imageModel || MODELS.IMAGE_PORTRAIT;
+}
+
+export async function getUserTextModel(userId: string): Promise<string> {
+    const settings = await getUserSettings(userId);
+    return settings.textModel || MODELS.TEXT;
+}
+
+export async function getUserVideoModel(userId: string): Promise<string> {
+    const settings = await getUserSettings(userId);
+    return settings.videoModel || MODELS.VIDEO;
+}
+
+export async function getUserTTSModel(userId: string): Promise<string> {
+    const settings = await getUserSettings(userId);
+    return settings.ttsModel || MODELS.TTS;
+}
+
+export async function getUserTTSVoice(userId: string): Promise<string> {
+    const settings = await getUserSettings(userId);
     return settings.ttsVoice || TTS_VOICES.KORE;
 }
 

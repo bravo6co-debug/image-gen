@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ProjectProvider, useProject } from './contexts/ProjectContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { TabNavigation, TabNavigationCompact } from './components/common/TabNavigation';
 import { ScenarioTab } from './components/scenario/ScenarioTab';
 import { VideoTab } from './components/video/VideoTab';
@@ -10,6 +11,8 @@ import { IdIcon, LayersIcon, SparklesIcon, MagnifyingGlassPlusIcon, PlusCircleIc
 import { ChapterDisplay } from './components/ChapterDisplay';
 import { ScenarioGenerator } from './components/ScenarioGenerator';
 import { ScenarioEditor } from './components/ScenarioEditor';
+import LoginModal from './components/LoginModal';
+import SettingsModal from './components/SettingsModal';
 
 // 줌/확대 이미지 모달
 const ItemModal: React.FC<{ item: GeneratedItem; onClose: () => void; }> = ({ item, onClose }) => {
@@ -280,6 +283,59 @@ const ProjectSettingsDropdown: React.FC = () => {
     );
 };
 
+// 인증 버튼 컴포넌트
+const AuthButton: React.FC = () => {
+    const { isAuthenticated, logout } = useAuth();
+    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+    if (isAuthenticated) {
+        return (
+            <>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setShowSettingsModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg text-sm text-gray-300 transition-colors"
+                        title="AI 모델 설정"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span className="hidden sm:inline">설정</span>
+                    </button>
+                    <button
+                        onClick={logout}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-gray-800/50 hover:bg-red-600/50 rounded-lg text-sm text-gray-300 hover:text-white transition-colors"
+                        title="로그아웃"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                    </button>
+                </div>
+                <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />
+            </>
+        );
+    }
+
+    return (
+        <>
+            <button
+                onClick={() => setShowLoginModal(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg text-sm text-gray-300 transition-colors"
+                title="관리자 로그인"
+            >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span className="hidden sm:inline">로그인</span>
+            </button>
+            <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
+        </>
+    );
+};
+
 // 메인 앱 콘텐츠 (ProjectContext 사용)
 const AppContent: React.FC = () => {
     const { currentTab, setCurrentTab } = useProject();
@@ -313,7 +369,10 @@ const AppContent: React.FC = () => {
                 <div className="hidden sm:block">
                     <TabNavigation currentTab={currentTab} onTabChange={setCurrentTab} />
                 </div>
-                <ProjectSettingsDropdown />
+                <div className="flex items-center gap-2">
+                    <ProjectSettingsDropdown />
+                    <AuthButton />
+                </div>
             </header>
 
             {/* 메인 콘텐츠 영역 */}
@@ -335,12 +394,14 @@ const AppContent: React.FC = () => {
     );
 };
 
-// 앱 루트 - ProjectProvider로 래핑
+// 앱 루트 - AuthProvider + ProjectProvider로 래핑
 const App: React.FC = () => {
     return (
-        <ProjectProvider>
-            <AppContent />
-        </ProjectProvider>
+        <AuthProvider>
+            <ProjectProvider>
+                <AppContent />
+            </ProjectProvider>
+        </AuthProvider>
     );
 };
 

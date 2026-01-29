@@ -400,3 +400,58 @@ export const TONE_OPTIONS: { value: ScenarioTone; label: string; description: st
   { value: 'nostalgic', label: '향수/추억', description: '그리움과 회상' },
   { value: 'educational', label: '정보/지식', description: '학습과 인사이트' },
 ];
+
+// =============================================
+// Gemini 모델 설정 (Gemini Model Settings)
+// =============================================
+
+export interface GeminiModelConfig {
+  textModel: string;
+  imageModel: string;
+  videoModel: string;
+  ttsModel: string;
+  ttsVoice: string;
+}
+
+// 사용 가능한 텍스트 모델
+export const AVAILABLE_TEXT_MODELS: { value: string; label: string }[] = [
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (빠름)' },
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (고품질)' },
+  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+];
+
+// 사용 가능한 이미지 모델
+export const AVAILABLE_IMAGE_MODELS: { value: string; label: string }[] = [
+  { value: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image (기본)' },
+  { value: 'imagen-4.0-generate-001', label: 'Imagen 4.0 (고품질)' },
+  { value: 'imagen-3.0-generate-002', label: 'Imagen 3.0' },
+];
+
+// 사용 가능한 비디오 모델
+export const AVAILABLE_VIDEO_MODELS: { value: string; label: string }[] = [
+  { value: 'veo-3.1-fast-generate-preview', label: 'Veo 3.1 Fast (빠름)' },
+  { value: 'veo-3.1-generate-preview', label: 'Veo 3.1 (고품질)' },
+];
+
+// 사용 가능한 TTS 모델
+export const AVAILABLE_TTS_MODELS: { value: string; label: string }[] = [
+  { value: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash TTS' },
+];
+
+// 사용 가능한 TTS 음성
+export const AVAILABLE_TTS_VOICES: { value: string; label: string }[] = [
+  { value: 'Kore', label: 'Kore (한국어 여성)' },
+  { value: 'Aoede', label: 'Aoede (여성)' },
+  { value: 'Charon', label: 'Charon (남성)' },
+  { value: 'Fenrir', label: 'Fenrir (남성, 깊은)' },
+  { value: 'Puck', label: 'Puck (중성)' },
+];
+
+// 기본 모델 설정
+export const DEFAULT_MODEL_CONFIG: GeminiModelConfig = {
+  textModel: 'gemini-2.5-flash',
+  imageModel: 'gemini-2.5-flash-image',
+  videoModel: 'veo-3.1-fast-generate-preview',
+  ttsModel: 'gemini-2.5-flash-preview-tts',
+  ttsVoice: 'Kore',
+};

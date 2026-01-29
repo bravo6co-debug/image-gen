@@ -4,15 +4,86 @@
  */
 
 import { GoogleGenAI, Modality, Part, Type } from "@google/genai";
+import { getSettings as getSettingsFromDB, type UserSettings } from './mongodb';
 
-// Validate API key exists
-const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-if (!apiKey) {
-    throw new Error("GEMINI_API_KEY environment variable not set");
+// Default API key from environment
+const defaultApiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+
+// Export the default AI client instance (for backwards compatibility)
+export const ai = defaultApiKey ? new GoogleGenAI({ apiKey: defaultApiKey }) : null;
+
+// ============================================
+// DYNAMIC SETTINGS FROM MONGODB
+// ============================================
+
+let cachedSettings: UserSettings | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 60000; // 1분 캐시
+
+/**
+ * MongoDB에서 설정을 가져옴 (캐싱 적용)
+ */
+export async function getAppSettings(): Promise<UserSettings> {
+    const now = Date.now();
+
+    // 캐시가 유효하면 캐시된 설정 반환
+    if (cachedSettings && (now - cacheTimestamp) < CACHE_TTL) {
+        return cachedSettings;
+    }
+
+    // MongoDB에서 설정 로드
+    cachedSettings = await getSettingsFromDB();
+    cacheTimestamp = now;
+
+    return cachedSettings;
 }
 
-// Export the AI client instance
-export const ai = new GoogleGenAI({ apiKey });
+/**
+ * 동적 API 키 가져오기 (MongoDB 설정 우선, 없으면 환경변수)
+ */
+export async function getApiKey(): Promise<string> {
+    const settings = await getAppSettings();
+    return settings.geminiApiKey || defaultApiKey || '';
+}
+
+/**
+ * 동적 AI 클라이언트 생성
+ */
+export async function getAIClient(): Promise<GoogleGenAI> {
+    const apiKey = await getApiKey();
+    if (!apiKey) {
+        throw new Error('GEMINI_API_KEY not configured. Please set API key in settings or environment.');
+    }
+    return new GoogleGenAI({ apiKey });
+}
+
+/**
+ * 동적 모델명 가져오기
+ */
+export async function getTextModel(): Promise<string> {
+    const settings = await getAppSettings();
+    return settings.textModel || MODELS.TEXT;
+}
+
+export async function getImageModel(): Promise<string> {
+    const settings = await getAppSettings();
+    return settings.imageModel || MODELS.IMAGE_PORTRAIT;
+}
+
+export async function getVideoModel(): Promise<string> {
+    const settings = await getAppSettings();
+    return settings.videoModel || MODELS.VIDEO;
+}
+
+export async function getTTSModel(): Promise<string> {
+    const settings = await getAppSettings();
+    return settings.ttsModel || MODELS.TTS;
+}
+
+export async function getTTSVoice(): Promise<string> {
+    const settings = await getAppSettings();
+    return settings.ttsVoice || TTS_VOICES.KORE;
+}
 
 // ============================================
 // MODEL CONFIGURATION

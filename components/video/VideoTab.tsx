@@ -148,7 +148,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
               e.stopPropagation();
               onPlayVideo?.();
             }}
-            className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity min-h-[44px]"
           >
             <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center">
               <PlayIcon className="w-6 h-6 text-gray-900 ml-1" />
@@ -171,26 +171,26 @@ const ClipCard: React.FC<ClipCardProps> = ({
 
         {/* 비디오 생성 상태 */}
         {clip.generatedVideo ? (
-          <div className="absolute top-2 right-2 px-2 py-1 bg-green-600/80 rounded text-xs text-white font-medium">
+          <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-green-600/80 rounded text-[10px] sm:text-xs text-white font-medium">
             완료
           </div>
         ) : clip.sourceImage ? (
-          <div className="absolute top-2 right-2 px-2 py-1 bg-amber-600/80 rounded text-xs text-white font-medium">
+          <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-amber-600/80 rounded text-[10px] sm:text-xs text-white font-medium">
             대기
           </div>
         ) : (
-          <div className="absolute top-2 right-2 px-2 py-1 bg-gray-600/80 rounded text-xs text-white font-medium">
+          <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-600/80 rounded text-[10px] sm:text-xs text-white font-medium">
             이미지 없음
           </div>
         )}
 
         {/* 클립 번호 */}
-        <div className="absolute top-2 left-2 px-2 py-1 bg-gray-900/80 rounded text-xs text-white font-bold">
+        <div className="absolute top-1.5 sm:top-2 left-1.5 sm:left-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-900/80 rounded text-[10px] sm:text-xs text-white font-bold">
           #{clip.order + 1}
         </div>
 
         {/* 길이 */}
-        <div className="absolute bottom-2 right-2 px-2 py-1 bg-gray-900/80 rounded text-xs text-white">
+        <div className="absolute bottom-1.5 sm:bottom-2 right-1.5 sm:right-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-900/80 rounded text-[10px] sm:text-xs text-white">
           {clip.duration}초
         </div>
 
@@ -202,7 +202,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
                 e.stopPropagation();
                 onDownload();
               }}
-              className="p-2 bg-green-600 rounded-full text-white hover:bg-green-700"
+              className="p-2 bg-green-600 rounded-full text-white hover:bg-green-700 min-h-[44px] min-w-[44px] flex items-center justify-center"
               title="비디오 다운로드"
             >
               <DownloadIcon className="w-5 h-5" />
@@ -214,7 +214,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
                 e.stopPropagation();
                 onRegenerate();
               }}
-              className="p-2 bg-blue-600 rounded-full text-white hover:bg-blue-700"
+              className="p-2 bg-blue-600 rounded-full text-white hover:bg-blue-700 min-h-[44px] min-w-[44px] flex items-center justify-center"
               title="비디오 재생성"
             >
               <RefreshIcon className="w-5 h-5" />
@@ -225,7 +225,7 @@ const ClipCard: React.FC<ClipCardProps> = ({
               e.stopPropagation();
               onDelete();
             }}
-            className="p-2 bg-red-600 rounded-full text-white hover:bg-red-700"
+            className="p-2 bg-red-600 rounded-full text-white hover:bg-red-700 min-h-[44px] min-w-[44px] flex items-center justify-center"
             title="삭제"
           >
             <TrashIcon className="w-5 h-5" />
@@ -234,8 +234,8 @@ const ClipCard: React.FC<ClipCardProps> = ({
       </div>
 
       {/* 클립 정보 */}
-      <div className="p-2">
-        <p className="text-xs text-gray-400 truncate">
+      <div className="p-1.5 sm:p-2">
+        <p className="text-[10px] sm:text-xs text-gray-400 truncate">
           {clip.motionPrompt || '모션 프롬프트 없음'}
         </p>
       </div>
@@ -282,48 +282,50 @@ const Timeline: React.FC<TimelineProps> = ({
   const playheadPosition = totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0;
 
   return (
-    <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
-      <div className="flex items-center justify-between mb-2 text-sm">
+    <div className="bg-gray-900 rounded-lg p-2 sm:p-4 border border-gray-700">
+      <div className="flex items-center justify-between mb-2 text-xs sm:text-sm">
         <span className="text-white font-medium">{formatTime(currentTime)}</span>
         <span className="text-gray-500">/</span>
         <span className="text-gray-400">{formatTime(totalDuration)}</span>
       </div>
 
       {/* 타임라인 트랙 */}
-      <div
-        ref={timelineRef}
-        className="relative h-16 bg-gray-800 rounded-lg cursor-pointer overflow-hidden"
-        onClick={handleTimelineClick}
-      >
-        {/* 클립 블록들 */}
-        <div className="absolute inset-0 flex">
-          {clips.map((clip, index) => {
-            const widthPercent = totalDuration > 0 ? (clip.duration / totalDuration) * 100 : 0;
-            return (
-              <div
-                key={clip.id}
-                style={{ width: `${widthPercent}%` }}
-                className={`h-full flex items-center justify-center border-r border-gray-700 transition-all
-                  ${selectedClipId === clip.id ? 'bg-blue-600/50' : clip.generatedVideo ? 'bg-green-800/50' : 'bg-gray-700/50'}
-                  ${clip.generatedVideo ? 'cursor-pointer hover:bg-green-700/50' : ''}
-                `}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectClip(clip.id);
-                }}
-              >
-                <span className="text-xs text-white/70 font-medium">#{index + 1}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* 재생 헤드 */}
+      <div className="overflow-x-auto">
         <div
-          className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
-          style={{ left: `${playheadPosition}%` }}
+          ref={timelineRef}
+          className="relative h-12 sm:h-16 bg-gray-800 rounded-lg cursor-pointer overflow-hidden min-w-[300px]"
+          onClick={handleTimelineClick}
         >
-          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-red-500" />
+          {/* 클립 블록들 */}
+          <div className="absolute inset-0 flex">
+            {clips.map((clip, index) => {
+              const widthPercent = totalDuration > 0 ? (clip.duration / totalDuration) * 100 : 0;
+              return (
+                <div
+                  key={clip.id}
+                  style={{ width: `${widthPercent}%` }}
+                  className={`h-full flex items-center justify-center border-r border-gray-700 transition-all min-h-[44px]
+                    ${selectedClipId === clip.id ? 'bg-blue-600/50' : clip.generatedVideo ? 'bg-green-800/50' : 'bg-gray-700/50'}
+                    ${clip.generatedVideo ? 'cursor-pointer hover:bg-green-700/50' : ''}
+                  `}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectClip(clip.id);
+                  }}
+                >
+                  <span className="text-[10px] sm:text-xs text-white/70 font-medium">#{index + 1}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 재생 헤드 */}
+          <div
+            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+            style={{ left: `${playheadPosition}%` }}
+          >
+            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-red-500" />
+          </div>
         </div>
       </div>
     </div>
@@ -355,19 +357,19 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
-      <div className="relative w-full max-w-4xl">
+    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="relative w-full max-w-4xl h-[90vh] sm:h-auto">
         <button
           onClick={onClose}
-          className="absolute -top-10 right-0 text-white hover:text-gray-300"
+          className="absolute -top-10 right-2 sm:right-0 text-white hover:text-gray-300 min-h-[44px] min-w-[44px] flex items-center justify-center"
         >
           <ClearIcon className="w-8 h-8" />
         </button>
-        <div className="bg-gray-900 rounded-xl overflow-hidden">
+        <div className="bg-gray-900 rounded-t-2xl sm:rounded-xl overflow-hidden h-full sm:h-auto flex flex-col">
           <div className="p-3 bg-gray-800 border-b border-gray-700">
-            <h3 className="text-white font-medium">클립 #{clipNumber} 미리보기</h3>
+            <h3 className="text-sm sm:text-base text-white font-medium">클립 #{clipNumber} 미리보기</h3>
           </div>
-          <div className="aspect-video bg-black">
+          <div className="aspect-video bg-black flex-shrink-0">
             <video
               ref={videoRef}
               src={videoUrl}
@@ -427,30 +429,30 @@ const SceneImportModal: React.FC<SceneImportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-gray-800 rounded-t-2xl sm:rounded-xl shadow-2xl w-full sm:max-w-4xl h-[90vh] sm:h-auto sm:max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-700">
-          <h3 className="text-base sm:text-lg font-bold text-white">씬 가져오기</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+          <h3 className="text-sm sm:text-lg font-bold text-white">씬 가져오기</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white min-h-[44px] min-w-[44px] flex items-center justify-center">
             <ClearIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
-        <div className="p-3 sm:p-4 border-b border-gray-700">
+        <div className="p-2 sm:p-4 border-b border-gray-700">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <p className="text-xs sm:text-sm text-gray-400">
               {scenesWithImages.length}개 / 선택: {selectedSceneIds.length}개
             </p>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button
                 onClick={selectAll}
-                className="text-xs text-blue-400 hover:text-blue-300"
+                className="text-xs text-blue-400 hover:text-blue-300 min-h-[44px] px-2 flex items-center"
               >
                 전체 선택
               </button>
               <button
                 onClick={deselectAll}
-                className="text-xs text-gray-400 hover:text-gray-300"
+                className="text-xs text-gray-400 hover:text-gray-300 min-h-[44px] px-2 flex items-center"
               >
                 해제
               </button>
@@ -460,7 +462,7 @@ const SceneImportModal: React.FC<SceneImportModalProps> = ({
 
         <div className="flex-grow overflow-y-auto p-2 sm:p-4">
           {scenesWithImages.length === 0 ? (
-            <div className="text-center text-gray-500 py-8 text-sm">
+            <div className="text-center text-gray-500 py-8 text-xs sm:text-sm">
               이미지가 있는 씬이 없습니다.
             </div>
           ) : (
@@ -485,16 +487,16 @@ const SceneImportModal: React.FC<SceneImportModalProps> = ({
                         />
                       )}
                     </div>
-                    <div className="absolute top-2 left-2 px-2 py-1 bg-gray-900/80 rounded text-xs text-white font-bold">
+                    <div className="absolute top-1.5 sm:top-2 left-1.5 sm:left-2 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-900/80 rounded text-[10px] sm:text-xs text-white font-bold">
                       #{scene.sceneNumber}
                     </div>
                     {isSelected && (
-                      <div className="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                      <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                         <span className="text-white text-xs">✓</span>
                       </div>
                     )}
-                    <div className="p-2 bg-gray-800">
-                      <p className="text-xs text-gray-400 truncate">{scene.visualDescription}</p>
+                    <div className="p-1.5 sm:p-2 bg-gray-800">
+                      <p className="text-[10px] sm:text-xs text-gray-400 truncate">{scene.visualDescription}</p>
                     </div>
                   </div>
                 );
@@ -503,17 +505,17 @@ const SceneImportModal: React.FC<SceneImportModalProps> = ({
           )}
         </div>
 
-        <div className="flex justify-end gap-3 p-4 border-t border-gray-700">
+        <div className="flex justify-end gap-2 sm:gap-3 p-3 sm:p-4 border-t border-gray-700 flex-wrap">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-600 rounded-lg hover:bg-gray-500"
+            className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-300 bg-gray-600 rounded-lg hover:bg-gray-500 min-h-[44px]"
           >
             취소
           </button>
           <button
             onClick={handleImport}
             disabled={selectedSceneIds.length === 0}
-            className="px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
           >
             {selectedSceneIds.length}개 씬 가져오기
           </button>
@@ -816,22 +818,22 @@ export const VideoTab: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 p-3 sm:p-4 border-b border-gray-700 bg-gray-800">
+      <div className="flex-shrink-0 p-2 sm:p-4 border-b border-gray-700 bg-gray-800">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="text-lg sm:text-xl font-bold text-white">영상 제작</h2>
+            <h2 className="text-base sm:text-xl font-bold text-white">영상 제작</h2>
             <p className="text-xs sm:text-sm text-gray-400 mt-0.5 sm:mt-1 truncate">
               {videoMode === 'remotion'
                 ? `${scenario?.scenes.filter(s => s.generatedImage || s.customImage).length || 0}개 씬 · ${scenario?.scenes.reduce((acc, s) => acc + (s.generatedImage || s.customImage ? s.duration : 0), 0) || 0}초`
                 : `${clips.length}개 클립 · ${totalDuration}초`}
             </p>
           </div>
-          <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
+          <div className="flex gap-1.5 sm:gap-2 flex-shrink-0 flex-wrap justify-end">
             {videoMode === 'remotion' ? (
               <button
                 onClick={() => setIsExportModalOpen(true)}
                 disabled={!scenario || scenario.scenes.every(s => !s.generatedImage && !s.customImage)}
-                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg hover:from-green-500 hover:to-emerald-500 disabled:opacity-50"
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg hover:from-green-500 hover:to-emerald-500 disabled:opacity-50 min-h-[44px]"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -844,7 +846,7 @@ export const VideoTab: React.FC = () => {
                 {scenario && scenario.scenes.some(s => s.generatedImage || s.customImage) && (
                   <button
                     onClick={() => setIsImportModalOpen(true)}
-                    className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600"
+                    className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 min-h-[44px]"
                   >
                     <LayersIcon className="w-4 h-4" />
                     <span className="hidden sm:inline">시나리오에서 가져오기</span>
@@ -854,7 +856,7 @@ export const VideoTab: React.FC = () => {
                 <button
                   onClick={handleGenerateAllClips}
                   disabled={isGenerating || clips.length === 0 || clips.every(c => c.generatedVideo) || veoApiStatus === 'unavailable'}
-                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50"
+                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 min-h-[44px]"
                 >
                   <SparklesIcon className="w-4 h-4" />
                   <span className="hidden sm:inline">{isGenerating ? '생성 중...' : '전체 비디오 생성'}</span>
@@ -866,12 +868,12 @@ export const VideoTab: React.FC = () => {
         </div>
 
         {/* 모드 토글 */}
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
           <span className="text-xs text-gray-500">생성 방식:</span>
           <div className="flex bg-gray-900 rounded-lg p-1">
             <button
               onClick={() => setVideoMode('remotion')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors min-h-[44px] sm:min-h-0 ${
                 videoMode === 'remotion'
                   ? 'bg-green-600 text-white'
                   : 'text-gray-400 hover:text-white'
@@ -881,7 +883,7 @@ export const VideoTab: React.FC = () => {
             </button>
             <button
               onClick={() => setVideoMode('veo')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors min-h-[44px] sm:min-h-0 ${
                 videoMode === 'veo'
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-400 hover:text-white'
@@ -897,12 +899,12 @@ export const VideoTab: React.FC = () => {
 
         {/* Veo API 상태 표시 (Veo 모드일 때만) */}
         {videoMode === 'veo' && (
-          <div className="mt-3 flex items-center justify-between bg-gray-900/50 rounded-lg px-3 py-2">
+          <div className="mt-3 flex items-center justify-between bg-gray-900/50 rounded-lg px-3 py-2 flex-wrap gap-2">
             <ApiStatusIcon status={veoApiStatus} error={veoApiError} />
             <button
               onClick={checkApiStatus}
               disabled={veoApiStatus === 'checking'}
-              className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50"
+              className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 min-h-[44px] flex items-center"
             >
               {veoApiStatus === 'checking' ? '확인 중...' : 'API 상태 확인'}
             </button>
@@ -911,10 +913,10 @@ export const VideoTab: React.FC = () => {
 
         {/* Error Display */}
         {error && (
-          <div className="mt-3 p-3 bg-red-900/50 border border-red-700 rounded-lg text-sm text-red-300">
+          <div className="mt-3 p-2 sm:p-3 bg-red-900/50 border border-red-700 rounded-lg text-xs sm:text-sm text-red-300">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-medium">오류 발생</span>
-              <button onClick={clearError} className="text-red-400 hover:text-red-300">
+              <span className="font-medium text-xs sm:text-sm">오류 발생</span>
+              <button onClick={clearError} className="text-red-400 hover:text-red-300 min-h-[44px] min-w-[44px] flex items-center justify-center">
                 <ClearIcon className="w-4 h-4" />
               </button>
             </div>
@@ -922,7 +924,7 @@ export const VideoTab: React.FC = () => {
             {veoApiStatus === 'unknown' && (
               <button
                 onClick={checkApiStatus}
-                className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline"
+                className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline min-h-[44px] flex items-center"
               >
                 API 상태를 확인해 보세요
               </button>
@@ -932,8 +934,8 @@ export const VideoTab: React.FC = () => {
 
         {/* API 사용 불가 경고 */}
         {veoApiStatus === 'unavailable' && !error && (
-          <div className="mt-3 p-3 bg-amber-900/50 border border-amber-700 rounded-lg text-sm text-amber-300">
-            <p className="font-medium mb-1">Veo API 사용 불가</p>
+          <div className="mt-3 p-2 sm:p-3 bg-amber-900/50 border border-amber-700 rounded-lg text-xs sm:text-sm text-amber-300">
+            <p className="font-medium mb-1 text-xs sm:text-sm">Veo API 사용 불가</p>
             <p className="text-xs text-amber-400">{veoApiError}</p>
             <p className="text-xs text-gray-400 mt-2">
               현재 API 키로는 Veo 2.0 비디오 생성을 사용할 수 없습니다.
@@ -959,13 +961,13 @@ export const VideoTab: React.FC = () => {
                 />
 
                 {/* TTS 나레이션 생성 섹션 */}
-                <div className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-                  <div className="flex items-center justify-between mb-3">
+                <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                     <div className="flex items-center gap-2">
-                      <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                       </svg>
-                      <span className="text-sm font-medium text-white">AI 나레이션</span>
+                      <span className="text-xs sm:text-sm font-medium text-white">AI 나레이션</span>
                     </div>
                     <span className="text-xs text-gray-400">
                       {getTTSStatus().generated}/{getTTSStatus().total} 적용됨
@@ -979,7 +981,7 @@ export const VideoTab: React.FC = () => {
                       value={ttsVoice}
                       onChange={(e) => setTtsVoice(e.target.value as TTSVoice)}
                       disabled={!!generatingPreviewSceneId}
-                      className="flex-1 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded text-white"
+                      className="flex-1 px-2 py-1.5 sm:py-1 text-xs bg-gray-700 border border-gray-600 rounded text-white min-h-[44px] sm:min-h-0"
                     >
                       <option value="Kore">Kore (한국어 여성)</option>
                       <option value="Aoede">Aoede (여성)</option>
@@ -1024,12 +1026,12 @@ export const VideoTab: React.FC = () => {
                             <p className="text-xs text-gray-400 mb-2 line-clamp-2">
                               {scene.narration}
                             </p>
-                            <div className="flex gap-1.5">
+                            <div className="flex gap-1.5 flex-wrap">
                               {/* 미리듣기 생성 버튼 */}
                               <button
                                 onClick={() => handleGeneratePreview(scene.id, scene.narration)}
                                 disabled={isGenerating}
-                                className="flex-1 px-2 py-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex-1 px-2 py-1.5 sm:py-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0"
                               >
                                 {isGenerating ? (
                                   <span className="flex items-center justify-center gap-1">
@@ -1046,7 +1048,7 @@ export const VideoTab: React.FC = () => {
                               {hasPreview && (
                                 <button
                                   onClick={() => handlePlayPreview(scene.id)}
-                                  className={`px-2 py-1 text-xs font-medium rounded ${
+                                  className={`px-2 py-1.5 sm:py-1 text-xs font-medium rounded min-h-[44px] sm:min-h-0 ${
                                     isPlaying
                                       ? 'text-white bg-red-600 hover:bg-red-500'
                                       : 'text-white bg-blue-600 hover:bg-blue-500'
@@ -1060,7 +1062,7 @@ export const VideoTab: React.FC = () => {
                               {hasPreview && (
                                 <button
                                   onClick={() => handleApplyPreview(scene.id)}
-                                  className="px-2 py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-500 rounded"
+                                  className="px-2 py-1.5 sm:py-1 text-xs font-medium text-white bg-green-600 hover:bg-green-500 rounded min-h-[44px] sm:min-h-0"
                                 >
                                   적용
                                 </button>
@@ -1077,13 +1079,13 @@ export const VideoTab: React.FC = () => {
                   )}
                 </div>
 
-                <div className="mt-4 text-center">
-                  <p className="text-sm text-gray-400 mb-3">
+                <div className="mt-3 sm:mt-4 text-center">
+                  <p className="text-xs sm:text-sm text-gray-400 mb-3">
                     시나리오의 이미지를 기반으로 비디오를 미리볼 수 있습니다
                   </p>
                   <button
                     onClick={() => setIsExportModalOpen(true)}
-                    className="px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg hover:from-green-500 hover:to-emerald-500"
+                    className="px-5 sm:px-6 py-3 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg hover:from-green-500 hover:to-emerald-500 min-h-[44px]"
                   >
                     <svg className="w-4 h-4 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -1093,25 +1095,25 @@ export const VideoTab: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="text-center max-w-md">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl flex items-center justify-center">
-                  <FilmIcon className="w-8 h-8 text-white" />
+              <div className="text-center max-w-md px-4">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl flex items-center justify-center">
+                  <FilmIcon className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2">시나리오 이미지 필요</h3>
-                <p className="text-gray-400 text-sm mb-4">
+                <h3 className="text-base sm:text-lg font-bold text-white mb-2">시나리오 이미지 필요</h3>
+                <p className="text-gray-400 text-xs sm:text-sm mb-4">
                   먼저 시나리오 탭에서 씬별 이미지를 생성하세요.<br />
                   Remotion은 생성된 이미지를 영상으로 변환합니다.
                 </p>
 
                 {/* TTS 나레이션 섹션 - 이미지 없이도 사용 가능 */}
                 {scenario && getTTSStatus().total > 0 && (
-                  <div className="mt-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700 text-left">
-                    <div className="flex items-center justify-between mb-3">
+                  <div className="mt-5 sm:mt-6 p-3 sm:p-4 bg-gray-800/50 rounded-lg border border-gray-700 text-left">
+                    <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                       <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                         </svg>
-                        <span className="text-sm font-medium text-white">AI 나레이션</span>
+                        <span className="text-xs sm:text-sm font-medium text-white">AI 나레이션</span>
                       </div>
                       <span className="text-xs text-gray-400">
                         {getTTSStatus().generated}/{getTTSStatus().total} 적용됨
@@ -1124,7 +1126,7 @@ export const VideoTab: React.FC = () => {
                         value={ttsVoice}
                         onChange={(e) => setTtsVoice(e.target.value as TTSVoice)}
                         disabled={!!generatingPreviewSceneId}
-                        className="flex-1 px-2 py-1 text-xs bg-gray-700 border border-gray-600 rounded text-white"
+                        className="flex-1 px-2 py-1.5 sm:py-1 text-xs bg-gray-700 border border-gray-600 rounded text-white min-h-[44px] sm:min-h-0"
                       >
                         <option value="Kore">Kore (한국어 여성)</option>
                         <option value="Aoede">Aoede (여성)</option>
@@ -1154,11 +1156,11 @@ export const VideoTab: React.FC = () => {
                               )}
                             </div>
                             <p className="text-xs text-gray-400 mb-2 line-clamp-1">{scene.narration}</p>
-                            <div className="flex gap-1.5">
+                            <div className="flex gap-1.5 flex-wrap">
                               <button
                                 onClick={() => handleGeneratePreview(scene.id, scene.narration)}
                                 disabled={isGenerating}
-                                className="flex-1 px-2 py-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50"
+                                className="flex-1 px-2 py-1.5 sm:py-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-50 min-h-[44px] sm:min-h-0"
                               >
                                 {isGenerating ? '생성 중...' : hasPreview || hasApplied ? '다시 생성' : '미리듣기'}
                               </button>
@@ -1166,7 +1168,7 @@ export const VideoTab: React.FC = () => {
                                 <>
                                   <button
                                     onClick={() => handlePlayPreview(scene.id)}
-                                    className={`px-2 py-1 text-xs font-medium rounded ${
+                                    className={`px-2 py-1.5 sm:py-1 text-xs font-medium rounded min-h-[44px] sm:min-h-0 ${
                                       isPlaying ? 'bg-red-600' : 'bg-blue-600'
                                     } text-white`}
                                   >
@@ -1174,7 +1176,7 @@ export const VideoTab: React.FC = () => {
                                   </button>
                                   <button
                                     onClick={() => handleApplyPreview(scene.id)}
-                                    className="px-2 py-1 text-xs font-medium text-white bg-green-600 rounded"
+                                    className="px-2 py-1.5 sm:py-1 text-xs font-medium text-white bg-green-600 rounded min-h-[44px] sm:min-h-0"
                                   >
                                     적용
                                   </button>
@@ -1196,24 +1198,24 @@ export const VideoTab: React.FC = () => {
         ) : clips.length === 0 ? (
           /* Veo 모드 - 클립이 없을 때 */
           <div className="flex-grow flex flex-col items-center justify-center">
-            <div className="text-center max-w-md">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center">
-                <FilmIcon className="w-8 h-8 text-white" />
+            <div className="text-center max-w-md px-4">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center">
+                <FilmIcon className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">클립을 추가하세요</h3>
-              <p className="text-gray-400 text-sm mb-6">
+              <h3 className="text-base sm:text-lg font-bold text-white mb-2">클립을 추가하세요</h3>
+              <p className="text-gray-400 text-xs sm:text-sm mb-6">
                 시나리오에서 이미지가 있는 씬을 가져와 AI 영상 클립을 생성합니다.
               </p>
               {scenario && scenario.scenes.some(s => s.generatedImage || s.customImage) ? (
                 <button
                   onClick={() => setIsImportModalOpen(true)}
-                  className="px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-500 hover:to-indigo-500"
+                  className="px-5 sm:px-6 py-3 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-500 hover:to-indigo-500 min-h-[44px]"
                 >
                   <LayersIcon className="w-4 h-4 inline mr-2" />
                   시나리오에서 가져오기
                 </button>
               ) : (
-                <p className="text-amber-400 text-sm">
+                <p className="text-amber-400 text-xs sm:text-sm">
                   먼저 시나리오 탭에서 이미지를 생성하세요
                 </p>
               )}
@@ -1244,14 +1246,14 @@ export const VideoTab: React.FC = () => {
 
             {/* 선택된 클립 상세 정보 */}
             {selectedClip && (
-              <div className="flex-shrink-0 bg-gray-900 rounded-lg p-4 border border-gray-700">
+              <div className="flex-shrink-0 bg-gray-900 rounded-lg p-3 sm:p-4 border border-gray-700">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-bold text-white">클립 #{selectedClip.order + 1} 상세</h4>
-                  <div className="flex gap-2">
+                  <h4 className="text-sm sm:text-base font-bold text-white">클립 #{selectedClip.order + 1} 상세</h4>
+                  <div className="flex gap-1 sm:gap-2">
                     <button
                       onClick={() => handleMoveClip(selectedClip.id, 'left')}
                       disabled={selectedClip.order === 0}
-                      className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30"
+                      className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 min-h-[44px] min-w-[44px] flex items-center justify-center"
                       title="왼쪽으로 이동"
                     >
                       <ArrowLeftIcon className="w-4 h-4" />
@@ -1259,25 +1261,25 @@ export const VideoTab: React.FC = () => {
                     <button
                       onClick={() => handleMoveClip(selectedClip.id, 'right')}
                       disabled={selectedClip.order === clips.length - 1}
-                      className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30"
+                      className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 min-h-[44px] min-w-[44px] flex items-center justify-center"
                       title="오른쪽으로 이동"
                     >
                       <ArrowRightIcon className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">모션 프롬프트</p>
-                    <p className="text-sm text-gray-300">{selectedClip.motionPrompt || '없음'}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500 mb-1">모션 프롬프트</p>
+                    <p className="text-xs sm:text-sm text-gray-300">{selectedClip.motionPrompt || '없음'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">길이</p>
-                    <p className="text-sm text-gray-300">{selectedClip.duration}초</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500 mb-1">길이</p>
+                    <p className="text-xs sm:text-sm text-gray-300">{selectedClip.duration}초</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">상태</p>
-                    <p className={`text-sm ${selectedClip.generatedVideo ? 'text-green-400' : 'text-amber-400'}`}>
+                    <p className="text-[10px] sm:text-xs text-gray-500 mb-1">상태</p>
+                    <p className={`text-xs sm:text-sm ${selectedClip.generatedVideo ? 'text-green-400' : 'text-amber-400'}`}>
                       {selectedClip.generatedVideo ? '비디오 생성 완료' : '대기 중'}
                     </p>
                   </div>
@@ -1285,7 +1287,7 @@ export const VideoTab: React.FC = () => {
                     <button
                       onClick={() => handleGenerateClip(selectedClip.id)}
                       disabled={isGenerating || !selectedClip.sourceImage || veoApiStatus === 'unavailable'}
-                      className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50"
+                      className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50 min-h-[44px]"
                       title={veoApiStatus === 'unavailable' ? 'Veo API 사용 불가' : ''}
                     >
                       {selectedClip.generatedVideo ? '재생성' : '비디오 생성'}
@@ -1306,11 +1308,11 @@ export const VideoTab: React.FC = () => {
             />
 
             {/* 재생 컨트롤 */}
-            <div className="flex-shrink-0 flex items-center justify-center gap-4 py-2">
+            <div className="flex-shrink-0 flex items-center justify-center gap-3 sm:gap-4 py-2">
               <button
                 onClick={stop}
                 disabled={!isPlaying}
-                className="p-2 text-gray-400 hover:text-white disabled:opacity-30"
+                className="p-2 text-gray-400 hover:text-white disabled:opacity-30 min-h-[44px] min-w-[44px] flex items-center justify-center"
                 title="정지"
               >
                 <StopIcon className="w-6 h-6" />
@@ -1318,7 +1320,7 @@ export const VideoTab: React.FC = () => {
               <button
                 onClick={isPlaying && !isPaused ? pause : play}
                 disabled={completedClips === 0}
-                className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-500 disabled:opacity-50"
+                className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-500 disabled:opacity-50 min-h-[48px] min-w-[48px] flex items-center justify-center"
                 title={isPlaying && !isPaused ? '일시정지' : '재생'}
               >
                 {isPlaying && !isPaused ? (
@@ -1330,7 +1332,7 @@ export const VideoTab: React.FC = () => {
               <button
                 onClick={handleDownloadAll}
                 disabled={completedClips === 0 || isDownloading}
-                className="p-2 text-gray-400 hover:text-white disabled:opacity-30"
+                className="p-2 text-gray-400 hover:text-white disabled:opacity-30 min-h-[44px] min-w-[44px] flex items-center justify-center"
                 title={isDownloading ? '다운로드 중...' : '전체 비디오 다운로드'}
               >
                 {isDownloading ? (

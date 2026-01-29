@@ -75,10 +75,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4">
+      <div className="bg-gray-800 rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-lg flex flex-col max-h-[90vh] sm:max-h-[85vh]">
         {/* 헤더 */}
-        <div className="sticky top-0 flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800">
+        <div className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -88,7 +88,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -97,7 +97,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* 본문 */}
-        <div className="p-4 space-y-5">
+        <div className="p-4 space-y-5 overflow-y-auto flex-grow">
           {/* API 키 */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -228,17 +228,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* 푸터 */}
-        <div className="sticky bottom-0 flex gap-3 p-4 border-t border-gray-700 bg-gray-800">
+        <div className="flex gap-3 p-4 border-t border-gray-700 flex-shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+            className="flex-1 min-h-[44px] px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
             disabled={isLoading}
           >
             닫기
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isLoading}
           >
             {isLoading ? (

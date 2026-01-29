@@ -99,10 +99,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4">
+      <div className="bg-gray-800 rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-md flex flex-col max-h-[90vh] sm:max-h-[85vh]">
         {/* 헤더 */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -111,7 +111,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -120,10 +120,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* 탭 */}
-        <div className="flex border-b border-gray-700">
+        <div className="flex border-b border-gray-700 flex-shrink-0">
           <button
             onClick={() => handleTabChange('login')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+            className={`flex-1 px-4 py-3 min-h-[44px] text-sm font-medium transition-colors ${
               activeTab === 'login'
                 ? 'text-blue-400 border-b-2 border-blue-400'
                 : 'text-gray-400 hover:text-white'
@@ -133,7 +133,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           </button>
           <button
             onClick={() => handleTabChange('register')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+            className={`flex-1 px-4 py-3 min-h-[44px] text-sm font-medium transition-colors ${
               activeTab === 'register'
                 ? 'text-blue-400 border-b-2 border-blue-400'
                 : 'text-gray-400 hover:text-white'
@@ -144,7 +144,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* 본문 */}
-        <form onSubmit={activeTab === 'login' ? handleLogin : handleRegister} className="p-4">
+        <form onSubmit={activeTab === 'login' ? handleLogin : handleRegister} className="p-4 overflow-y-auto flex-grow">
           <p className="text-gray-400 text-sm mb-4">
             {activeTab === 'login'
               ? '계정에 로그인하여 API 키와 설정을 관리하세요.'
@@ -213,18 +213,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              className="flex-1 min-h-[44px] px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               disabled={isLoading}
             >
               취소
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isLoading}
             >
               {isLoading ? (

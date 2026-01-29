@@ -15,6 +15,8 @@ import LoginModal from './components/LoginModal';
 import SettingsModal from './components/SettingsModal';
 import ApiKeyRequiredModal from './components/ApiKeyRequiredModal';
 import AdminDashboard from './components/AdminDashboard';
+import WelcomeModal from './components/WelcomeModal';
+import FloatingHelpButton from './components/FloatingHelpButton';
 
 // 줌/확대 이미지 모달
 const ItemModal: React.FC<{ item: GeneratedItem; onClose: () => void; }> = ({ item, onClose }) => {
@@ -395,6 +397,12 @@ const AppContent: React.FC = () => {
         onConfirm: () => void;
     } | null>(null);
 
+    // 첫 방문 환영 모달 상태
+    const [showWelcome, setShowWelcome] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return !localStorage.getItem('s2v_has_seen_welcome');
+    });
+
     // 탭별 콘텐츠 렌더링
     const renderTabContent = () => {
         switch (currentTab) {
@@ -442,6 +450,19 @@ const AppContent: React.FC = () => {
 
             {/* 인증 관련 글로벌 모달 */}
             <GlobalModals />
+
+            {/* 첫 방문 환영 모달 */}
+            {showWelcome && (
+                <WelcomeModal
+                    onClose={() => {
+                        localStorage.setItem('s2v_has_seen_welcome', 'true');
+                        setShowWelcome(false);
+                    }}
+                />
+            )}
+
+            {/* 플로팅 도움말 버튼 */}
+            <FloatingHelpButton />
         </div>
     );
 };

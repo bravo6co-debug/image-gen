@@ -58,7 +58,7 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
             onClick={() => onTabChange(tab.mode)}
             disabled={disabled}
             className={`
-              relative flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium
+              relative flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-lg font-medium
               transition-all duration-200 ease-in-out
               ${isActive
                 ? `bg-gradient-to-r ${tab.activeColor} text-white shadow-lg`
@@ -100,7 +100,7 @@ export const TabNavigationCompact: React.FC<TabNavigationProps> = ({
             disabled={disabled}
             title={tab.label}
             className={`
-              relative flex items-center justify-center p-2 rounded-md
+              relative flex items-center justify-center min-h-[44px] min-w-[44px] p-2 rounded-md
               transition-all duration-200 ease-in-out
               ${isActive
                 ? `bg-gradient-to-r ${tab.activeColor} text-white`

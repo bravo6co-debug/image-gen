@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenAI, Modality, Part, Type } from "@google/genai";
-import { getSettings as getSettingsFromDB, type UserSettings } from './mongodb';
+import { getSettings as getSettingsFromDB, type UserSettings } from './mongodb.js';
 
 // Default API key from environment
 const defaultApiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;

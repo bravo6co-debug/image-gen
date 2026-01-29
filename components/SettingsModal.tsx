@@ -42,7 +42,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     if (isOpen) {
       loadSettings();
     }
-  }, [isOpen, loadSettings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); // loadSettings 의존성 제거 (무한 루프 방지)
 
   const handleSave = async () => {
     setError('');

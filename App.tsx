@@ -286,7 +286,7 @@ const ProjectSettingsDropdown: React.FC = () => {
 
 // 인증 버튼 컴포넌트
 const AuthButton: React.FC = () => {
-    const { isAuthenticated, user, logout, openLoginModal, openSettingsModal, hasApiKey } = useAuth();
+    const { isAuthenticated, user, logout, openLoginModal, openSettingsModal, hasApiKey, isAdmin } = useAuth();
 
     if (isAuthenticated) {
         return (
@@ -295,8 +295,8 @@ const AuthButton: React.FC = () => {
                 <span className="hidden md:inline text-xs text-gray-400 truncate max-w-[120px]" title={user?.email}>
                     {user?.email}
                 </span>
-                {/* API 키 상태 표시 */}
-                {!hasApiKey && (
+                {/* API 키 상태 표시 (어드민은 서버 API 키 사용하므로 표시하지 않음) */}
+                {!hasApiKey && !isAdmin && (
                     <button
                         onClick={openSettingsModal}
                         className="flex items-center gap-1 px-2 py-1 bg-yellow-600/30 hover:bg-yellow-600/50 rounded text-xs text-yellow-400 transition-colors"

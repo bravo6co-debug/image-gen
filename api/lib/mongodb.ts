@@ -1,10 +1,10 @@
 import { MongoClient, Db, ObjectId } from 'mongodb';
 import crypto from 'crypto';
 
-const uri = process.env.MONGODB_URI;
+const uri = process.env.MONGODB_URI || process.env.s2v_MONGODB_URI;
 
 if (!uri) {
-    console.warn('MONGODB_URI is not defined. Using fallback settings.');
+    console.warn('MONGODB_URI or s2v_MONGODB_URI is not defined. Using fallback settings.');
 }
 
 let client: MongoClient | null = null;

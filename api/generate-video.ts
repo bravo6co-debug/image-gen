@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ai, MODELS, sanitizePrompt, setCorsHeaders } from './lib/gemini.js';
+import { requireAuth } from './lib/auth.js';
 import type { GenerateVideoRequest, VideoGenerationResult, ApiErrorResponse } from './lib/types.js';
 
 /**
@@ -15,6 +16,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' } as ApiErrorResponse);
+    }
+
+    // 인증 체크
+    const userId = requireAuth(req);
+    if (!userId) {
+        return res.status(401).json({
+            success: false,
+            error: '로그인이 필요합니다.'
+        });
     }
 
     try {

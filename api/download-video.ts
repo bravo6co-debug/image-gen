@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders } from './lib/gemini.js';
+import { requireAuth } from './lib/auth.js';
 
 /**
  * GET /api/download-video?fileId=xxx
@@ -16,6 +17,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // GET 요청만 허용
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    // 인증 체크
+    const userId = requireAuth(req);
+    if (!userId) {
+        return res.status(401).json({
+            success: false,
+            error: '로그인이 필요합니다.'
+        });
     }
 
     const { fileId } = req.query;

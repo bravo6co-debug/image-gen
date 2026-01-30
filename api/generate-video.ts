@@ -1,11 +1,17 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, sanitizePrompt, setCorsHeaders } from './lib/gemini.js';
+import { sanitizePrompt, setCorsHeaders } from './lib/gemini.js';
 import { requireAuth } from './lib/auth.js';
+import { findUserById } from './lib/mongodb.js';
 import type { GenerateVideoRequest, VideoGenerationResult, ApiErrorResponse } from './lib/types.js';
+
+// Hailuo V2.3 via eachlabs.ai
+const HAILUO_API_URL = 'https://api.eachlabs.ai/v1/prediction';
+const HAILUO_MODEL = 'minimax-hailuo-v2-3-fast-standard-image-to-video';
+const HAILUO_VERSION = '0.0.1';
 
 /**
  * POST /api/generate-video
- * Generates a video from an image using Veo API
+ * Generates a video from an image using Hailuo V2.3 (eachlabs.ai)
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     setCorsHeaders(res, req.headers.origin as string);
@@ -38,10 +44,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: 'motionPrompt is required' } as ApiErrorResponse);
         }
 
+        // 사용자별 Hailuo API 키 조회 (어드민은 환경변수, 일반 사용자는 본인 키)
+        let apiKey: string | undefined;
+        const user = await findUserById(auth.userId);
+        if (user?.isAdmin) {
+            apiKey = process.env.HAILUO_API_KEY;
+        } else {
+            apiKey = user?.settings?.hailuoApiKey || process.env.HAILUO_API_KEY;
+        }
+
+        if (!apiKey) {
+            return res.status(400).json({
+                error: 'Hailuo API 키가 설정되지 않았습니다. 설정에서 Hailuo API 키를 입력해 주세요.',
+                code: 'API_KEY_MISSING'
+            } as ApiErrorResponse);
+        }
+
         const sanitizedPrompt = sanitizePrompt(motionPrompt, 1000);
 
-        console.log('=== VIDEO GENERATION START ===');
-        console.log(`Model: ${MODELS.VIDEO}`);
+        console.log('=== VIDEO GENERATION START (Hailuo V2.3) ===');
         console.log('Duration:', durationSeconds, 'seconds');
 
         // Prepare the enhanced prompt for video generation
@@ -60,46 +81,63 @@ Technical Requirements:
 - No sudden jumps or artifacts
 `.trim();
 
-        // Generate video using Veo model
-        let operation;
+        // 소스 이미지를 data URL로 변환 (eachlabs.ai image_url 파라미터용)
+        const imageDataUrl = `data:${sourceImage.mimeType};base64,${sourceImage.data}`;
+
+        // Hailuo API로 prediction 생성
+        let predictionId: string;
         try {
-            operation = await ai.models.generateVideos({
-                model: MODELS.VIDEO,
-                prompt: enhancedPrompt,
-                image: {
-                    imageBytes: sourceImage.data,
-                    mimeType: sourceImage.mimeType as 'image/jpeg' | 'image/png',
+            const createResponse = await fetch(`${HAILUO_API_URL}/`, {
+                method: 'POST',
+                headers: {
+                    'X-API-Key': apiKey,
+                    'Content-Type': 'application/json',
                 },
-                config: {
-                    numberOfVideos: 1,
-                    durationSeconds: Math.min(durationSeconds, 8),
-                    aspectRatio: '16:9',
-                },
+                body: JSON.stringify({
+                    model: HAILUO_MODEL,
+                    version: HAILUO_VERSION,
+                    input: {
+                        prompt_optimizer: true,
+                        duration: String(durationSeconds <= 6 ? 6 : 10),
+                        image_url: imageDataUrl,
+                        prompt: enhancedPrompt,
+                    },
+                    webhook_url: '',
+                }),
             });
-            console.log('Operation created successfully');
+
+            const createResult = await createResponse.json() as any;
+
+            if (createResult.status !== 'success' || !createResult.predictionID) {
+                const errMsg = createResult.error || createResult.message || JSON.stringify(createResult);
+                throw new Error(errMsg);
+            }
+
+            predictionId = createResult.predictionID;
+            console.log(`Prediction created: ${predictionId}`);
         } catch (initError) {
-            console.error('Failed to create video generation operation:', initError);
+            console.error('Failed to create video generation prediction:', initError);
             const errorMsg = initError instanceof Error ? initError.message : String(initError);
 
-            if (errorMsg.includes('not found') || errorMsg.includes('404')) {
-                return res.status(400).json({
-                    error: `Veo 모델(${MODELS.VIDEO})을 찾을 수 없습니다. API 키가 Veo API를 지원하는지 확인하세요.`,
-                    code: 'MODEL_NOT_FOUND'
+            if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+                return res.status(403).json({
+                    error: 'Hailuo API 키가 유효하지 않습니다. 키를 확인하세요.',
+                    code: 'PERMISSION_DENIED'
                 } as ApiErrorResponse);
             }
 
-            throw new Error(`Veo API 호출 실패: ${errorMsg}`);
+            throw new Error(`Hailuo API 호출 실패: ${errorMsg}`);
         }
 
         console.log('Video generation started, polling for completion...');
 
         // Poll until video generation is complete (max 5 minutes timeout)
         const maxPollingTime = 300000; // 5 minutes
-        const pollInterval = 10000; // 10 seconds
+        const pollInterval = 5000; // 5초 간격
         const startTime = Date.now();
         let pollCount = 0;
 
-        while (!operation.done) {
+        while (true) {
             pollCount++;
             const elapsed = Math.round((Date.now() - startTime) / 1000);
 
@@ -111,81 +149,47 @@ Technical Requirements:
             await new Promise(resolve => setTimeout(resolve, pollInterval));
 
             try {
-                operation = await ai.operations.getVideosOperation({
-                    operation: operation,
+                const pollResponse = await fetch(`${HAILUO_API_URL}/${predictionId}`, {
+                    headers: {
+                        'X-API-Key': apiKey,
+                    },
                 });
+                const pollResult = await pollResponse.json() as any;
+
+                if (pollResult.status === 'success' && pollResult.output) {
+                    const totalTime = Math.round((Date.now() - startTime) / 1000);
+                    console.log(`Video generation completed in ${totalTime} seconds!`);
+
+                    const videoUrl = pollResult.output;
+                    console.log('=== VIDEO GENERATION SUCCESS ===');
+                    console.log('Output URL:', videoUrl);
+
+                    const result: VideoGenerationResult = {
+                        videoUrl: videoUrl,
+                        thumbnailUrl: `data:${sourceImage.mimeType};base64,${sourceImage.data}`,
+                        duration: durationSeconds,
+                    };
+                    return res.status(200).json(result);
+                }
+
+                if (pollResult.status === 'error') {
+                    const errDetail = pollResult.error || pollResult.message || '알 수 없는 오류';
+                    throw new Error(`비디오 생성 실패: ${errDetail}`);
+                }
+
+                // 아직 처리 중 (processing/pending) → 계속 폴링
             } catch (pollError) {
+                // 비디오 생성 관련 에러는 바로 throw
+                if (pollError instanceof Error && pollError.message.includes('비디오')) {
+                    throw pollError;
+                }
                 console.error(`Poll #${pollCount} failed:`, pollError);
-                throw new Error(`비디오 생성 상태 확인 실패`);
-            }
-        }
-
-        const totalTime = Math.round((Date.now() - startTime) / 1000);
-        console.log(`Video generation completed in ${totalTime} seconds!`);
-
-        // Extract video data from response
-        const response = operation.response as any;
-
-        let videoData: string | undefined;
-        let videoUrl: string | undefined;
-        let videoMimeType = 'video/mp4';
-
-        const videoSources = [
-            response?.generateVideoResponse?.generatedSamples?.[0]?.video,
-            response?.generatedVideos?.[0]?.video,
-            response?.generatedSamples?.[0]?.video,
-        ];
-
-        for (const video of videoSources) {
-            if (video) {
-                if (video.videoBytes) {
-                    videoData = video.videoBytes;
-                    videoMimeType = video.mimeType || 'video/mp4';
-                    break;
-                }
-                if (video.uri) {
-                    videoUrl = video.uri;
+                // 네트워크 에러 등은 재시도 허용 (최대 3회 연속 실패 시 중단)
+                if (pollCount > 3) {
+                    throw new Error('비디오 생성 상태 확인이 반복 실패했습니다.');
                 }
             }
         }
-
-        // videoBytes가 있으면 data URL로 변환
-        if (videoData) {
-            const videoDataUrl = `data:${videoMimeType};base64,${videoData}`;
-            console.log('=== VIDEO GENERATION SUCCESS (with bytes) ===');
-            const result: VideoGenerationResult = {
-                videoUrl: videoDataUrl,
-                thumbnailUrl: `data:${sourceImage.mimeType};base64,${sourceImage.data}`,
-                duration: durationSeconds,
-            };
-            return res.status(200).json(result);
-        }
-
-        // URI만 있는 경우 - Vercel API 프록시를 통해 다운로드
-        if (videoUrl) {
-            const fileMatch = videoUrl.match(/files\/([^:/?]+)/);
-            if (fileMatch) {
-                const fileId = fileMatch[1];
-                console.log('=== VIDEO GENERATION SUCCESS ===');
-                const proxyUrl = `/api/download-video?fileId=${fileId}`;
-                const result: VideoGenerationResult = {
-                    videoUrl: proxyUrl,
-                    thumbnailUrl: `data:${sourceImage.mimeType};base64,${sourceImage.data}`,
-                    duration: durationSeconds,
-                };
-                return res.status(200).json(result);
-            }
-
-            // fileId를 추출할 수 없는 경우
-            const result: VideoGenerationResult = {
-                videoUrl: videoUrl,
-                thumbnailUrl: `data:${sourceImage.mimeType};base64,${sourceImage.data}`,
-                duration: durationSeconds,
-            };
-            return res.status(200).json(result);
-        }
-
-        throw new Error('비디오 생성이 완료되었지만 비디오 데이터를 찾을 수 없습니다.');
 
     } catch (e) {
         console.error('=== VIDEO GENERATION ERROR ===');
@@ -194,19 +198,19 @@ Technical Requirements:
         if (e instanceof Error) {
             const msg = e.message;
 
-            if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('Forbidden')) {
+            if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('Forbidden') || msg.includes('Unauthorized')) {
                 return res.status(403).json({
-                    error: 'Veo API 접근 권한이 없습니다. API 키가 Veo를 지원하는지 확인하세요.',
+                    error: 'Hailuo API 접근 권한이 없습니다. API 키를 확인하세요.',
                     code: 'PERMISSION_DENIED'
                 } as ApiErrorResponse);
             }
-            if (msg.includes('QUOTA_EXCEEDED') || msg.includes('429') || msg.includes('Resource exhausted')) {
+            if (msg.includes('QUOTA_EXCEEDED') || msg.includes('429') || msg.includes('Resource exhausted') || msg.includes('rate limit')) {
                 return res.status(429).json({
-                    error: 'Veo API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.',
+                    error: 'API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.',
                     code: 'QUOTA_EXCEEDED'
                 } as ApiErrorResponse);
             }
-            if (msg.includes('비디오') || msg.includes('Veo')) {
+            if (msg.includes('비디오') || msg.includes('Hailuo')) {
                 return res.status(500).json({
                     error: msg,
                     code: 'VIDEO_GENERATION_FAILED'

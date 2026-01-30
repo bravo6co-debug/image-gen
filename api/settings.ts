@@ -33,7 +33,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 geminiApiKey: settings.geminiApiKey
                     ? maskApiKey(settings.geminiApiKey)
                     : undefined,
+                hailuoApiKey: settings.hailuoApiKey
+                    ? maskApiKey(settings.hailuoApiKey)
+                    : undefined,
                 hasApiKey: !!settings.geminiApiKey,
+                hasHailuoApiKey: !!settings.hailuoApiKey,
             };
 
             return res.status(200).json({
@@ -47,6 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // 설정 저장
             const {
                 geminiApiKey,
+                hailuoApiKey,
                 textModel,
                 imageModel,
                 videoModel,
@@ -57,18 +62,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // 유효성 검사
             const validTextModels = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'];
             const validImageModels = ['gemini-3-pro-image-preview', 'gemini-2.5-flash-image', 'imagen-4.0-generate-001', 'imagen-4.0-fast-generate-001'];
-            const validVideoModels = ['veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview'];
+            const validVideoModels = ['veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview', 'minimax-hailuo-v2-3-fast-standard-image-to-video'];
             const validTtsModels = ['gemini-2.5-flash-preview-tts'];
             const validTtsVoices = ['Kore', 'Aoede', 'Charon', 'Fenrir', 'Puck'];
 
             const updates: Record<string, unknown> = {};
 
-            // API 키 (빈 문자열이면 기존 값 유지, null이면 삭제)
+            // Gemini API 키 (빈 문자열이면 기존 값 유지, null이면 삭제)
             if (geminiApiKey !== undefined) {
                 if (geminiApiKey === null || geminiApiKey === '') {
                     updates.geminiApiKey = undefined;
                 } else if (typeof geminiApiKey === 'string' && geminiApiKey.trim()) {
                     updates.geminiApiKey = geminiApiKey.trim();
+                }
+            }
+
+            // Hailuo API 키 (동영상 생성용)
+            if (hailuoApiKey !== undefined) {
+                if (hailuoApiKey === null || hailuoApiKey === '') {
+                    updates.hailuoApiKey = undefined;
+                } else if (typeof hailuoApiKey === 'string' && hailuoApiKey.trim()) {
+                    updates.hailuoApiKey = hailuoApiKey.trim();
                 }
             }
 
@@ -116,7 +130,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 geminiApiKey: newSettings.geminiApiKey
                     ? maskApiKey(newSettings.geminiApiKey)
                     : undefined,
+                hailuoApiKey: newSettings.hailuoApiKey
+                    ? maskApiKey(newSettings.hailuoApiKey)
+                    : undefined,
                 hasApiKey: !!newSettings.geminiApiKey,
+                hasHailuoApiKey: !!newSettings.hailuoApiKey,
             };
 
             return res.status(200).json({

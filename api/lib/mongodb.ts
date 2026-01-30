@@ -60,6 +60,7 @@ export interface User {
 
 export interface UserSettings {
     geminiApiKey?: string;
+    hailuoApiKey?: string;
     textModel: string;
     imageModel: string;
     videoModel: string;
@@ -72,9 +73,10 @@ export interface UserSettings {
  */
 export const DEFAULT_SETTINGS: UserSettings = {
     geminiApiKey: undefined,
+    hailuoApiKey: undefined,
     textModel: 'gemini-2.5-flash',
     imageModel: 'gemini-2.5-flash-image',
-    videoModel: 'veo-3.1-fast-generate-preview',
+    videoModel: 'minimax-hailuo-v2-3-fast-standard-image-to-video',
     ttsModel: 'gemini-2.5-flash-preview-tts',
     ttsVoice: 'Kore',
 };
@@ -189,6 +191,9 @@ export async function saveUserSettings(userId: string, settings: Partial<UserSet
 
         if (settings.geminiApiKey !== undefined) {
             updateFields['settings.geminiApiKey'] = settings.geminiApiKey || undefined;
+        }
+        if (settings.hailuoApiKey !== undefined) {
+            updateFields['settings.hailuoApiKey'] = settings.hailuoApiKey || undefined;
         }
         if (settings.textModel) {
             updateFields['settings.textModel'] = settings.textModel;

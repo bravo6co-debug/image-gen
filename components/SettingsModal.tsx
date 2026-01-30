@@ -14,10 +14,12 @@ interface SettingsModalProps {
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  const { settings, hasApiKey, saveSettings, isLoading, loadSettings } = useAuth();
+  const { settings, hasApiKey, hasHailuoApiKey, saveSettings, isLoading, loadSettings } = useAuth();
 
   const [apiKey, setApiKey] = useState('');
+  const [hailuoApiKey, setHailuoApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showHailuoApiKey, setShowHailuoApiKey] = useState(false);
   const [textModel, setTextModel] = useState(DEFAULT_MODEL_CONFIG.textModel);
   const [imageModel, setImageModel] = useState(DEFAULT_MODEL_CONFIG.imageModel);
   const [videoModel, setVideoModel] = useState(DEFAULT_MODEL_CONFIG.videoModel);
@@ -34,6 +36,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       setVideoModel(settings.videoModel || DEFAULT_MODEL_CONFIG.videoModel);
       setTtsVoice(settings.ttsVoice || DEFAULT_MODEL_CONFIG.ttsVoice);
       setApiKey(''); // API 키는 보안상 표시하지 않음
+      setHailuoApiKey('');
     }
   }, [isOpen, settings]);
 
@@ -60,12 +63,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
     if (apiKey.trim()) {
       updates.geminiApiKey = apiKey.trim();
     }
+    if (hailuoApiKey.trim()) {
+      updates.hailuoApiKey = hailuoApiKey.trim();
+    }
 
     const result = await saveSettings(updates);
 
     if (result.success) {
       setSuccess('설정이 저장되었습니다.');
       setApiKey('');
+      setHailuoApiKey('');
       setTimeout(() => setSuccess(''), 3000);
     } else {
       setError(result.error || '설정 저장에 실패했습니다.');
@@ -133,6 +140,44 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             </div>
             <p className="mt-1 text-xs text-gray-500">
               Google AI Studio에서 발급받은 API 키
+            </p>
+          </div>
+
+          {/* Hailuo API 키 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Hailuo API 키 (동영상 생성)
+              {hasHailuoApiKey && (
+                <span className="ml-2 text-xs text-green-400">(설정됨)</span>
+              )}
+            </label>
+            <div className="relative">
+              <input
+                type={showHailuoApiKey ? 'text' : 'password'}
+                value={hailuoApiKey}
+                onChange={(e) => setHailuoApiKey(e.target.value)}
+                placeholder={hasHailuoApiKey ? '새 API 키로 변경하려면 입력' : 'Hailuo API 키 입력'}
+                className="w-full px-3 py-2 pr-10 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={() => setShowHailuoApiKey(!showHailuoApiKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              >
+                {showHailuoApiKey ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              eachlabs.ai에서 발급받은 API 키 (동영상 클립 생성에 필요)
             </p>
           </div>
 

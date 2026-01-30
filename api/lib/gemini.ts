@@ -179,8 +179,8 @@ export const MODELS = {
     IMAGE_PORTRAIT: 'gemini-2.5-flash-image',  // Character/prop/background portraits
     IMAGE_SCENE: 'gemini-2.5-flash-image',     // Scene images (with references)
 
-    // Video generation model
-    VIDEO: 'veo-3.1-fast-generate-preview',
+    // Video generation model (Hailuo V2.3 via eachlabs.ai)
+    VIDEO: 'minimax-hailuo-v2-3-fast-standard-image-to-video',
 
     // Text-to-Speech (TTS) model for narration
     TTS: 'gemini-2.5-flash-preview-tts',

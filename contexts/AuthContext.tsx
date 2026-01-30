@@ -18,13 +18,14 @@ interface AuthContextType {
   user: User | null;
   settings: GeminiModelConfig | null;
   hasApiKey: boolean;
+  hasHailuoApiKey: boolean;
   isAdmin: boolean;
   canUseApi: boolean; // 어드민이거나 본인 API 키가 있으면 true
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   loadSettings: () => Promise<void>;
-  saveSettings: (settings: Partial<GeminiModelConfig & { geminiApiKey?: string }>) => Promise<{ success: boolean; error?: string }>;
+  saveSettings: (settings: Partial<GeminiModelConfig & { geminiApiKey?: string; hailuoApiKey?: string }>) => Promise<{ success: boolean; error?: string }>;
   openLoginModal: () => void;
   openSettingsModal: () => void;
   isLoginModalOpen: boolean;
@@ -49,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(false);
   const [settings, setSettings] = useState<GeminiModelConfig | null>(null);
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [hasHailuoApiKey, setHasHailuoApiKey] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
@@ -143,6 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setSettings(null);
     setHasApiKey(false);
+    setHasHailuoApiKey(false);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   }, []);
@@ -177,6 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ttsVoice: data.settings.ttsVoice || DEFAULT_MODEL_CONFIG.ttsVoice,
         });
         setHasApiKey(data.settings.hasApiKey || false);
+        setHasHailuoApiKey(data.settings.hasHailuoApiKey || false);
 
         // user 상태도 업데이트
         if (user) {
@@ -194,7 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // 설정 저장
   const saveSettings = useCallback(async (
-    newSettings: Partial<GeminiModelConfig & { geminiApiKey?: string }>
+    newSettings: Partial<GeminiModelConfig & { geminiApiKey?: string; hailuoApiKey?: string }>
   ): Promise<{ success: boolean; error?: string }> => {
     if (!token) {
       return { success: false, error: '로그인이 필요합니다.' };
@@ -227,6 +231,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ttsVoice: data.settings.ttsVoice || DEFAULT_MODEL_CONFIG.ttsVoice,
         });
         setHasApiKey(data.settings.hasApiKey || false);
+        setHasHailuoApiKey(data.settings.hasHailuoApiKey || false);
 
         // user 상태도 업데이트
         if (user) {
@@ -263,6 +268,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         settings,
         hasApiKey,
+        hasHailuoApiKey,
         isAdmin,
         canUseApi,
         login,

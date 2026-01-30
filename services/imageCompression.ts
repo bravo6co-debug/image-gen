@@ -194,18 +194,69 @@ export const compressImage = async (dataUrl: string): Promise<CompressedImage> =
 };
 
 /**
+ * Upscale a small image using canvas (for video generation minimum size requirements)
+ */
+const upscaleImage = async (
+    img: HTMLImageElement,
+    minLongSide: number
+): Promise<string> => {
+    const longSide = Math.max(img.width, img.height);
+    if (longSide >= minLongSide) {
+        // 이미 충분히 큼 - 원본 그대로 JPEG 변환
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        return canvas.toDataURL('image/jpeg', 0.92);
+    }
+
+    const scale = minLongSide / longSide;
+    const newWidth = Math.round(img.width * scale);
+    const newHeight = Math.round(img.height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+    const ctx = canvas.getContext('2d')!;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+    return canvas.toDataURL('image/jpeg', 0.92);
+};
+
+/**
  * Compress an image for video generation (higher quality, larger dimensions).
  * Hailuo API requires minimum 300x300 pixels.
+ * Small images (< 720px) are automatically upscaled.
  * Uses 1280px max dimension and 1MB target size.
  */
-export const compressImageForVideo = async (dataUrl: string): Promise<CompressedImage> => {
+export const compressImageForVideo = async (dataUrl: string): Promise<CompressedImage & { upscaled?: boolean; dimensions?: { width: number; height: number } }> => {
     try {
         const img = await loadImage(dataUrl);
 
+        const VIDEO_MIN = 720;
         const VIDEO_MAX = 1280;
         const VIDEO_TARGET_SIZE = 1024 * 1024; // 1MB
 
-        // 원본이 이미 작고 가벼우면 그대로 사용
+        const longSide = Math.max(img.width, img.height);
+
+        // 작은 이미지는 업스케일 (최소 720px)
+        if (longSide < VIDEO_MIN) {
+            console.log(`Image too small (${img.width}x${img.height}), upscaling to min ${VIDEO_MIN}px...`);
+            const upscaled = await upscaleImage(img, VIDEO_MIN);
+            const base64Data = upscaled.split(',')[1];
+            const upscaledImg = await loadImage(upscaled);
+            return {
+                data: base64Data,
+                mimeType: 'image/jpeg',
+                upscaled: true,
+                dimensions: { width: upscaledImg.width, height: upscaledImg.height },
+            };
+        }
+
+        // 원본이 적정 크기이고 가벼우면 그대로 사용
         const originalSize = dataUrl.split(',')[1].length * 0.75;
         const needsCompression = originalSize > VIDEO_TARGET_SIZE ||
                                   img.width > VIDEO_MAX ||
@@ -215,7 +266,7 @@ export const compressImageForVideo = async (dataUrl: string): Promise<Compressed
             const [header, base64Data] = dataUrl.split(',');
             const mimeMatch = header.match(/data:([^;]+)/);
             const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-            return { data: base64Data, mimeType };
+            return { data: base64Data, mimeType, dimensions: { width: img.width, height: img.height } };
         }
 
         // 큰 이미지만 리사이즈 (최소 720px 보장)

@@ -16,6 +16,7 @@ export const FoodVideoTab: React.FC = () => {
   const [foodImage, setFoodImage] = useState<FoodImageData | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [imageSizeInfo, setImageSizeInfo] = useState<{ original: number; compressed: number } | null>(null);
+  const [imageWarning, setImageWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 프롬프트 상태
@@ -61,6 +62,12 @@ export const FoodVideoTab: React.FC = () => {
       setFoodImage({ mimeType: compressed.mimeType, data: compressed.data });
       setImagePreviewUrl(`data:${compressed.mimeType};base64,${compressed.data}`);
       setImageSizeInfo({ original: originalSize, compressed: compressedSize });
+
+      if (compressed.upscaled) {
+        setImageWarning(`원본 이미지가 작아서 자동 확대되었습니다 (→ ${compressed.dimensions?.width}x${compressed.dimensions?.height}). 고화질 원본 이미지를 사용하면 더 좋은 영상이 생성됩니다.`);
+      } else {
+        setImageWarning(null);
+      }
     } catch {
       setError('이미지 처리에 실패했습니다. 다른 이미지를 시도해 주세요.');
     }
@@ -91,6 +98,7 @@ export const FoodVideoTab: React.FC = () => {
     setFoodImage(null);
     setImagePreviewUrl(null);
     setImageSizeInfo(null);
+    setImageWarning(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -248,6 +256,11 @@ export const FoodVideoTab: React.FC = () => {
                       ? `${formatBytes(imageSizeInfo.original)} → ${formatBytes(imageSizeInfo.compressed)} (압축됨)`
                       : formatBytes(imageSizeInfo.compressed)
                     }
+                  </div>
+                )}
+                {imageWarning && (
+                  <div className="absolute top-2 left-2 right-12 px-2 py-1.5 bg-amber-900/90 border border-amber-600/50 rounded text-xs text-amber-300">
+                    {imageWarning}
                   </div>
                 )}
               </div>

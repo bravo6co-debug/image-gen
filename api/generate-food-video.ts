@@ -69,16 +69,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log('=== FOOD VIDEO GENERATION START ===');
         console.log('Step 1: Translating Korean food prompt to English video prompt...');
 
-        const aiClient = await getAIClientForUser(auth.userId);
+        let translatedPrompt: string;
+        try {
+            const aiClient = await getAIClientForUser(auth.userId);
 
-        const translationResponse = await aiClient.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: [
-                {
-                    role: 'user',
-                    parts: [
-                        {
-                            text: `You are a professional food cinematography director. Convert the following Korean food description into an English video motion prompt optimized for image-to-video generation.
+            const translationResponse = await aiClient.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [
+                            {
+                                text: `You are a professional food cinematography director. Convert the following Korean food description into an English video motion prompt optimized for image-to-video generation.
 
 The output must be a single cinematic English prompt that describes:
 - Camera movements (slow zoom, pan, dolly, tracking shot, etc.)
@@ -90,17 +92,49 @@ Only return the English prompt text. Do not include any explanation or Korean te
 
 Korean food description:
 ${sanitizedPrompt}`
-                        }
-                    ]
-                }
-            ]
-        });
+                            }
+                        ]
+                    }
+                ]
+            });
 
-        const translatedPrompt = (translationResponse as any)?.candidates?.[0]?.content?.parts?.[0]?.text
-            || (translationResponse as any)?.text
-            || sanitizedPrompt;
+            translatedPrompt = (translationResponse as any)?.candidates?.[0]?.content?.parts?.[0]?.text
+                || (translationResponse as any)?.text
+                || sanitizedPrompt;
 
-        console.log('Translated prompt:', translatedPrompt);
+            console.log('Translated prompt:', translatedPrompt);
+        } catch (geminiError) {
+            console.error('Gemini API error during prompt translation:', geminiError);
+            const errMsg = geminiError instanceof Error ? geminiError.message : String(geminiError);
+
+            // Gemini API 키 관련 오류 감지
+            if (errMsg.includes('API key not valid') || errMsg.includes('API_KEY_INVALID') || errMsg.includes('INVALID_ARGUMENT')) {
+                return res.status(403).json({
+                    error: 'Gemini API 키가 유효하지 않습니다. 설정에서 올바른 Gemini API 키를 입력해 주세요.',
+                    code: 'GEMINI_API_KEY_INVALID'
+                } as ApiErrorResponse);
+            }
+            if (errMsg.includes('PERMISSION_DENIED') || errMsg.includes('403')) {
+                return res.status(403).json({
+                    error: 'Gemini API 접근 권한이 없습니다. API 키를 확인하세요.',
+                    code: 'GEMINI_PERMISSION_DENIED'
+                } as ApiErrorResponse);
+            }
+            if (errMsg.includes('QUOTA_EXCEEDED') || errMsg.includes('429') || errMsg.includes('Resource exhausted')) {
+                return res.status(429).json({
+                    error: 'Gemini API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.',
+                    code: 'QUOTA_EXCEEDED'
+                } as ApiErrorResponse);
+            }
+            if (errMsg.includes('API 키가 설정되지 않았습니다') || errMsg.includes('서버 API 키')) {
+                return res.status(400).json({
+                    error: 'Gemini API 키가 설정되지 않았습니다. 설정에서 Gemini API 키를 입력해 주세요.',
+                    code: 'GEMINI_API_KEY_MISSING'
+                } as ApiErrorResponse);
+            }
+
+            throw new Error(`프롬프트 번역 실패 (Gemini): ${errMsg}`);
+        }
 
         // ============================================
         // Step 2: Hailuo API로 음식 영상 생성

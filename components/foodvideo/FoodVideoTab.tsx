@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { generateFoodVideo, type FoodVideoResult } from '../../services/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { compressImage, getBase64Size, formatBytes } from '../../services/imageCompression';
 
 // 이미지 데이터 타입
 interface FoodImageData {
@@ -14,6 +15,7 @@ export const FoodVideoTab: React.FC = () => {
   // 이미지 상태
   const [foodImage, setFoodImage] = useState<FoodImageData | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [imageSizeInfo, setImageSizeInfo] = useState<{ original: number; compressed: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 프롬프트 상태
@@ -27,33 +29,41 @@ export const FoodVideoTab: React.FC = () => {
   const [result, setResult] = useState<FoodVideoResult | null>(null);
   const [translatedPrompt, setTranslatedPrompt] = useState<string | null>(null);
 
-  // 이미지 업로드 처리
-  const handleImageUpload = useCallback((file: File) => {
+  // 이미지 업로드 처리 (자동 압축 포함)
+  const handleImageUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
       setError('이미지 파일만 업로드할 수 있습니다.');
       return;
     }
 
-    // 10MB 제한
+    // 10MB 원본 제한
     if (file.size > 10 * 1024 * 1024) {
       setError('이미지 크기는 10MB 이하여야 합니다.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const base64 = dataUrl.split(',')[1];
-      const mimeType = file.type;
+    setError(null);
 
-      setFoodImage({ mimeType, data: base64 });
-      setImagePreviewUrl(dataUrl);
-      setError(null);
-    };
-    reader.onerror = () => {
-      setError('이미지 파일을 읽는데 실패했습니다.');
-    };
-    reader.readAsDataURL(file);
+    try {
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const originalSize = file.size;
+
+      // 자동 압축 (768x768 이하, JPEG 품질 75%, 최대 300KB)
+      const compressed = await compressImage(dataUrl);
+      const compressedSize = getBase64Size(compressed.data);
+
+      setFoodImage({ mimeType: compressed.mimeType, data: compressed.data });
+      setImagePreviewUrl(`data:${compressed.mimeType};base64,${compressed.data}`);
+      setImageSizeInfo({ original: originalSize, compressed: compressedSize });
+    } catch {
+      setError('이미지 처리에 실패했습니다. 다른 이미지를 시도해 주세요.');
+    }
   }, []);
 
   // 파일 선택
@@ -83,6 +93,7 @@ export const FoodVideoTab: React.FC = () => {
   const handleRemoveImage = useCallback(() => {
     setFoodImage(null);
     setImagePreviewUrl(null);
+    setImageSizeInfo(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -197,6 +208,15 @@ export const FoodVideoTab: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
+                {/* 이미지 크기 정보 */}
+                {imageSizeInfo && (
+                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-gray-900/80 rounded text-xs text-gray-300">
+                    {imageSizeInfo.original !== imageSizeInfo.compressed
+                      ? `${formatBytes(imageSizeInfo.original)} → ${formatBytes(imageSizeInfo.compressed)} (압축됨)`
+                      : formatBytes(imageSizeInfo.compressed)
+                    }
+                  </div>
+                )}
               </div>
             ) : (
               <div
@@ -212,7 +232,7 @@ export const FoodVideoTab: React.FC = () => {
                   클릭하거나 이미지를 드래그하세요
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  JPG, PNG, WebP (최대 10MB)
+                  JPG, PNG, WebP (최대 10MB, 자동 압축: 768px / 300KB 이하)
                 </p>
               </div>
             )}

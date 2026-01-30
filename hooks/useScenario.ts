@@ -4,6 +4,7 @@ import {
   Scenario,
   Scene,
   ScenarioConfig,
+  AdScenarioConfig,
   ImageData,
   SceneAssetPlacement,
   CharacterAsset,
@@ -11,6 +12,7 @@ import {
 } from '../types';
 import {
   generateScenario as apiGenerateScenario,
+  generateAdScenario as apiGenerateAdScenario,
   regenerateScene as apiRegenerateScene,
   generateSceneImage as apiGenerateSceneImage,
 } from '../services/geminiService';
@@ -35,6 +37,8 @@ interface UseScenarioReturn {
   // 시나리오 관리
   setScenario: (scenario: Scenario | null) => void;
   generateScenario: (config: ScenarioConfig) => Promise<Scenario>;
+  generateAdScenario: (config: AdScenarioConfig) => Promise<Scenario>;
+  setProductImage: (image: ImageData | undefined) => void;
   updateSuggestedCharacter: (characterName: string, updates: Partial<SuggestedCharacter>) => void;
 
   // 씬 관리
@@ -124,6 +128,34 @@ export function useScenario(): UseScenarioReturn {
       setIsGenerating(false);
     }
   }, [contextSetScenario]);
+
+  // 광고 시나리오 생성
+  const generateAdScenario = useCallback(async (config: AdScenarioConfig): Promise<Scenario> => {
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const newScenario = await apiGenerateAdScenario(config);
+      contextSetScenario(newScenario);
+      return newScenario;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '광고 시나리오 생성에 실패했습니다.';
+      setError(message);
+      throw e;
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [contextSetScenario]);
+
+  // 상품 이미지 설정 (광고 시나리오용)
+  const setProductImage = useCallback((image: ImageData | undefined) => {
+    if (!scenario) return;
+    contextSetScenario({
+      ...scenario,
+      productImage: image,
+      updatedAt: Date.now(),
+    });
+  }, [scenario, contextSetScenario]);
 
   // 제안된 캐릭터 수정 (이름, 설명 등)
   const updateSuggestedCharacter = useCallback((
@@ -286,11 +318,16 @@ export function useScenario(): UseScenarioReturn {
         ? filterCharactersForScene(scene, allCharacters)
         : undefined;
 
+      // 광고 시나리오의 상품 이미지를 prop 참조에 자동 추가
+      const effectivePropImages = scenario.productImage
+        ? [scenario.productImage, ...propImages]
+        : propImages;
+
       // 시나리오의 imageStyle을 전달
       const imageData = await apiGenerateSceneImage(
         scene,
         characterImages,
-        propImages,
+        effectivePropImages,
         backgroundImage,
         aspectRatio,
         scenario.imageStyle,
@@ -342,10 +379,15 @@ export function useScenario(): UseScenarioReturn {
             ? filterCharactersForScene(scene, allCharacters)
             : undefined;
 
+          // 광고 시나리오의 상품 이미지를 prop 참조에 자동 추가
+          const effectivePropImages = scenario.productImage
+            ? [scenario.productImage, ...propImages]
+            : propImages;
+
           const imageData = await apiGenerateSceneImage(
             scene,
             characterImages,
-            propImages,
+            effectivePropImages,
             backgroundImage,
             aspectRatio,
             scenario.imageStyle,
@@ -545,6 +587,8 @@ export function useScenario(): UseScenarioReturn {
     // 시나리오 관리
     setScenario,
     generateScenario,
+    generateAdScenario,
+    setProductImage,
     updateSuggestedCharacter,
 
     // 씬 관리

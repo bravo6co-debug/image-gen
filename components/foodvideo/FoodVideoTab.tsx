@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { translateFoodPrompt, generateFoodVideo, type FoodVideoResult } from '../../services/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
-import { compressImage, getBase64Size, formatBytes } from '../../services/imageCompression';
+import { compressImageForVideo, getBase64Size, formatBytes } from '../../services/imageCompression';
 
 // 이미지 데이터 타입
 interface FoodImageData {
@@ -55,7 +55,7 @@ export const FoodVideoTab: React.FC = () => {
       });
 
       const originalSize = file.size;
-      const compressed = await compressImage(dataUrl);
+      const compressed = await compressImageForVideo(dataUrl);
       const compressedSize = getBase64Size(compressed.data);
 
       setFoodImage({ mimeType: compressed.mimeType, data: compressed.data });
@@ -265,7 +265,7 @@ export const FoodVideoTab: React.FC = () => {
                   클릭하거나 이미지를 드래그하세요
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  JPG, PNG, WebP (최대 10MB, 자동 압축: 768px / 300KB 이하)
+                  JPG, PNG, WebP (최대 10MB, 자동 압축: 1280px / 1MB 이하)
                 </p>
               </div>
             )}

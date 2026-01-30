@@ -194,6 +194,56 @@ export const compressImage = async (dataUrl: string): Promise<CompressedImage> =
 };
 
 /**
+ * Compress an image for video generation (higher quality, larger dimensions).
+ * Hailuo API requires minimum 300x300 pixels.
+ * Uses 1280px max dimension and 1MB target size.
+ */
+export const compressImageForVideo = async (dataUrl: string): Promise<CompressedImage> => {
+    try {
+        const img = await loadImage(dataUrl);
+
+        const VIDEO_MAX = 1280;
+        const VIDEO_TARGET_SIZE = 1024 * 1024; // 1MB
+
+        // 원본이 이미 작고 가벼우면 그대로 사용
+        const originalSize = dataUrl.split(',')[1].length * 0.75;
+        const needsCompression = originalSize > VIDEO_TARGET_SIZE ||
+                                  img.width > VIDEO_MAX ||
+                                  img.height > VIDEO_MAX;
+
+        if (!needsCompression) {
+            const [header, base64Data] = dataUrl.split(',');
+            const mimeMatch = header.match(/data:([^;]+)/);
+            const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+            return { data: base64Data, mimeType };
+        }
+
+        // 큰 이미지만 리사이즈 (최소 720px 보장)
+        let quality = 0.85;
+        let maxDim = VIDEO_MAX;
+        let result: string;
+
+        while (quality >= 0.5) {
+            result = await compressWithCanvas(img, maxDim, maxDim, quality, 'image/jpeg');
+            const size = result.split(',')[1].length * 0.75;
+            if (size <= VIDEO_TARGET_SIZE) {
+                return { data: result.split(',')[1], mimeType: 'image/jpeg' };
+            }
+            quality -= 0.1;
+            if (quality < 0.6 && maxDim > 720) {
+                maxDim = 720;
+                quality = 0.85;
+            }
+        }
+
+        return { data: result!.split(',')[1], mimeType: 'image/jpeg' };
+    } catch (error) {
+        console.error('Video image compression failed:', error);
+        throw error;
+    }
+};
+
+/**
  * Get the size of a base64 string in bytes
  */
 export const getBase64Size = (base64: string): number => {

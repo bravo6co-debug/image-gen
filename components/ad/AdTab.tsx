@@ -1,10 +1,9 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useProject } from '../../contexts/ProjectContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { useScenario } from '../../hooks/useScenario';
+import { useAdScenario } from '../../hooks/useAdScenario';
 import {
   AdScenarioConfig,
-  ImageData,
   ImageStyle,
   ScenarioTone,
   IMAGE_STYLE_OPTIONS,
@@ -61,7 +60,7 @@ const AdTab: React.FC = () => {
   const { isAuthenticated, canUseApi } = useAuth();
   const { imageStyle: projectImageStyle } = useProject();
   const {
-    scenario,
+    adScenario,
     isGenerating,
     generatingImageSceneId,
     isGeneratingAllImages,
@@ -71,9 +70,9 @@ const AdTab: React.FC = () => {
     generateSceneImage,
     generateAllSceneImages,
     replaceSceneImage,
-    setScenario,
+    setAdScenario,
     clearError,
-  } = useScenario();
+  } = useAdScenario();
 
   // Input form state
   const [productName, setProductName] = useState('');
@@ -150,7 +149,7 @@ const AdTab: React.FC = () => {
       setShowApiKeyModal(true);
       return;
     }
-    await generateSceneImage(sceneId, [], [], null);
+    await generateSceneImage(sceneId);
   }, [isAuthenticated, canUseApi, generateSceneImage]);
 
   // 전체 이미지 생성
@@ -159,20 +158,20 @@ const AdTab: React.FC = () => {
       setShowApiKeyModal(true);
       return;
     }
-    await generateAllSceneImages([], [], null, { includeTTS: true, ttsVoice: 'Kore' });
+    await generateAllSceneImages({ includeTTS: true, ttsVoice: 'Kore' });
   }, [isAuthenticated, canUseApi, generateAllSceneImages]);
 
   // 새 시나리오 생성 (현재 시나리오 초기화)
   const handleNewScenario = useCallback(() => {
-    setScenario(null);
-  }, [setScenario]);
+    setAdScenario(null);
+  }, [setAdScenario]);
 
-  const isAdScenario = scenario?.scenarioType === 'ad';
+  const hasAdScenario = adScenario !== null;
 
   return (
     <div className="h-full flex flex-col">
-      {/* 시나리오가 없거나 광고 시나리오가 아닐 때: 입력 폼 */}
-      {!isAdScenario ? (
+      {/* 광고 시나리오가 없을 때: 입력 폼 */}
+      {!hasAdScenario ? (
         <div className="flex-grow flex flex-col items-center justify-center bg-gray-800/50 rounded-xl border border-gray-700 p-4 sm:p-8">
           <div className="w-full max-w-lg">
             {/* Header */}
@@ -286,12 +285,12 @@ const AdTab: React.FC = () => {
           <div className="flex-shrink-0 p-3 sm:p-4 border-b border-gray-700 bg-gray-800">
             <div className="flex items-start justify-between gap-2">
               <div className="flex-grow min-w-0">
-                <h2 className="text-base sm:text-lg font-bold text-white truncate">{scenario.title}</h2>
-                <p className="text-xs sm:text-sm text-gray-400 mt-1">{scenario.synopsis}</p>
+                <h2 className="text-base sm:text-lg font-bold text-white truncate">{adScenario.title}</h2>
+                <p className="text-xs sm:text-sm text-gray-400 mt-1">{adScenario.synopsis}</p>
                 <div className="flex flex-wrap gap-1.5 mt-2 text-xs">
                   <span className="px-2 py-1 bg-orange-900/50 rounded text-orange-300">30초 광고</span>
                   <span className="px-2 py-1 bg-gray-700 rounded text-gray-300">6씬 x 5초</span>
-                  <span className="px-2 py-1 bg-gray-700 rounded text-gray-300">{scenario.productName}</span>
+                  <span className="px-2 py-1 bg-gray-700 rounded text-gray-300">{adScenario.productName}</span>
                 </div>
               </div>
               <div className="flex gap-1.5 flex-shrink-0">
@@ -332,10 +331,10 @@ const AdTab: React.FC = () => {
                 onChange={handleProductImageUpload}
                 className="hidden"
               />
-              {scenario.productImage ? (
+              {adScenario.productImage ? (
                 <div className="flex items-center gap-3">
                   <img
-                    src={`data:${scenario.productImage.mimeType};base64,${scenario.productImage.data}`}
+                    src={`data:${adScenario.productImage.mimeType};base64,${adScenario.productImage.data}`}
                     alt="상품 이미지"
                     className="w-20 h-20 object-cover rounded-lg border border-orange-600/50"
                   />
@@ -372,7 +371,7 @@ const AdTab: React.FC = () => {
             {/* 씬 목록 */}
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-gray-300">씬 구성 (6씬 x 5초)</h3>
-              {scenario.scenes.map((scene) => {
+              {adScenario.scenes.map((scene) => {
                 const sceneImage = scene.customImage || scene.generatedImage;
                 const isGeneratingThis = generatingImageSceneId === scene.id;
                 const beatColor = STORY_BEAT_COLORS[scene.storyBeat] || 'bg-gray-600';

@@ -137,6 +137,7 @@ export interface Project {
   props: PropAsset[];
   backgrounds: BackgroundAsset[];
   scenario: Scenario | null;
+  adScenario: Scenario | null;
   videoTimeline: VideoTimeline | null;
   createdAt: number;
   updatedAt: number;

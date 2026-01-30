@@ -225,7 +225,7 @@ export function useVideo(): UseVideoReturn {
       const result = await generateVideoFromImage(
         clip.sourceImage,
         clip.motionPrompt || 'Cinematic camera movement with subtle motion',
-        Math.min(clip.duration, 10) // Hailuo supports 6s or 10s per clip
+        Math.min(clip.duration, 6) // Hailuo 클립 최대 6초
       );
 
       // Update with generated video

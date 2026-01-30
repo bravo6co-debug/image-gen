@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { generateFoodVideo, type FoodVideoResult } from '../../services/apiClient';
+import { translateFoodPrompt, generateFoodVideo, type FoodVideoResult } from '../../services/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { compressImage, getBase64Size, formatBytes } from '../../services/imageCompression';
 
@@ -19,15 +19,18 @@ export const FoodVideoTab: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 프롬프트 상태
-  const [prompt, setPrompt] = useState('');
+  const [koreanPrompt, setKoreanPrompt] = useState('');
+  const [englishPrompt, setEnglishPrompt] = useState('');
+  const [koreanDescription, setKoreanDescription] = useState('');
 
-  // 생성 상태
+  // 단계 상태
+  const [isTranslating, setIsTranslating] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isTranslated, setIsTranslated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // 결과 상태
   const [result, setResult] = useState<FoodVideoResult | null>(null);
-  const [translatedPrompt, setTranslatedPrompt] = useState<string | null>(null);
 
   // 이미지 업로드 처리 (자동 압축 포함)
   const handleImageUpload = useCallback(async (file: File) => {
@@ -36,7 +39,6 @@ export const FoodVideoTab: React.FC = () => {
       return;
     }
 
-    // 10MB 원본 제한
     if (file.size > 10 * 1024 * 1024) {
       setError('이미지 크기는 10MB 이하여야 합니다.');
       return;
@@ -53,8 +55,6 @@ export const FoodVideoTab: React.FC = () => {
       });
 
       const originalSize = file.size;
-
-      // 자동 압축 (768x768 이하, JPEG 품질 75%, 최대 300KB)
       const compressed = await compressImage(dataUrl);
       const compressedSize = getBase64Size(compressed.data);
 
@@ -66,7 +66,6 @@ export const FoodVideoTab: React.FC = () => {
     }
   }, []);
 
-  // 파일 선택
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -74,7 +73,6 @@ export const FoodVideoTab: React.FC = () => {
     }
   }, [handleImageUpload]);
 
-  // 드래그 앤 드롭
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -89,7 +87,6 @@ export const FoodVideoTab: React.FC = () => {
     e.stopPropagation();
   }, []);
 
-  // 이미지 제거
   const handleRemoveImage = useCallback(() => {
     setFoodImage(null);
     setImagePreviewUrl(null);
@@ -99,14 +96,48 @@ export const FoodVideoTab: React.FC = () => {
     }
   }, []);
 
-  // 영상 생성
+  // Step 1: 프롬프트 변환 (한국어 → 영어)
+  const handleTranslate = useCallback(async () => {
+    if (!koreanPrompt.trim()) {
+      setError('한국어 프롬프트를 입력해 주세요.');
+      return;
+    }
+    if (!isAuthenticated) {
+      openLoginModal();
+      return;
+    }
+    if (!canUseApi) {
+      openSettingsModal();
+      return;
+    }
+
+    setIsTranslating(true);
+    setError(null);
+    setEnglishPrompt('');
+    setKoreanDescription('');
+    setIsTranslated(false);
+
+    try {
+      const result = await translateFoodPrompt(koreanPrompt.trim());
+      setEnglishPrompt(result.englishPrompt);
+      setKoreanDescription(result.koreanDescription);
+      setIsTranslated(true);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '프롬프트 변환에 실패했습니다.';
+      setError(errorMessage);
+    } finally {
+      setIsTranslating(false);
+    }
+  }, [koreanPrompt, isAuthenticated, canUseApi, openLoginModal, openSettingsModal]);
+
+  // Step 2: 영상 생성
   const handleGenerate = useCallback(async () => {
     if (!foodImage) {
       setError('음식 이미지를 업로드해 주세요.');
       return;
     }
-    if (!prompt.trim()) {
-      setError('프롬프트를 입력해 주세요.');
+    if (!englishPrompt.trim()) {
+      setError('영어 프롬프트가 필요합니다. 먼저 프롬프트 변환을 진행해 주세요.');
       return;
     }
     if (!isAuthenticated) {
@@ -121,19 +152,17 @@ export const FoodVideoTab: React.FC = () => {
     setIsGenerating(true);
     setError(null);
     setResult(null);
-    setTranslatedPrompt(null);
 
     try {
-      const videoResult = await generateFoodVideo(foodImage, prompt.trim(), 6);
+      const videoResult = await generateFoodVideo(foodImage, englishPrompt.trim(), 6);
       setResult(videoResult);
-      setTranslatedPrompt(videoResult.translatedPrompt);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '영상 생성에 실패했습니다.';
       setError(errorMessage);
     } finally {
       setIsGenerating(false);
     }
-  }, [foodImage, prompt, isAuthenticated, canUseApi, openLoginModal, openSettingsModal]);
+  }, [foodImage, englishPrompt, isAuthenticated, canUseApi, openLoginModal, openSettingsModal]);
 
   // 영상 다운로드
   const handleDownload = useCallback(async () => {
@@ -155,10 +184,15 @@ export const FoodVideoTab: React.FC = () => {
     }
   }, [result]);
 
-  // 재생성 (같은 이미지, 수정된 프롬프트)
-  const handleRegenerate = useCallback(() => {
-    handleGenerate();
-  }, [handleGenerate]);
+  // 한국어 프롬프트 변경 시 변환 결과 초기화
+  const handleKoreanPromptChange = useCallback((value: string) => {
+    setKoreanPrompt(value);
+    if (isTranslated) {
+      setIsTranslated(false);
+      setEnglishPrompt('');
+      setKoreanDescription('');
+    }
+  }, [isTranslated]);
 
   return (
     <div className="h-full flex flex-col bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
@@ -208,7 +242,6 @@ export const FoodVideoTab: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
-                {/* 이미지 크기 정보 */}
                 {imageSizeInfo && (
                   <div className="absolute bottom-2 left-2 px-2 py-1 bg-gray-900/80 rounded text-xs text-gray-300">
                     {imageSizeInfo.original !== imageSizeInfo.compressed
@@ -245,50 +278,135 @@ export const FoodVideoTab: React.FC = () => {
             />
           </div>
 
-          {/* 한국어 프롬프트 입력 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              한국어 프롬프트
-            </label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="예: 김이 모락모락 나는 라면을 젓가락으로 들어올리는 장면"
-              rows={3}
-              maxLength={500}
-              className="w-full px-3 py-2.5 bg-gray-900 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none text-sm sm:text-base"
-            />
-            <div className="flex justify-between mt-1">
-              <p className="text-xs text-gray-500">
-                음식의 움직임이나 카메라 동작을 자유롭게 묘사하세요
-              </p>
-              <span className="text-xs text-gray-500">{prompt.length}/500</span>
+          {/* ============================================ */}
+          {/* Step 1: 한국어 프롬프트 → 영어 프롬프트 변환 */}
+          {/* ============================================ */}
+          <div className="p-3 sm:p-4 bg-gray-900/40 border border-gray-700 rounded-xl space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex-shrink-0">1</span>
+              <h3 className="text-sm font-bold text-white">프롬프트 변환</h3>
+              <span className="text-xs text-gray-500">한국어 → 영어 시네마틱 프롬프트</span>
             </div>
+
+            <div>
+              <textarea
+                value={koreanPrompt}
+                onChange={(e) => handleKoreanPromptChange(e.target.value)}
+                placeholder="예: 김이 모락모락 나는 라면을 젓가락으로 들어올리는 장면"
+                rows={3}
+                maxLength={500}
+                className="w-full px-3 py-2.5 bg-gray-900 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm"
+              />
+              <div className="flex justify-between mt-1">
+                <p className="text-xs text-gray-500">
+                  음식의 움직임이나 카메라 동작을 자유롭게 묘사하세요
+                </p>
+                <span className="text-xs text-gray-500">{koreanPrompt.length}/500</span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleTranslate}
+              disabled={isTranslating || !koreanPrompt.trim()}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px]"
+            >
+              {isTranslating ? (
+                <>
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  프롬프트 변환 중...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                  </svg>
+                  프롬프트 변환
+                </>
+              )}
+            </button>
           </div>
 
-          {/* 생성 버튼 */}
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating || !foodImage || !prompt.trim()}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm sm:text-base font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl hover:from-amber-400 hover:to-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-h-[48px]"
-          >
-            {isGenerating ? (
-              <>
-                <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                영상 생성 중... (최대 5분 소요)
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                영상 생성
-              </>
-            )}
-          </button>
+          {/* 변환 결과 */}
+          {isTranslated && (
+            <div className="p-3 sm:p-4 bg-gray-900/40 border border-emerald-700/50 rounded-xl space-y-3">
+              {/* 한국어 설명 */}
+              {koreanDescription && (
+                <div className="p-3 bg-emerald-900/30 border border-emerald-700/40 rounded-lg">
+                  <p className="text-xs font-medium text-emerald-400 mb-1.5 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    이런 영상이 생성됩니다
+                  </p>
+                  <p className="text-sm text-gray-300 leading-relaxed">{koreanDescription}</p>
+                </div>
+              )}
+
+              {/* 영어 프롬프트 (편집 가능) */}
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5 flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  영어 프롬프트 (편집 가능)
+                </label>
+                <textarea
+                  value={englishPrompt}
+                  onChange={(e) => setEnglishPrompt(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2.5 bg-gray-900 border border-gray-600 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none text-sm font-mono leading-relaxed"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  영어 프롬프트를 직접 수정하여 원하는 영상을 더 정확하게 묘사할 수 있습니다
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================ */}
+          {/* Step 2: 영상 생성 */}
+          {/* ============================================ */}
+          {isTranslated && (
+            <div className="p-3 sm:p-4 bg-gray-900/40 border border-gray-700 rounded-xl space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-600 text-white text-xs font-bold flex-shrink-0">2</span>
+                <h3 className="text-sm font-bold text-white">영상 생성</h3>
+                <span className="text-xs text-gray-500">Hailuo AI로 영상 제작</span>
+              </div>
+
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating || !foodImage || !englishPrompt.trim()}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 rounded-lg hover:from-amber-400 hover:to-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-h-[48px]"
+              >
+                {isGenerating ? (
+                  <>
+                    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    영상 생성 중... (최대 5분 소요)
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    영상 생성
+                  </>
+                )}
+              </button>
+
+              {!foodImage && (
+                <p className="text-xs text-amber-400 text-center">
+                  영상을 생성하려면 먼저 음식 이미지를 업로드하세요
+                </p>
+              )}
+            </div>
+          )}
 
           {/* 에러 메시지 */}
           {error && (
@@ -316,7 +434,6 @@ export const FoodVideoTab: React.FC = () => {
                   생성된 영상
                 </h3>
 
-                {/* 비디오 플레이어 */}
                 <div className="rounded-xl overflow-hidden bg-black border border-gray-700">
                   <video
                     src={result.videoUrl}
@@ -329,7 +446,6 @@ export const FoodVideoTab: React.FC = () => {
                   </video>
                 </div>
 
-                {/* 다운로드 + 재생성 버튼 */}
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={handleDownload}
@@ -341,46 +457,34 @@ export const FoodVideoTab: React.FC = () => {
                     다운로드
                   </button>
                   <button
-                    onClick={handleRegenerate}
+                    onClick={handleGenerate}
                     disabled={isGenerating}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-colors disabled:opacity-50 min-h-[44px]"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    프롬프트 수정 후 재생성
+                    재생성
                   </button>
                 </div>
               </div>
-
-              {/* 변환된 영어 프롬프트 (참고용) */}
-              {translatedPrompt && (
-                <div className="p-3 bg-gray-900/50 border border-gray-700 rounded-xl">
-                  <p className="text-xs font-medium text-gray-400 mb-1.5 flex items-center gap-1.5">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                    </svg>
-                    변환된 영어 프롬프트 (참고)
-                  </p>
-                  <p className="text-xs text-gray-400 leading-relaxed">{translatedPrompt}</p>
-                </div>
-              )}
             </div>
           )}
 
           {/* 사용 안내 (결과가 없을 때만) */}
-          {!result && !isGenerating && (
+          {!result && !isGenerating && !isTranslated && (
             <div className="p-4 bg-gray-900/30 border border-gray-700/50 rounded-xl">
               <h4 className="text-xs sm:text-sm font-medium text-gray-300 mb-2">사용 방법</h4>
               <ol className="text-xs text-gray-500 space-y-1.5 list-decimal list-inside">
                 <li>음식 사진을 업로드하세요</li>
                 <li>원하는 움직임을 한국어로 설명하세요</li>
-                <li>"영상 생성" 버튼을 클릭하면 AI가 자동으로 영어 프롬프트로 변환 후 영상을 만듭니다</li>
-                <li>결과를 확인하고 프롬프트를 수정하여 다시 생성할 수 있습니다</li>
+                <li><span className="text-blue-400 font-medium">"프롬프트 변환"</span> 버튼을 클릭하면 AI가 영어 시네마틱 프롬프트로 변환합니다</li>
+                <li>변환된 프롬프트를 확인하고 필요하면 직접 수정하세요</li>
+                <li><span className="text-amber-400 font-medium">"영상 생성"</span> 버튼으로 영상을 제작합니다</li>
               </ol>
               <div className="mt-3 p-2.5 bg-amber-900/20 border border-amber-700/30 rounded-lg">
                 <p className="text-xs text-amber-400">
-                  Hailuo API 키가 필요합니다. 설정에서 API 키를 등록하세요.
+                  Gemini API 키 (프롬프트 변환)와 Hailuo API 키 (영상 생성)가 모두 필요합니다. 설정에서 API 키를 등록하세요.
                 </p>
               </div>
             </div>

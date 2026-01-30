@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sanitizePrompt, setCorsHeaders, getAIClientForUser } from './lib/gemini.js';
+import { setCorsHeaders } from './lib/gemini.js';
 import { requireAuth } from './lib/auth.js';
 import { findUserById } from './lib/mongodb.js';
 import type { ApiErrorResponse } from './lib/types.js';
@@ -14,21 +14,20 @@ interface GenerateFoodVideoRequest {
         mimeType: string;
         data: string;
     };
-    prompt: string;
+    englishPrompt: string;
     durationSeconds?: number;
 }
 
 interface FoodVideoResult {
     videoUrl: string;
-    translatedPrompt: string;
     duration: number;
 }
 
 /**
  * POST /api/generate-food-video
- * Generates a cinematic food video from a food image and Korean description.
- * Step 1: Translates Korean food prompt to English cinematic video prompt via Gemini.
- * Step 2: Generates video using Hailuo V2.3 image-to-video (eachlabs.ai).
+ * Generates a cinematic food video from a food image and an English video prompt.
+ * Uses Hailuo V2.3 image-to-video (eachlabs.ai).
+ * Note: Prompt translation is handled separately by /api/translate-food-prompt.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     setCorsHeaders(res, req.headers.origin as string);
@@ -51,95 +50,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        const { foodImage, prompt, durationSeconds = 6 } = req.body as GenerateFoodVideoRequest;
+        const { foodImage, englishPrompt, durationSeconds = 6 } = req.body as GenerateFoodVideoRequest;
 
         if (!foodImage || !foodImage.data || !foodImage.mimeType) {
-            return res.status(400).json({ error: 'foodImage is required (mimeType and data)' } as ApiErrorResponse);
+            return res.status(400).json({ error: '음식 이미지가 필요합니다.' } as ApiErrorResponse);
         }
 
-        if (!prompt) {
-            return res.status(400).json({ error: 'prompt is required' } as ApiErrorResponse);
+        if (!englishPrompt) {
+            return res.status(400).json({ error: '영어 프롬프트가 필요합니다. 먼저 프롬프트 변환을 진행해 주세요.' } as ApiErrorResponse);
         }
 
-        const sanitizedPrompt = sanitizePrompt(prompt, 1000);
-
-        // ============================================
-        // Step 1: 한국어 음식 설명을 영어 영상 프롬프트로 변환
-        // ============================================
         console.log('=== FOOD VIDEO GENERATION START ===');
-        console.log('Step 1: Translating Korean food prompt to English video prompt...');
-
-        let translatedPrompt: string;
-        try {
-            const aiClient = await getAIClientForUser(auth.userId);
-
-            const translationResponse = await aiClient.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: [
-                    {
-                        role: 'user',
-                        parts: [
-                            {
-                                text: `You are a professional food cinematography director. Convert the following Korean food description into an English video motion prompt optimized for image-to-video generation.
-
-The output must be a single cinematic English prompt that describes:
-- Camera movements (slow zoom, pan, dolly, tracking shot, etc.)
-- Food presentation details (steam rising, sauce drizzling, garnish falling, etc.)
-- Lighting and atmosphere (warm lighting, soft bokeh, golden hour, etc.)
-- Cinematic quality cues (shallow depth of field, slow motion, macro lens, etc.)
-
-Only return the English prompt text. Do not include any explanation or Korean text.
-
-Korean food description:
-${sanitizedPrompt}`
-                            }
-                        ]
-                    }
-                ]
-            });
-
-            translatedPrompt = (translationResponse as any)?.candidates?.[0]?.content?.parts?.[0]?.text
-                || (translationResponse as any)?.text
-                || sanitizedPrompt;
-
-            console.log('Translated prompt:', translatedPrompt);
-        } catch (geminiError) {
-            console.error('Gemini API error during prompt translation:', geminiError);
-            const errMsg = geminiError instanceof Error ? geminiError.message : String(geminiError);
-
-            // Gemini API 키 관련 오류 감지
-            if (errMsg.includes('API key not valid') || errMsg.includes('API_KEY_INVALID') || errMsg.includes('INVALID_ARGUMENT')) {
-                return res.status(403).json({
-                    error: 'Gemini API 키가 유효하지 않습니다. 설정에서 올바른 Gemini API 키를 입력해 주세요.',
-                    code: 'GEMINI_API_KEY_INVALID'
-                } as ApiErrorResponse);
-            }
-            if (errMsg.includes('PERMISSION_DENIED') || errMsg.includes('403')) {
-                return res.status(403).json({
-                    error: 'Gemini API 접근 권한이 없습니다. API 키를 확인하세요.',
-                    code: 'GEMINI_PERMISSION_DENIED'
-                } as ApiErrorResponse);
-            }
-            if (errMsg.includes('QUOTA_EXCEEDED') || errMsg.includes('429') || errMsg.includes('Resource exhausted')) {
-                return res.status(429).json({
-                    error: 'Gemini API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.',
-                    code: 'QUOTA_EXCEEDED'
-                } as ApiErrorResponse);
-            }
-            if (errMsg.includes('API 키가 설정되지 않았습니다') || errMsg.includes('서버 API 키')) {
-                return res.status(400).json({
-                    error: 'Gemini API 키가 설정되지 않았습니다. 설정에서 Gemini API 키를 입력해 주세요.',
-                    code: 'GEMINI_API_KEY_MISSING'
-                } as ApiErrorResponse);
-            }
-
-            throw new Error(`프롬프트 번역 실패 (Gemini): ${errMsg}`);
-        }
-
-        // ============================================
-        // Step 2: Hailuo API로 음식 영상 생성
-        // ============================================
-        console.log('Step 2: Generating food video via Hailuo API...');
+        console.log('English prompt:', englishPrompt);
 
         // 사용자별 Hailuo API 키 조회 (어드민은 환경변수, 일반 사용자는 본인 키)
         let hailuoApiKey: string | undefined;
@@ -153,7 +75,7 @@ ${sanitizedPrompt}`
         if (!hailuoApiKey) {
             return res.status(400).json({
                 error: 'Hailuo API 키가 설정되지 않았습니다. 설정에서 Hailuo API 키를 입력해 주세요.',
-                code: 'API_KEY_MISSING'
+                code: 'HAILUO_API_KEY_MISSING'
             } as ApiErrorResponse);
         }
 
@@ -176,7 +98,7 @@ ${sanitizedPrompt}`
                         prompt_optimizer: true,
                         duration: '6',
                         image_url: dataUrl,
-                        prompt: translatedPrompt,
+                        prompt: englishPrompt,
                     },
                     webhook_url: '',
                 }),
@@ -197,8 +119,8 @@ ${sanitizedPrompt}`
 
             if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
                 return res.status(403).json({
-                    error: 'Hailuo API 키가 유효하지 않습니다. 키를 확인하세요.',
-                    code: 'PERMISSION_DENIED'
+                    error: 'Hailuo API 키가 유효하지 않습니다. 설정에서 키를 확인하세요.',
+                    code: 'HAILUO_PERMISSION_DENIED'
                 } as ApiErrorResponse);
             }
 
@@ -218,7 +140,7 @@ ${sanitizedPrompt}`
             const elapsed = Math.round((Date.now() - startTime) / 1000);
 
             if (Date.now() - startTime > maxPollingTime) {
-                throw new Error(`음식 영상 생성 시간 초과 (${elapsed}초 경과). 나중에 다시 시도하세요.`);
+                throw new Error(`영상 생성 시간 초과 (${elapsed}초 경과). 나중에 다시 시도하세요.`);
             }
 
             console.log(`Polling #${pollCount} - ${elapsed}s elapsed...`);
@@ -242,7 +164,6 @@ ${sanitizedPrompt}`
 
                     const result: FoodVideoResult = {
                         videoUrl: videoUrl,
-                        translatedPrompt: translatedPrompt,
                         duration: durationSeconds,
                     };
                     return res.status(200).json(result);
@@ -250,19 +171,17 @@ ${sanitizedPrompt}`
 
                 if (pollResult.status === 'error') {
                     const errDetail = pollResult.error || pollResult.message || '알 수 없는 오류';
-                    throw new Error(`음식 영상 생성 실패: ${errDetail}`);
+                    throw new Error(`영상 생성 실패: ${errDetail}`);
                 }
 
                 // 아직 처리 중 (processing/pending) -> 계속 폴링
             } catch (pollError) {
-                // 음식 영상 생성 관련 에러는 바로 throw
-                if (pollError instanceof Error && pollError.message.includes('음식')) {
+                if (pollError instanceof Error && pollError.message.includes('영상 생성')) {
                     throw pollError;
                 }
                 console.error(`Poll #${pollCount} failed:`, pollError);
-                // 네트워크 에러 등은 재시도 허용 (최대 3회 연속 실패 시 중단)
                 if (pollCount > 3) {
-                    throw new Error('음식 영상 생성 상태 확인이 반복 실패했습니다.');
+                    throw new Error('영상 생성 상태 확인이 반복 실패했습니다.');
                 }
             }
         }
@@ -277,30 +196,24 @@ ${sanitizedPrompt}`
             if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('Forbidden') || msg.includes('Unauthorized')) {
                 return res.status(403).json({
                     error: 'Hailuo API 접근 권한이 없습니다. API 키를 확인하세요.',
-                    code: 'PERMISSION_DENIED'
+                    code: 'HAILUO_PERMISSION_DENIED'
                 } as ApiErrorResponse);
             }
             if (msg.includes('QUOTA_EXCEEDED') || msg.includes('429') || msg.includes('Resource exhausted') || msg.includes('rate limit')) {
                 return res.status(429).json({
-                    error: 'API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.',
+                    error: 'Hailuo API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.',
                     code: 'QUOTA_EXCEEDED'
-                } as ApiErrorResponse);
-            }
-            if (msg.includes('음식') || msg.includes('Hailuo')) {
-                return res.status(500).json({
-                    error: msg,
-                    code: 'FOOD_VIDEO_GENERATION_FAILED'
                 } as ApiErrorResponse);
             }
 
             return res.status(500).json({
-                error: `음식 영상 생성 실패: ${msg}`,
+                error: `영상 생성 실패: ${msg}`,
                 code: 'FOOD_VIDEO_GENERATION_FAILED'
             } as ApiErrorResponse);
         }
 
         return res.status(500).json({
-            error: '음식 영상 생성 중 알 수 없는 오류가 발생했습니다.',
+            error: '영상 생성 중 알 수 없는 오류가 발생했습니다.',
             code: 'UNKNOWN_ERROR'
         } as ApiErrorResponse);
     }

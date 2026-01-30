@@ -394,23 +394,37 @@ export const checkVideoApiAvailability = async (): Promise<{ available: boolean;
 export const checkVeoApiAvailability = checkVideoApiAvailability;
 
 // ============================================
-// FOOD VIDEO GENERATION
+// FOOD VIDEO GENERATION (2-step)
 // ============================================
 
+// Step 1: 한국어 프롬프트 → 영어 프롬프트 변환
+export interface TranslateFoodPromptResult {
+    englishPrompt: string;
+    koreanDescription: string;
+}
+
+export const translateFoodPrompt = async (
+    prompt: string
+): Promise<TranslateFoodPromptResult> => {
+    return post<TranslateFoodPromptResult>('/api/translate-food-prompt', {
+        prompt,
+    }, 'food-translate');
+};
+
+// Step 2: 영어 프롬프트 + 이미지 → 영상 생성
 export interface FoodVideoResult {
     videoUrl: string;
-    translatedPrompt: string;
     duration: number;
 }
 
 export const generateFoodVideo = async (
     foodImage: ImageData,
-    prompt: string,
+    englishPrompt: string,
     durationSeconds: number = 6
 ): Promise<FoodVideoResult> => {
     return post<FoodVideoResult>('/api/generate-food-video', {
         foodImage,
-        prompt,
+        englishPrompt,
         durationSeconds,
     }, 'video');
 };

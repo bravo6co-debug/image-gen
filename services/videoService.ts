@@ -216,6 +216,135 @@ function getSceneAtFrame(
 }
 
 /**
+ * Canvas에 이미지를 cover 방식으로 그리기 (Ken Burns 효과 포함)
+ */
+function drawImageCover(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  img: HTMLImageElement,
+  scale: number = 1,
+  offsetX: number = 0,
+  offsetY: number = 0
+): void {
+  const imgRatio = img.width / img.height;
+  const canvasRatio = canvas.width / canvas.height;
+
+  let drawWidth, drawHeight;
+  if (imgRatio > canvasRatio) {
+    drawHeight = canvas.height * scale;
+    drawWidth = drawHeight * imgRatio;
+  } else {
+    drawWidth = canvas.width * scale;
+    drawHeight = drawWidth / imgRatio;
+  }
+
+  const drawX = (canvas.width - drawWidth) / 2 - offsetX;
+  const drawY = (canvas.height - drawHeight) / 2 - offsetY;
+
+  ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+}
+
+/**
+ * 보간 유틸리티 (Remotion의 interpolate와 동일한 동작, clamp 포함)
+ */
+function interpolateValue(
+  value: number,
+  inputRange: number[],
+  outputRange: number[]
+): number {
+  const clampedValue = Math.max(inputRange[0], Math.min(inputRange[inputRange.length - 1], value));
+
+  for (let i = 0; i < inputRange.length - 1; i++) {
+    if (clampedValue >= inputRange[i] && clampedValue <= inputRange[i + 1]) {
+      const inputSpan = inputRange[i + 1] - inputRange[i];
+      if (inputSpan === 0) return outputRange[i];
+      const t = (clampedValue - inputRange[i]) / inputSpan;
+      return outputRange[i] + t * (outputRange[i + 1] - outputRange[i]);
+    }
+  }
+
+  return outputRange[outputRange.length - 1];
+}
+
+/**
+ * Canvas 기반 장면 전환 효과 렌더링
+ * Remotion의 Transition 컴포넌트(remotion/components/Transitions.tsx)와 동일한 로직
+ */
+function renderTransitionFrame(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  type: TransitionConfig['type'],
+  progress: number,
+  fromImg: HTMLImageElement,
+  toImg: HTMLImageElement
+): void {
+  switch (type) {
+    case 'fade':
+      // 페이드: from 이미지 페이드 아웃, to 이미지 페이드 인
+      ctx.globalAlpha = 1 - progress;
+      drawImageCover(ctx, canvas, fromImg);
+      ctx.globalAlpha = progress;
+      drawImageCover(ctx, canvas, toImg);
+      ctx.globalAlpha = 1;
+      break;
+
+    case 'dissolve':
+      // 디졸브: 크로스 디졸브 (더 부드러운 블렌딩)
+      ctx.globalAlpha = 1 - progress * 0.5;
+      drawImageCover(ctx, canvas, fromImg);
+      ctx.globalAlpha = progress;
+      drawImageCover(ctx, canvas, toImg);
+      ctx.globalAlpha = 1;
+      break;
+
+    case 'slide': {
+      // 슬라이드: from 이미지가 왼쪽으로 나가고 to 이미지가 오른쪽에서 들어옴
+      ctx.save();
+      ctx.translate(-canvas.width * progress, 0);
+      drawImageCover(ctx, canvas, fromImg);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(canvas.width * (1 - progress), 0);
+      drawImageCover(ctx, canvas, toImg);
+      ctx.restore();
+      break;
+    }
+
+    case 'zoom': {
+      // 줌: from 이미지 확대+페이드아웃, to 이미지 축소→원본+페이드인
+      const fromScale = interpolateValue(progress, [0, 1], [1, 1.5]);
+      const toScale = interpolateValue(progress, [0, 1], [0.5, 1]);
+      const fromOpacity = interpolateValue(progress, [0, 0.5, 1], [1, 0.5, 0]);
+      const toOpacity = interpolateValue(progress, [0, 0.5, 1], [0, 0.5, 1]);
+
+      ctx.save();
+      ctx.globalAlpha = fromOpacity;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(fromScale, fromScale);
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      drawImageCover(ctx, canvas, fromImg);
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = toOpacity;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(toScale, toScale);
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      drawImageCover(ctx, canvas, toImg);
+      ctx.restore();
+      break;
+    }
+
+    case 'none':
+    default:
+      // 즉시 전환: 중간 지점에서 이미지 교체
+      drawImageCover(ctx, canvas, progress < 0.5 ? fromImg : toImg);
+      break;
+  }
+}
+
+/**
  * 총 비디오 길이 계산 (초)
  */
 export function calculateTotalDuration(scenes: Scene[]): number {
@@ -467,34 +596,41 @@ export async function renderVideo(
         const scene = remotionScenes[sceneIndex];
         const img = imageMap.get(scene.id);
 
+        // 배경 클리어
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         if (img) {
-          // 배경 클리어
-          ctx.fillStyle = '#000';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          // 장면 전환 영역 감지
+          const transitionDurationFrames = config.transitionType !== 'none' ? config.transitionDuration : 0;
+          const isInTransition = transitionDurationFrames > 0 &&
+            sceneIndex < remotionScenes.length - 1 &&
+            frameInScene >= sceneDurationFrames - transitionDurationFrames;
 
-          // Ken Burns 효과 계산 (씬 내 진행률 기반)
-          const progress = frameInScene / sceneDurationFrames;
-          const scale = 1 + progress * 0.1; // 10% 확대
-          const offsetX = progress * 20; // 약간의 이동
+          if (isInTransition) {
+            // 장면 전환 효과 렌더링
+            const nextScene = remotionScenes[sceneIndex + 1];
+            const nextImg = imageMap.get(nextScene.id);
 
-          // 이미지 그리기 (cover 방식)
-          const imgRatio = img.width / img.height;
-          const canvasRatio = canvas.width / canvas.height;
+            if (nextImg) {
+              const transitionFrame = frameInScene - (sceneDurationFrames - transitionDurationFrames);
+              const transitionProgress = Math.min(1, Math.max(0, transitionFrame / transitionDurationFrames));
 
-          let drawWidth, drawHeight, drawX, drawY;
-
-          if (imgRatio > canvasRatio) {
-            drawHeight = canvas.height * scale;
-            drawWidth = drawHeight * imgRatio;
+              renderTransitionFrame(ctx, canvas, config.transitionType, transitionProgress, img, nextImg);
+            } else {
+              // 다음 씬 이미지 없으면 현재 씬만 표시 (Ken Burns 포함)
+              const progress = frameInScene / sceneDurationFrames;
+              const scale = 1 + progress * 0.1;
+              const offsetX = progress * 20;
+              drawImageCover(ctx, canvas, img, scale, offsetX);
+            }
           } else {
-            drawWidth = canvas.width * scale;
-            drawHeight = drawWidth / imgRatio;
+            // 일반 씬 렌더링 (Ken Burns 효과)
+            const progress = frameInScene / sceneDurationFrames;
+            const scale = 1 + progress * 0.1; // 10% 확대
+            const offsetX = progress * 20; // 약간의 이동
+            drawImageCover(ctx, canvas, img, scale, offsetX);
           }
-
-          drawX = (canvas.width - drawWidth) / 2 - offsetX;
-          drawY = (canvas.height - drawHeight) / 2;
-
-          ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
 
           // 자막 그리기 (선택적) - 큰 폰트, 자동 줄바꿈
           if (config.showSubtitles && scene.narration) {

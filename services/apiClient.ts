@@ -379,12 +379,8 @@ export const generateVideoFromImage = async (
     }, 'video');
 };
 
-export const checkVeoApiAvailability = async (): Promise<{ available: boolean; error?: string }> => {
-    // Since Veo availability depends on the server-side API key,
-    // we'll make a simple test request and handle errors appropriately
+export const checkVideoApiAvailability = async (): Promise<{ available: boolean; error?: string }> => {
     try {
-        // This will be handled by the generate-video endpoint
-        // For now, we assume availability and let errors propagate naturally
         return { available: true };
     } catch (e) {
         return {
@@ -393,6 +389,9 @@ export const checkVeoApiAvailability = async (): Promise<{ available: boolean; e
         };
     }
 };
+
+/** @deprecated Use checkVideoApiAvailability */
+export const checkVeoApiAvailability = checkVideoApiAvailability;
 
 // ============================================
 // TTS NARRATION GENERATION

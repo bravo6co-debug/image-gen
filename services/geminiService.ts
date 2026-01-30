@@ -30,6 +30,7 @@ export {
 
     // Video generation
     generateVideoFromImage,
+    checkVideoApiAvailability,
     checkVeoApiAvailability,
 
     // Types

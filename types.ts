@@ -452,8 +452,6 @@ export const AVAILABLE_IMAGE_MODELS: { value: string; label: string }[] = [
 // 사용 가능한 비디오 모델
 export const AVAILABLE_VIDEO_MODELS: { value: string; label: string }[] = [
   { value: 'minimax-hailuo-v2-3-fast-standard-image-to-video', label: 'Hailuo V2.3 Fast (기본)' },
-  { value: 'veo-3.1-fast-generate-preview', label: 'Veo 3.1 Fast (빠름)' },
-  { value: 'veo-3.1-generate-preview', label: 'Veo 3.1 (고품질)' },
 ];
 
 // 사용 가능한 TTS 모델

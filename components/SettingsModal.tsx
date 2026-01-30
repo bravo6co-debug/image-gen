@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   AVAILABLE_TEXT_MODELS,
   AVAILABLE_IMAGE_MODELS,
-  AVAILABLE_VIDEO_MODELS,
   AVAILABLE_TTS_VOICES,
   DEFAULT_MODEL_CONFIG,
 } from '../types';
@@ -220,24 +219,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             <p className="mt-1 text-xs text-gray-500">
               Imagen 4.0은 더 높은 품질의 이미지를 생성합니다
             </p>
-          </div>
-
-          {/* 비디오 모델 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              비디오 모델 (비디오 생성)
-            </label>
-            <select
-              value={videoModel}
-              onChange={(e) => setVideoModel(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {AVAILABLE_VIDEO_MODELS.map((model) => (
-                <option key={model.value} value={model.value}>
-                  {model.label}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* TTS 음성 */}

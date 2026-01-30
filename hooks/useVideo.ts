@@ -221,11 +221,11 @@ export function useVideo(): UseVideoReturn {
         updatedAt: Date.now(),
       });
 
-      // Generate video using Veo API
+      // Generate video using Hailuo API
       const result = await generateVideoFromImage(
         clip.sourceImage,
         clip.motionPrompt || 'Cinematic camera movement with subtle motion',
-        Math.min(clip.duration, 8) // Veo supports max 8 seconds per clip
+        Math.min(clip.duration, 10) // Hailuo supports 6s or 10s per clip
       );
 
       // Update with generated video

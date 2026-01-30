@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useProject } from '../../contexts/ProjectContext';
 import { useVideo } from '../../hooks/useVideo';
 import { VideoClip, Scene, NarrationAudio } from '../../types';
-import { checkVeoApiAvailability } from '../../services/geminiService';
+import { checkVideoApiAvailability } from '../../services/apiClient';
 import { generateNarration, type TTSVoice } from '../../services/apiClient';
 import { RemotionPlayer } from './RemotionPlayer';
 import { VideoExportModal, type ExportConfig } from './VideoExportModal';
@@ -19,18 +19,18 @@ import {
 type VideoSource = 'scenario' | 'ad';
 
 // 비디오 생성 모드
-type VideoMode = 'remotion' | 'veo';
+type VideoMode = 'remotion' | 'hailuo';
 
-// Veo API 상태 타입
-type VeoApiStatus = 'unknown' | 'checking' | 'available' | 'unavailable';
+// Hailuo API 상태 타입
+type HailuoApiStatus = 'unknown' | 'checking' | 'available' | 'unavailable';
 
 // API 상태 아이콘
-const ApiStatusIcon: React.FC<{ status: VeoApiStatus; error?: string }> = ({ status, error }) => {
+const ApiStatusIcon: React.FC<{ status: HailuoApiStatus; error?: string }> = ({ status, error }) => {
   const statusConfig = {
     unknown: { color: 'text-gray-400', bg: 'bg-gray-600', label: 'API 상태 확인 안됨' },
     checking: { color: 'text-blue-400', bg: 'bg-blue-600', label: 'API 확인 중...' },
-    available: { color: 'text-green-400', bg: 'bg-green-600', label: 'Veo API 사용 가능' },
-    unavailable: { color: 'text-red-400', bg: 'bg-red-600', label: error || 'Veo API 사용 불가' },
+    available: { color: 'text-green-400', bg: 'bg-green-600', label: 'Hailuo API 사용 가능' },
+    unavailable: { color: 'text-red-400', bg: 'bg-red-600', label: error || 'Hailuo API 사용 불가' },
   };
 
   const config = statusConfig[status];
@@ -573,7 +573,7 @@ export const VideoTab: React.FC = () => {
   const [playingVideoClip, setPlayingVideoClip] = useState<VideoClip | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // 비디오 생성 모드 (Remotion 또는 Veo API)
+  // 비디오 생성 모드 (Remotion 또는 Hailuo AI)
   const [videoMode, setVideoMode] = useState<VideoMode>('remotion');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
@@ -738,8 +738,8 @@ export const VideoTab: React.FC = () => {
     };
   }, []);
 
-  // 비디오 다운로드 함수 (Veo용)
-  const downloadVeoVideo = async (url: string, filename: string) => {
+  // 비디오 다운로드 함수
+  const downloadClipVideo = async (url: string, filename: string) => {
     try {
       const response = await fetch(url);
       const blob = await response.blob();
@@ -757,7 +757,7 @@ export const VideoTab: React.FC = () => {
     }
   };
 
-  // 전체 비디오 다운로드 (개별 파일로 - Veo용)
+  // 전체 비디오 다운로드 (개별 파일로)
   const handleDownloadAll = async () => {
     const completedClipsList = clips.filter(c => c.generatedVideo?.url);
     if (completedClipsList.length === 0) return;
@@ -767,7 +767,7 @@ export const VideoTab: React.FC = () => {
       for (let i = 0; i < completedClipsList.length; i++) {
         const clip = completedClipsList[i];
         if (clip.generatedVideo?.url) {
-          await downloadVeoVideo(clip.generatedVideo.url, `clip_${clip.order + 1}.mp4`);
+          await downloadClipVideo(clip.generatedVideo.url, `clip_${clip.order + 1}.mp4`);
           // 다운로드 간 간격
           if (i < completedClipsList.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -779,22 +779,22 @@ export const VideoTab: React.FC = () => {
     }
   };
 
-  // Veo API 상태
-  const [veoApiStatus, setVeoApiStatus] = useState<VeoApiStatus>('unknown');
-  const [veoApiError, setVeoApiError] = useState<string | undefined>();
+  // Hailuo API 상태
+  const [hailuoApiStatus, setHailuoApiStatus] = useState<HailuoApiStatus>('unknown');
+  const [hailuoApiError, setHailuoApiError] = useState<string | undefined>();
 
-  // Veo API 상태 체크
+  // Hailuo API 상태 체크
   const checkApiStatus = async () => {
-    setVeoApiStatus('checking');
-    setVeoApiError(undefined);
+    setHailuoApiStatus('checking');
+    setHailuoApiError(undefined);
 
-    const result = await checkVeoApiAvailability();
+    const result = await checkVideoApiAvailability();
 
     if (result.available) {
-      setVeoApiStatus('available');
+      setHailuoApiStatus('available');
     } else {
-      setVeoApiStatus('unavailable');
-      setVeoApiError(result.error);
+      setHailuoApiStatus('unavailable');
+      setHailuoApiError(result.error);
     }
   };
 
@@ -880,7 +880,7 @@ export const VideoTab: React.FC = () => {
                 )}
                 <button
                   onClick={handleGenerateAllClips}
-                  disabled={isGenerating || clips.length === 0 || clips.every(c => c.generatedVideo) || veoApiStatus === 'unavailable'}
+                  disabled={isGenerating || clips.length === 0 || clips.every(c => c.generatedVideo) || hailuoApiStatus === 'unavailable'}
                   className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 min-h-[44px]"
                 >
                   <SparklesIcon className="w-4 h-4" />
@@ -907,14 +907,14 @@ export const VideoTab: React.FC = () => {
               Remotion (무료)
             </button>
             <button
-              onClick={() => setVideoMode('veo')}
+              onClick={() => setVideoMode('hailuo')}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors min-h-[44px] sm:min-h-0 ${
-                videoMode === 'veo'
+                videoMode === 'hailuo'
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
-              Veo API (AI)
+              Hailuo AI
             </button>
           </div>
           {videoMode === 'remotion' && (
@@ -963,16 +963,16 @@ export const VideoTab: React.FC = () => {
           </div>
         )}
 
-        {/* Veo API 상태 표시 (Veo 모드일 때만) */}
-        {videoMode === 'veo' && (
+        {/* Hailuo API 상태 표시 (Hailuo 모드일 때만) */}
+        {videoMode === 'hailuo' && (
           <div className="mt-3 flex items-center justify-between bg-gray-900/50 rounded-lg px-3 py-2 flex-wrap gap-2">
-            <ApiStatusIcon status={veoApiStatus} error={veoApiError} />
+            <ApiStatusIcon status={hailuoApiStatus} error={hailuoApiError} />
             <button
               onClick={checkApiStatus}
-              disabled={veoApiStatus === 'checking'}
+              disabled={hailuoApiStatus === 'checking'}
               className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50 min-h-[44px] flex items-center"
             >
-              {veoApiStatus === 'checking' ? '확인 중...' : 'API 상태 확인'}
+              {hailuoApiStatus === 'checking' ? '확인 중...' : 'API 상태 확인'}
             </button>
           </div>
         )}
@@ -987,7 +987,7 @@ export const VideoTab: React.FC = () => {
               </button>
             </div>
             <p className="text-xs">{error}</p>
-            {veoApiStatus === 'unknown' && (
+            {hailuoApiStatus === 'unknown' && (
               <button
                 onClick={checkApiStatus}
                 className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline min-h-[44px] flex items-center"
@@ -999,13 +999,13 @@ export const VideoTab: React.FC = () => {
         )}
 
         {/* API 사용 불가 경고 */}
-        {veoApiStatus === 'unavailable' && !error && (
+        {hailuoApiStatus === 'unavailable' && !error && (
           <div className="mt-3 p-2 sm:p-3 bg-amber-900/50 border border-amber-700 rounded-lg text-xs sm:text-sm text-amber-300">
-            <p className="font-medium mb-1 text-xs sm:text-sm">Veo API 사용 불가</p>
-            <p className="text-xs text-amber-400">{veoApiError}</p>
+            <p className="font-medium mb-1 text-xs sm:text-sm">Hailuo API 사용 불가</p>
+            <p className="text-xs text-amber-400">{hailuoApiError}</p>
             <p className="text-xs text-gray-400 mt-2">
-              현재 API 키로는 Veo 2.0 비디오 생성을 사용할 수 없습니다.
-              Google AI Studio에서 Veo API 접근 권한을 확인하세요.
+              설정에서 Hailuo API 키를 입력해 주세요.
+              eachlabs.ai에서 API 키를 발급받을 수 있습니다.
             </p>
           </div>
         )}
@@ -1262,7 +1262,7 @@ export const VideoTab: React.FC = () => {
             )}
           </div>
         ) : clips.length === 0 ? (
-          /* Veo 모드 - 클립이 없을 때 */
+          /* Hailuo 모드 - 클립이 없을 때 */
           <div className="flex-grow flex flex-col items-center justify-center">
             <div className="text-center max-w-md px-4">
               <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center">
@@ -1288,7 +1288,7 @@ export const VideoTab: React.FC = () => {
             </div>
           </div>
         ) : (
-          /* Veo 모드 - 클립이 있을 때 */
+          /* Hailuo 모드 - 클립이 있을 때 */
           <>
             {/* 클립 그리드 */}
             <div className="flex-grow overflow-y-auto">
@@ -1304,7 +1304,7 @@ export const VideoTab: React.FC = () => {
                     onDelete={() => removeClip(clip.id)}
                     isGenerating={generatingClipId === clip.id}
                     onPlayVideo={() => clip.generatedVideo?.url && setPlayingVideoClip(clip)}
-                    onDownload={clip.generatedVideo?.url ? () => downloadVeoVideo(clip.generatedVideo!.url, `clip_${clip.order + 1}.mp4`) : undefined}
+                    onDownload={clip.generatedVideo?.url ? () => downloadClipVideo(clip.generatedVideo!.url, `clip_${clip.order + 1}.mp4`) : undefined}
                   />
                 ))}
               </div>
@@ -1352,9 +1352,9 @@ export const VideoTab: React.FC = () => {
                   <div className="flex items-end">
                     <button
                       onClick={() => handleGenerateClip(selectedClip.id)}
-                      disabled={isGenerating || !selectedClip.sourceImage || veoApiStatus === 'unavailable'}
+                      disabled={isGenerating || !selectedClip.sourceImage || hailuoApiStatus === 'unavailable'}
                       className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50 min-h-[44px]"
-                      title={veoApiStatus === 'unavailable' ? 'Veo API 사용 불가' : ''}
+                      title={hailuoApiStatus === 'unavailable' ? 'Hailuo API 사용 불가' : ''}
                     >
                       {selectedClip.generatedVideo ? '재생성' : '비디오 생성'}
                     </button>

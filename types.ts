@@ -285,7 +285,7 @@ export type ScenarioTone =
   | 'trustworthy'
   | 'energetic';
 
-export type StoryBeat = 'Hook' | 'Setup' | 'Development' | 'Climax' | 'Resolution';
+export type StoryBeat = 'Hook' | 'Setup' | 'Development' | 'Climax' | 'Resolution' | 'Discovery' | 'Story' | 'Experience' | 'Reason';
 
 export type CameraAngle =
   | 'Close-up'
@@ -362,6 +362,118 @@ export interface AdScenarioConfig {
   productFeatures: string;
   tone?: ScenarioTone;
   imageStyle?: ImageStyle;
+}
+
+// =============================================
+// 광고 V2: HDSER 프레임워크 (Ad Scenario V2)
+// =============================================
+
+// 광고 유형
+export type AdType =
+  | 'product-intro'       // 제품 소개
+  | 'problem-solution'    // 문제 해결
+  | 'lifestyle'           // 라이프스타일
+  | 'testimonial'         // 후기/체험
+  | 'promotion'           // 이벤트/혜택
+  | 'brand-story';        // 브랜드 스토리
+
+export const AD_TYPE_OPTIONS: {
+  value: AdType;
+  label: string;
+  description: string;
+  example: string;
+}[] = [
+  { value: 'product-intro', label: '제품 소개', description: '신제품/서비스를 처음 알리는 광고', example: '신메뉴 출시, 서비스 런칭' },
+  { value: 'problem-solution', label: '문제 해결', description: '고객의 Pain Point를 해결하는 광고', example: '기능성 제품, 전문 서비스' },
+  { value: 'lifestyle', label: '라이프스타일', description: '브랜드/제품과 어울리는 삶을 보여주는 광고', example: '카페, 패션, 인테리어' },
+  { value: 'testimonial', label: '후기/체험', description: '실제 사용 경험을 공유하는 광고', example: '뷰티, 건강, F&B' },
+  { value: 'promotion', label: '이벤트/혜택', description: '할인, 이벤트, 기간 한정 혜택 광고', example: '시즌 세일, 오픈 이벤트' },
+  { value: 'brand-story', label: '브랜드 스토리', description: '브랜드의 가치와 철학을 전달하는 광고', example: '리브랜딩, 브랜드 인지도' },
+];
+
+// 업종 카테고리
+export type IndustryCategory =
+  | 'restaurant'     // 음식점
+  | 'cafe'           // 카페
+  | 'beauty'         // 뷰티
+  | 'medical'        // 병원/의원
+  | 'education'      // 교육
+  | 'fitness'        // 피트니스
+  | 'fashion'        // 패션
+  | 'tech'           // IT/테크
+  | 'interior'       // 인테리어
+  | 'other';         // 기타
+
+export const INDUSTRY_OPTIONS: {
+  value: IndustryCategory;
+  label: string;
+}[] = [
+  { value: 'restaurant', label: '음식점' },
+  { value: 'cafe', label: '카페' },
+  { value: 'beauty', label: '뷰티/화장품' },
+  { value: 'medical', label: '병원/의원' },
+  { value: 'education', label: '교육' },
+  { value: 'fitness', label: '피트니스/헬스' },
+  { value: 'fashion', label: '패션/의류' },
+  { value: 'tech', label: 'IT/테크' },
+  { value: 'interior', label: '인테리어/리빙' },
+  { value: 'other', label: '기타' },
+];
+
+// 타겟 고객
+export type TargetAudience =
+  | '10s'            // 10대
+  | '20s-female'     // 20대 여성
+  | '20s-male'       // 20대 남성
+  | '30s-female'     // 30대 여성
+  | '30s-male'       // 30대 남성
+  | '40s-parent'     // 40대 부모
+  | '50s-plus'       // 50대 이상
+  | 'all';           // 전연령
+
+export const TARGET_AUDIENCE_OPTIONS: {
+  value: TargetAudience;
+  label: string;
+}[] = [
+  { value: '10s', label: '10대' },
+  { value: '20s-female', label: '20대 여성' },
+  { value: '20s-male', label: '20대 남성' },
+  { value: '30s-female', label: '30대 여성' },
+  { value: '30s-male', label: '30대 남성' },
+  { value: '40s-parent', label: '40대 부모' },
+  { value: '50s-plus', label: '50대 이상' },
+  { value: 'all', label: '전연령' },
+];
+
+// HDSER 스토리 비트
+export type HDSERBeat = 'Hook' | 'Discovery' | 'Story' | 'Experience' | 'Reason';
+
+// 광고 영상 길이
+export type AdDuration = 15 | 30 | 45 | 60;
+
+export const AD_DURATION_OPTIONS: {
+  value: AdDuration;
+  label: string;
+  scenes: number;
+}[] = [
+  { value: 15, label: '15초', scenes: 3 },
+  { value: 30, label: '30초', scenes: 5 },
+  { value: 45, label: '45초', scenes: 5 },
+  { value: 60, label: '60초', scenes: 6 },
+];
+
+// V2 광고 시나리오 설정
+export interface AdScenarioConfigV2 {
+  adType: AdType;
+  industry: IndustryCategory;
+  productName: string;
+  usps: string[];                // 핵심 강점 (1~2개)
+  targetAudiences: TargetAudience[];
+  tone: ScenarioTone;
+  imageStyle: ImageStyle;
+  duration: AdDuration;
+  priceOrPromotion?: string;     // 가격/혜택 정보 (선택)
+  referenceImages?: ImageData[]; // 참고 이미지 (최대 3장)
 }
 
 // =============================================

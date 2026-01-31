@@ -4,7 +4,7 @@
  * to keep API keys secure on the server side.
  */
 
-import { Character, ImageData, AspectRatio, ScenarioConfig, AdScenarioConfig, Scenario, Scene, ImageStyle, NarrationAudio } from '../types';
+import { Character, ImageData, AspectRatio, ScenarioConfig, AdScenarioConfig, AdScenarioConfigV2, Scenario, Scene, ImageStyle, NarrationAudio } from '../types';
 import {
     ApiError,
     QuotaExceededError,
@@ -242,9 +242,15 @@ export const generateScenario = async (config: ScenarioConfig): Promise<Scenario
     return response.scenario;
 };
 
-// 광고 시나리오 생성
+// 광고 시나리오 생성 (V1 - legacy AICPAC)
 export const generateAdScenario = async (config: AdScenarioConfig): Promise<Scenario> => {
     const response = await post<GenerateScenarioResponse>('/api/generate-ad-scenario', { config }, 'scenario');
+    return response.scenario;
+};
+
+// 광고 시나리오 생성 V2 (HDSER 프레임워크)
+export const generateAdScenarioV2 = async (config: AdScenarioConfigV2): Promise<Scenario> => {
+    const response = await post<GenerateScenarioResponse>('/api/generate-ad-scenario-v2', { config }, 'scenario');
     return response.scenario;
 };
 

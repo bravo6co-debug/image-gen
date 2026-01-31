@@ -567,6 +567,39 @@ export const generateFoodVideo = async (
 };
 
 // ============================================
+// MUKBANG (먹방) IMAGE GENERATION
+// ============================================
+
+export type MukbangPersonType = 'young-woman' | 'young-man' | 'middle-woman' | 'middle-man';
+
+export interface MukbangImageResult {
+    compositeImage: ImageData;
+    videoPrompt: string;
+}
+
+/**
+ * FLUX 2 Turbo Edit로 먹방 합성 이미지 생성
+ * 음식 사진 + 인물 사진(또는 생성)을 합성하여 먹방 장면 생성
+ */
+export const generateMukbangImage = async (
+    foodImage: ImageData,
+    foodName: string,
+    options: {
+        personImage?: ImageData;
+        generatePerson?: boolean;
+        personType?: MukbangPersonType;
+    }
+): Promise<MukbangImageResult> => {
+    return post<MukbangImageResult>('/api/generate-mukbang-image', {
+        foodImage,
+        foodName,
+        personImage: options.personImage,
+        generatePerson: options.generatePerson,
+        personType: options.personType,
+    }, 'mukbang-image');
+};
+
+// ============================================
 // TTS NARRATION GENERATION
 // ============================================
 

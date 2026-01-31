@@ -15,7 +15,7 @@ export type ScenarioTone = 'emotional' | 'dramatic' | 'inspirational' | 'romanti
 
 export type ScenarioMode = 'character' | 'environment' | 'abstract' | 'narration';
 
-export type StoryBeat = 'Hook' | 'Setup' | 'Development' | 'Climax' | 'Resolution';
+export type StoryBeat = 'Hook' | 'Setup' | 'Development' | 'Climax' | 'Resolution' | 'Discovery' | 'Story' | 'Experience' | 'Reason';
 
 export type CameraAngle =
     | 'Close-up'
@@ -95,6 +95,33 @@ export interface AdScenarioConfig {
     productFeatures: string;
     tone?: ScenarioTone;
     imageStyle?: ImageStyle;
+}
+
+// =============================================
+// 광고 V2: HDSER 프레임워크
+// =============================================
+
+export type AdType = 'product-intro' | 'problem-solution' | 'lifestyle' | 'testimonial' | 'promotion' | 'brand-story';
+export type IndustryCategory = 'restaurant' | 'cafe' | 'beauty' | 'medical' | 'education' | 'fitness' | 'fashion' | 'tech' | 'interior' | 'other';
+export type TargetAudience = '10s' | '20s-female' | '20s-male' | '30s-female' | '30s-male' | '40s-parent' | '50s-plus' | 'all';
+export type HDSERBeat = 'Hook' | 'Discovery' | 'Story' | 'Experience' | 'Reason';
+export type AdDuration = 15 | 30 | 45 | 60;
+
+export interface AdScenarioConfigV2 {
+    adType: AdType;
+    industry: IndustryCategory;
+    productName: string;
+    usps: string[];
+    targetAudiences: TargetAudience[];
+    tone: ScenarioTone;
+    imageStyle: ImageStyle;
+    duration: AdDuration;
+    priceOrPromotion?: string;
+    referenceImages?: ImageData[];
+}
+
+export interface GenerateAdScenarioV2Request {
+    config: AdScenarioConfigV2;
 }
 
 export interface VideoGenerationResult {

@@ -4,13 +4,14 @@ import {
   Scenario,
   Scene,
   AdScenarioConfig,
+  AdScenarioConfigV2,
   ImageData,
 } from '../types';
 import {
   generateAdScenario as apiGenerateAdScenario,
   generateSceneImage as apiGenerateSceneImage,
 } from '../services/geminiService';
-import { generateNarration, TTSVoice } from '../services/apiClient';
+import { generateAdScenarioV2 as apiGenerateAdScenarioV2, generateNarration, TTSVoice } from '../services/apiClient';
 
 interface GenerateAllOptions {
   includeTTS?: boolean;
@@ -30,6 +31,7 @@ interface UseAdScenarioReturn {
   // 시나리오 관리
   setAdScenario: (scenario: Scenario | null) => void;
   generateAdScenario: (config: AdScenarioConfig) => Promise<Scenario>;
+  generateAdScenarioV2: (config: AdScenarioConfigV2) => Promise<Scenario>;
   setProductImage: (image: ImageData | undefined) => void;
 
   // 이미지 생성
@@ -76,6 +78,23 @@ export function useAdScenario(): UseAdScenarioReturn {
 
     try {
       const newScenario = await apiGenerateAdScenario(config);
+      contextSetAdScenario(newScenario);
+      return newScenario;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '광고 시나리오 생성에 실패했습니다.';
+      setError(message);
+      throw e;
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [contextSetAdScenario]);
+
+  const generateAdScenarioV2 = useCallback(async (config: AdScenarioConfigV2): Promise<Scenario> => {
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const newScenario = await apiGenerateAdScenarioV2(config);
       contextSetAdScenario(newScenario);
       return newScenario;
     } catch (e) {
@@ -324,6 +343,7 @@ export function useAdScenario(): UseAdScenarioReturn {
 
     setAdScenario,
     generateAdScenario,
+    generateAdScenarioV2,
     setProductImage,
 
     generateSceneImage,

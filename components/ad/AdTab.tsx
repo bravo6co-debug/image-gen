@@ -3,9 +3,17 @@ import { useProject } from '../../contexts/ProjectContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdScenario } from '../../hooks/useAdScenario';
 import {
-  AdScenarioConfig,
+  AdScenarioConfigV2,
+  AdType,
+  IndustryCategory,
+  TargetAudience,
+  AdDuration,
   ImageStyle,
   ScenarioTone,
+  AD_TYPE_OPTIONS,
+  INDUSTRY_OPTIONS,
+  TARGET_AUDIENCE_OPTIONS,
+  AD_DURATION_OPTIONS,
   IMAGE_STYLE_OPTIONS,
   TONE_OPTIONS,
 } from '../../types';
@@ -13,25 +21,25 @@ import { compressImageFile } from '../../services/imageCompression';
 import ApiKeyRequiredModal from '../ApiKeyRequiredModal';
 import { SparklesIcon, ClearIcon } from '../Icons';
 
-// Ad Phase 라벨 매핑
-const AD_PHASE_LABELS: Record<string, { label: string; color: string }> = {
-  Attention: { label: '주목', color: 'bg-red-600' },
-  Interest: { label: '관심', color: 'bg-orange-600' },
-  Credibility: { label: '신뢰', color: 'bg-blue-600' },
-  Proof: { label: '증명', color: 'bg-green-600' },
-  Appeal: { label: '어필', color: 'bg-purple-600' },
-  CTA: { label: 'CTA', color: 'bg-pink-600' },
+// =============================================
+// HDSER 비트 색상/라벨
+// =============================================
+const HDSER_BEAT_CONFIG: Record<string, { label: string; color: string }> = {
+  Hook: { label: 'Hook', color: 'bg-red-600' },
+  Discovery: { label: 'Discovery', color: 'bg-amber-600' },
+  Story: { label: 'Story', color: 'bg-blue-600' },
+  Experience: { label: 'Experience', color: 'bg-green-600' },
+  Reason: { label: 'Reason', color: 'bg-purple-600' },
+  // 하위 호환 (AICPAC)
+  Setup: { label: 'Setup', color: 'bg-blue-600' },
+  Development: { label: 'Development', color: 'bg-green-600' },
+  Climax: { label: 'Climax', color: 'bg-yellow-600' },
+  Resolution: { label: 'Resolution', color: 'bg-purple-600' },
 };
 
-const STORY_BEAT_COLORS: Record<string, string> = {
-  Hook: 'bg-red-600',
-  Setup: 'bg-blue-600',
-  Development: 'bg-green-600',
-  Climax: 'bg-yellow-600',
-  Resolution: 'bg-purple-600',
-};
-
+// =============================================
 // Icons
+// =============================================
 const MegaphoneIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
@@ -62,6 +70,23 @@ const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+const ChevronLeftIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+  </svg>
+);
+
+const ChevronRightIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+  </svg>
+);
+
+// =============================================
+// Wizard Step Types
+// =============================================
+type WizardStep = 1 | 2 | 3;
+
 const AdTab: React.FC = () => {
   const { isAuthenticated, canUseApi } = useAuth();
   const { imageStyle: projectImageStyle } = useProject();
@@ -71,7 +96,7 @@ const AdTab: React.FC = () => {
     generatingImageSceneId,
     isGeneratingAllImages,
     error,
-    generateAdScenario,
+    generateAdScenarioV2,
     setProductImage,
     generateSceneImage,
     generateAllSceneImages,
@@ -82,233 +107,447 @@ const AdTab: React.FC = () => {
     clearError,
   } = useAdScenario();
 
-  // Input form state
-  const [productName, setProductName] = useState('');
-  const [productFeatures, setProductFeatures] = useState('');
-  const [tone, setTone] = useState<ScenarioTone>('inspirational');
-  const [imageStyle, setImageStyle] = useState<ImageStyle>(projectImageStyle);
+  // =============================================
+  // Wizard State
+  // =============================================
+  const [wizardStep, setWizardStep] = useState<WizardStep>(1);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
+  // Step 1: 광고 유형
+  const [adType, setAdType] = useState<AdType>('product-intro');
+
+  // Step 2: 상품/서비스 정보
+  const [industry, setIndustry] = useState<IndustryCategory>('other');
+  const [productName, setProductName] = useState('');
+  const [usp1, setUsp1] = useState('');
+  const [usp2, setUsp2] = useState('');
+  const [selectedTargets, setSelectedTargets] = useState<TargetAudience[]>(['all']);
+  const [priceOrPromotion, setPriceOrPromotion] = useState('');
+
+  // Step 3: 표현 스타일
+  const [tone, setTone] = useState<ScenarioTone>('inspirational');
+  const [imageStyle, setImageStyle] = useState<ImageStyle>(projectImageStyle);
+  const [duration, setDuration] = useState<AdDuration>(30);
+
+  // Scene view refs
   const productImageInputRef = useRef<HTMLInputElement>(null);
   const sceneImageInputRef = useRef<HTMLInputElement>(null);
   const scenarioFileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingSceneId, setUploadingSceneId] = useState<string | null>(null);
 
-  // 광고 시나리오 생성
-  const handleGenerate = useCallback(async () => {
+  // =============================================
+  // Target audience toggle
+  // =============================================
+  const toggleTarget = (target: TargetAudience) => {
+    setSelectedTargets(prev => {
+      if (target === 'all') return ['all'];
+      const without = prev.filter(t => t !== 'all');
+      if (without.includes(target)) {
+        const result = without.filter(t => t !== target);
+        return result.length === 0 ? ['all'] : result;
+      }
+      return [...without, target];
+    });
+  };
+
+  // =============================================
+  // Generate V2 scenario
+  // =============================================
+  const handleGenerateV2 = useCallback(async () => {
     if (!isAuthenticated || !canUseApi) {
       setShowApiKeyModal(true);
       return;
     }
     if (!productName.trim()) return;
 
-    const config: AdScenarioConfig = {
+    const usps = [usp1.trim(), usp2.trim()].filter(Boolean);
+
+    const config: AdScenarioConfigV2 = {
+      adType,
+      industry,
       productName: productName.trim(),
-      productFeatures: productFeatures.trim(),
+      usps,
+      targetAudiences: selectedTargets,
       tone,
       imageStyle,
+      duration,
+      priceOrPromotion: priceOrPromotion.trim() || undefined,
     };
 
     try {
-      await generateAdScenario(config);
+      await generateAdScenarioV2(config);
     } catch {
       // error handled by hook
     }
-  }, [isAuthenticated, canUseApi, productName, productFeatures, tone, imageStyle, generateAdScenario]);
+  }, [isAuthenticated, canUseApi, adType, industry, productName, usp1, usp2, selectedTargets, tone, imageStyle, duration, priceOrPromotion, generateAdScenarioV2]);
 
-  // 상품 이미지 업로드
+  // =============================================
+  // Scene handlers (same as before)
+  // =============================================
   const handleProductImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       const compressed = await compressImageFile(file);
       setProductImage(compressed);
     } catch (err) {
       console.error('Product image upload failed:', err);
     }
-
-    // Reset file input
-    if (productImageInputRef.current) {
-      productImageInputRef.current.value = '';
-    }
+    if (productImageInputRef.current) productImageInputRef.current.value = '';
   }, [setProductImage]);
 
-  // 씬 이미지 업로드
   const handleSceneImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !uploadingSceneId) return;
-
     try {
       const compressed = await compressImageFile(file);
       replaceSceneImage(uploadingSceneId, compressed);
     } catch (err) {
       console.error('Scene image upload failed:', err);
     }
-
     setUploadingSceneId(null);
-    if (sceneImageInputRef.current) {
-      sceneImageInputRef.current.value = '';
-    }
+    if (sceneImageInputRef.current) sceneImageInputRef.current.value = '';
   }, [uploadingSceneId, replaceSceneImage]);
 
-  // 씬 이미지 생성
   const handleGenerateSceneImage = useCallback(async (sceneId: string) => {
-    if (!isAuthenticated || !canUseApi) {
-      setShowApiKeyModal(true);
-      return;
-    }
+    if (!isAuthenticated || !canUseApi) { setShowApiKeyModal(true); return; }
     await generateSceneImage(sceneId);
   }, [isAuthenticated, canUseApi, generateSceneImage]);
 
-  // 전체 이미지 생성
   const handleGenerateAllImages = useCallback(async () => {
-    if (!isAuthenticated || !canUseApi) {
-      setShowApiKeyModal(true);
-      return;
-    }
+    if (!isAuthenticated || !canUseApi) { setShowApiKeyModal(true); return; }
     await generateAllSceneImages({ includeTTS: true, ttsVoice: 'Kore' });
   }, [isAuthenticated, canUseApi, generateAllSceneImages]);
 
-  // 새 시나리오 생성 (현재 시나리오 초기화)
   const handleNewScenario = useCallback(() => {
     setAdScenario(null);
+    setWizardStep(1);
   }, [setAdScenario]);
 
-  // 시나리오 파일 불러오기
   const handleScenarioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      await loadAdScenarioFromFile(file);
-    }
-    if (scenarioFileInputRef.current) {
-      scenarioFileInputRef.current.value = '';
-    }
+    if (file) await loadAdScenarioFromFile(file);
+    if (scenarioFileInputRef.current) scenarioFileInputRef.current.value = '';
   };
 
   const hasAdScenario = adScenario !== null;
 
+  // =============================================
+  // Step validation
+  // =============================================
+  const canProceedStep2 = true; // Step 1 always valid (radio selection)
+  const canProceedStep3 = productName.trim().length > 0;
+  const canGenerate = productName.trim().length > 0;
+
+  // =============================================
+  // Render
+  // =============================================
   return (
     <div className="h-full flex flex-col">
-      {/* 광고 시나리오가 없을 때: 입력 폼 */}
       {!hasAdScenario ? (
-        <div className="flex-grow flex flex-col items-center justify-center bg-gray-800/50 rounded-xl border border-gray-700 p-4 sm:p-8">
-          <div className="w-full max-w-lg">
-            {/* Header */}
-            <div className="text-center mb-6">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center">
-                <MegaphoneIcon className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+        /* =============================================
+         * WIZARD: 3-Step Guided Input
+         * ============================================= */
+        <div className="flex-grow flex flex-col bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
+          {/* Wizard Header / Step Indicator */}
+          <div className="flex-shrink-0 p-3 sm:p-4 border-b border-gray-700 bg-gray-800">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center">
+                  <MegaphoneIcon className="w-4 h-4 text-white" />
+                </div>
+                <h2 className="text-sm sm:text-base font-bold text-white">광고 시나리오</h2>
               </div>
-              <h2 className="text-lg sm:text-xl font-bold text-white mb-2">30초 광고 숏폼</h2>
-              <p className="text-gray-400 text-xs sm:text-sm">
-                상품 정보를 입력하면 AI가 6씬(5초씩) 광고 시나리오를 생성합니다.
-                <br />생성 후 상품 이미지를 업로드하면 컨텍스트가 유지됩니다.
-              </p>
+              <button
+                onClick={() => scenarioFileInputRef.current?.click()}
+                className="text-xs text-gray-400 hover:text-gray-300 flex items-center gap-1"
+              >
+                <UploadIcon className="w-3.5 h-3.5" />
+                불러오기
+              </button>
             </div>
+            {/* Step indicator */}
+            <div className="flex items-center gap-2">
+              {[1, 2, 3].map((step) => (
+                <React.Fragment key={step}>
+                  <button
+                    onClick={() => { if (step <= wizardStep) setWizardStep(step as WizardStep); }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                      wizardStep === step
+                        ? 'bg-orange-600 text-white'
+                        : wizardStep > step
+                          ? 'bg-orange-900/50 text-orange-300 cursor-pointer hover:bg-orange-900/70'
+                          : 'bg-gray-700 text-gray-500'
+                    }`}
+                    disabled={step > wizardStep}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-black/20 flex items-center justify-center text-[10px]">{step}</span>
+                    <span className="hidden sm:inline">
+                      {step === 1 ? '광고 유형' : step === 2 ? '상품 정보' : '스타일'}
+                    </span>
+                  </button>
+                  {step < 3 && <div className={`flex-grow h-px ${wizardStep > step ? 'bg-orange-600' : 'bg-gray-700'}`} />}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
 
-            {/* Form */}
-            <div className="space-y-4">
-              {/* 상품명 */}
-              <div>
-                <label className="text-xs sm:text-sm font-medium text-gray-300 mb-2 block">
-                  상품명 <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  placeholder="예: 아쿠아 히알루론 세럼"
-                  className="w-full p-2.5 sm:p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm"
-                  disabled={isGenerating}
-                />
+          {/* Wizard Content */}
+          <div className="flex-grow overflow-y-auto p-3 sm:p-4">
+            {/* =============================================
+             * STEP 1: 광고 유형 선택
+             * ============================================= */}
+            {wizardStep === 1 && (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-400">어떤 목적의 광고를 만드시나요?</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {AD_TYPE_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setAdType(opt.value)}
+                      className={`text-left p-3 rounded-lg border transition-all ${
+                        adType === opt.value
+                          ? 'border-orange-500 bg-orange-900/30 ring-1 ring-orange-500'
+                          : 'border-gray-700 bg-gray-900/50 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="text-sm font-medium text-white">{opt.label}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">{opt.description}</div>
+                      <div className="text-[10px] text-gray-500 mt-1">{opt.example}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
+            )}
 
-              {/* 상품 특징 */}
-              <div>
-                <label className="text-xs sm:text-sm font-medium text-gray-300 mb-2 block">
-                  상품 특징 <span className="text-red-400">*</span>
-                </label>
-                <textarea
-                  value={productFeatures}
-                  onChange={(e) => setProductFeatures(e.target.value)}
-                  placeholder={"예:\n- 히알루론산 3중 보습\n- 48시간 수분 유지\n- 민감성 피부 테스트 완료\n- 무향료, 무색소"}
-                  className="w-full h-28 p-2.5 sm:p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm resize-none"
-                  disabled={isGenerating}
-                />
-              </div>
-
-              {/* 톤 & 스타일 */}
-              <div className="grid grid-cols-2 gap-3">
+            {/* =============================================
+             * STEP 2: 상품/서비스 정보
+             * ============================================= */}
+            {wizardStep === 2 && (
+              <div className="space-y-4">
+                {/* 업종 */}
                 <div>
-                  <label className="text-xs sm:text-sm font-medium text-gray-300 mb-2 block">톤/분위기</label>
+                  <label className="text-xs font-medium text-gray-300 mb-1.5 block">업종 카테고리</label>
                   <select
-                    value={tone}
-                    onChange={(e) => setTone(e.target.value as ScenarioTone)}
+                    value={industry}
+                    onChange={(e) => setIndustry(e.target.value as IndustryCategory)}
                     className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     disabled={isGenerating}
                   >
-                    {TONE_OPTIONS.map(opt => (
+                    {INDUSTRY_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
+
+                {/* 상품/서비스명 */}
                 <div>
-                  <label className="text-xs sm:text-sm font-medium text-gray-300 mb-2 block">이미지 스타일</label>
+                  <label className="text-xs font-medium text-gray-300 mb-1.5 block">
+                    상품/서비스명 <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    placeholder="예: 시그니처 라떼, 두피 케어 프로그램"
+                    className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm"
+                    disabled={isGenerating}
+                  />
+                </div>
+
+                {/* USP */}
+                <div>
+                  <label className="text-xs font-medium text-gray-300 mb-1.5 block">핵심 강점 (USP)</label>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={usp1}
+                      onChange={(e) => setUsp1(e.target.value)}
+                      placeholder="강점 1: 예) 유기농 원두, 특허 성분"
+                      className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm"
+                      disabled={isGenerating}
+                    />
+                    <input
+                      type="text"
+                      value={usp2}
+                      onChange={(e) => setUsp2(e.target.value)}
+                      placeholder="강점 2: 예) 48시간 보습 유지 (선택)"
+                      className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm"
+                      disabled={isGenerating}
+                    />
+                  </div>
+                </div>
+
+                {/* 타겟 고객 */}
+                <div>
+                  <label className="text-xs font-medium text-gray-300 mb-1.5 block">타겟 고객</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TARGET_AUDIENCE_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => toggleTarget(opt.value)}
+                        className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                          selectedTargets.includes(opt.value)
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 가격/혜택 (선택) */}
+                <div>
+                  <label className="text-xs font-medium text-gray-300 mb-1.5 block">가격/혜택 정보 <span className="text-gray-500">(선택)</span></label>
+                  <input
+                    type="text"
+                    value={priceOrPromotion}
+                    onChange={(e) => setPriceOrPromotion(e.target.value)}
+                    placeholder="예: 첫 방문 30% 할인, 월 9,900원"
+                    className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm"
+                    disabled={isGenerating}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* =============================================
+             * STEP 3: 표현 스타일
+             * ============================================= */}
+            {wizardStep === 3 && (
+              <div className="space-y-4">
+                {/* 톤 */}
+                <div>
+                  <label className="text-xs font-medium text-gray-300 mb-1.5 block">톤/분위기</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {TONE_OPTIONS.filter(t => t.category === 'commercial' || t.value === 'emotional' || t.value === 'comedic' || t.value === 'inspirational' || t.value === 'dramatic').map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setTone(opt.value)}
+                        className={`p-2 rounded-lg border text-left transition-all ${
+                          tone === opt.value
+                            ? 'border-orange-500 bg-orange-900/30'
+                            : 'border-gray-700 bg-gray-900/50 hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="text-xs font-medium text-white">{opt.label}</div>
+                        <div className="text-[10px] text-gray-500">{opt.description}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 이미지 스타일 */}
+                <div>
+                  <label className="text-xs font-medium text-gray-300 mb-1.5 block">비주얼 스타일</label>
                   <select
                     value={imageStyle}
                     onChange={(e) => setImageStyle(e.target.value as ImageStyle)}
                     className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    disabled={isGenerating}
                   >
                     {IMAGE_STYLE_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.emoji} {opt.label}</option>
                     ))}
                   </select>
                 </div>
-              </div>
 
-              {/* Error */}
-              {error && (
-                <div className="p-3 bg-red-900/50 border border-red-700 rounded-lg">
-                  <p className="text-sm text-red-300">{error}</p>
+                {/* 영상 길이 */}
+                <div>
+                  <label className="text-xs font-medium text-gray-300 mb-1.5 block">영상 길이</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {AD_DURATION_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setDuration(opt.value)}
+                        className={`p-2.5 rounded-lg border text-center transition-all ${
+                          duration === opt.value
+                            ? 'border-orange-500 bg-orange-900/30'
+                            : 'border-gray-700 bg-gray-900/50 hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="text-sm font-bold text-white">{opt.label}</div>
+                        <div className="text-[10px] text-gray-500">{opt.scenes}씬</div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              )}
 
-              {/* Generate Button */}
+                {/* Summary */}
+                <div className="p-3 bg-gray-900/70 border border-gray-700 rounded-lg">
+                  <h4 className="text-xs font-bold text-gray-300 mb-2">설정 요약</h4>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                    <span className="text-gray-500">광고 유형</span>
+                    <span className="text-gray-300">{AD_TYPE_OPTIONS.find(o => o.value === adType)?.label}</span>
+                    <span className="text-gray-500">업종</span>
+                    <span className="text-gray-300">{INDUSTRY_OPTIONS.find(o => o.value === industry)?.label}</span>
+                    <span className="text-gray-500">상품명</span>
+                    <span className="text-gray-300 truncate">{productName || '-'}</span>
+                    <span className="text-gray-500">길이</span>
+                    <span className="text-gray-300">{duration}초 / {AD_DURATION_OPTIONS.find(o => o.value === duration)?.scenes}씬</span>
+                  </div>
+                </div>
+
+                {/* Error */}
+                {error && (
+                  <div className="p-3 bg-red-900/50 border border-red-700 rounded-lg">
+                    <p className="text-sm text-red-300">{error}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Wizard Footer: Navigation Buttons */}
+          <div className="flex-shrink-0 p-3 sm:p-4 border-t border-gray-700 bg-gray-800 flex items-center justify-between gap-2">
+            {wizardStep > 1 ? (
               <button
-                onClick={handleGenerate}
-                disabled={isGenerating || !productName.trim() || !productFeatures.trim()}
-                className="w-full min-h-[48px] px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-lg hover:from-orange-400 hover:to-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                onClick={() => setWizardStep((wizardStep - 1) as WizardStep)}
+                className="min-h-[44px] px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center gap-1"
+              >
+                <ChevronLeftIcon className="w-4 h-4" />
+                이전
+              </button>
+            ) : <div />}
+
+            {wizardStep < 3 ? (
+              <button
+                onClick={() => setWizardStep((wizardStep + 1) as WizardStep)}
+                disabled={wizardStep === 2 && !canProceedStep3}
+                className="min-h-[44px] px-4 py-2 text-sm font-bold text-white bg-orange-600 rounded-lg hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                다음
+                <ChevronRightIcon className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={handleGenerateV2}
+                disabled={isGenerating || !canGenerate}
+                className="min-h-[44px] px-6 py-2 text-sm font-bold text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-lg hover:from-orange-400 hover:to-red-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isGenerating ? (
-                  <span className="flex items-center justify-center gap-2">
+                  <>
                     <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    시나리오 생성 중...
-                  </span>
+                    생성 중...
+                  </>
                 ) : (
-                  <span className="flex items-center justify-center gap-2">
+                  <>
                     <SparklesIcon className="w-4 h-4" />
-                    광고 시나리오 생성
-                  </span>
+                    시나리오 생성
+                  </>
                 )}
               </button>
-
-              {/* 시나리오 불러오기 */}
-              <button
-                onClick={() => scenarioFileInputRef.current?.click()}
-                className="w-full min-h-[44px] px-6 py-3 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600"
-              >
-                <UploadIcon className="w-4 h-4 inline mr-2" />
-                시나리오 불러오기
-              </button>
-            </div>
+            )}
           </div>
         </div>
       ) : (
-        /* 광고 시나리오가 있을 때: 결과 표시 */
+        /* =============================================
+         * SCENARIO RESULT VIEW (HDSER)
+         * ============================================= */
         <div className="h-full flex flex-col bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
           {/* Header */}
           <div className="flex-shrink-0 p-3 sm:p-4 border-b border-gray-700 bg-gray-800">
@@ -317,8 +556,8 @@ const AdTab: React.FC = () => {
                 <h2 className="text-base sm:text-lg font-bold text-white truncate">{adScenario.title}</h2>
                 <p className="text-xs sm:text-sm text-gray-400 mt-1">{adScenario.synopsis}</p>
                 <div className="flex flex-wrap gap-1.5 mt-2 text-xs">
-                  <span className="px-2 py-1 bg-orange-900/50 rounded text-orange-300">30초 광고</span>
-                  <span className="px-2 py-1 bg-gray-700 rounded text-gray-300">6씬 x 5초</span>
+                  <span className="px-2 py-1 bg-orange-900/50 rounded text-orange-300">{adScenario.totalDuration}초 광고</span>
+                  <span className="px-2 py-1 bg-gray-700 rounded text-gray-300">{adScenario.scenes.length}씬</span>
                   <span className="px-2 py-1 bg-gray-700 rounded text-gray-300">{adScenario.productName}</span>
                 </div>
               </div>
@@ -388,18 +627,8 @@ const AdTab: React.FC = () => {
                     <p className="text-xs text-gray-500 mt-0.5">이미지 생성 시 자동 참조</p>
                   </div>
                   <div className="flex gap-1.5">
-                    <button
-                      onClick={() => productImageInputRef.current?.click()}
-                      className="min-h-[36px] px-3 py-1.5 text-xs text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600"
-                    >
-                      변경
-                    </button>
-                    <button
-                      onClick={() => setProductImage(undefined)}
-                      className="min-h-[36px] p-2 text-red-400 bg-gray-700 rounded-lg hover:bg-gray-600"
-                    >
-                      <TrashIcon className="w-3.5 h-3.5" />
-                    </button>
+                    <button onClick={() => productImageInputRef.current?.click()} className="min-h-[36px] px-3 py-1.5 text-xs text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600">변경</button>
+                    <button onClick={() => setProductImage(undefined)} className="min-h-[36px] p-2 text-red-400 bg-gray-700 rounded-lg hover:bg-gray-600"><TrashIcon className="w-3.5 h-3.5" /></button>
                   </div>
                 </div>
               ) : (
@@ -413,13 +642,13 @@ const AdTab: React.FC = () => {
               )}
             </div>
 
-            {/* 씬 목록 */}
+            {/* HDSER 씬 목록 */}
             <div className="space-y-3">
-              <h3 className="text-sm font-bold text-gray-300">씬 구성 (6씬 x 5초)</h3>
+              <h3 className="text-sm font-bold text-gray-300">HDSER 씬 구성</h3>
               {adScenario.scenes.map((scene) => {
                 const sceneImage = scene.customImage || scene.generatedImage;
                 const isGeneratingThis = generatingImageSceneId === scene.id;
-                const beatColor = STORY_BEAT_COLORS[scene.storyBeat] || 'bg-gray-600';
+                const beatConfig = HDSER_BEAT_CONFIG[scene.storyBeat] || { label: scene.storyBeat, color: 'bg-gray-600' };
 
                 return (
                   <div key={scene.id} className="bg-gray-900/50 rounded-lg border border-gray-700 overflow-hidden">
@@ -441,28 +670,16 @@ const AdTab: React.FC = () => {
                               </svg>
                             ) : (
                               <>
-                                <button
-                                  onClick={() => handleGenerateSceneImage(scene.id)}
-                                  className="p-1.5 text-blue-400 hover:text-blue-300 transition-colors"
-                                  title="AI 이미지 생성"
-                                >
+                                <button onClick={() => handleGenerateSceneImage(scene.id)} className="p-1.5 text-blue-400 hover:text-blue-300 transition-colors" title="AI 이미지 생성">
                                   <SparklesIcon className="w-5 h-5" />
                                 </button>
-                                <button
-                                  onClick={() => {
-                                    setUploadingSceneId(scene.id);
-                                    sceneImageInputRef.current?.click();
-                                  }}
-                                  className="p-1.5 text-gray-400 hover:text-gray-300 transition-colors"
-                                  title="이미지 업로드"
-                                >
+                                <button onClick={() => { setUploadingSceneId(scene.id); sceneImageInputRef.current?.click(); }} className="p-1.5 text-gray-400 hover:text-gray-300 transition-colors" title="이미지 업로드">
                                   <UploadIcon className="w-4 h-4" />
                                 </button>
                               </>
                             )}
                           </div>
                         )}
-                        {/* 씬 번호 뱃지 */}
                         <span className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/70 rounded text-[10px] font-bold text-white">
                           {scene.sceneNumber}
                         </span>
@@ -471,8 +688,8 @@ const AdTab: React.FC = () => {
                       {/* 텍스트 영역 */}
                       <div className="flex-grow min-w-0">
                         <div className="flex items-center gap-1.5 mb-1.5">
-                          <span className={`px-1.5 py-0.5 ${beatColor} rounded text-[10px] font-bold text-white`}>
-                            {scene.storyBeat}
+                          <span className={`px-1.5 py-0.5 ${beatConfig.color} rounded text-[10px] font-bold text-white`}>
+                            {beatConfig.label}
                           </span>
                           <span className="text-[10px] text-gray-500">{scene.duration}초</span>
                         </div>
@@ -487,22 +704,10 @@ const AdTab: React.FC = () => {
                       {/* Actions */}
                       {sceneImage && (
                         <div className="flex flex-col gap-1 flex-shrink-0">
-                          <button
-                            onClick={() => handleGenerateSceneImage(scene.id)}
-                            disabled={isGeneratingThis}
-                            className="p-1.5 text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
-                            title="이미지 재생성"
-                          >
+                          <button onClick={() => handleGenerateSceneImage(scene.id)} disabled={isGeneratingThis} className="p-1.5 text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors" title="이미지 재생성">
                             <SparklesIcon className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => {
-                              setUploadingSceneId(scene.id);
-                              sceneImageInputRef.current?.click();
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-gray-300 transition-colors"
-                            title="이미지 교체"
-                          >
+                          <button onClick={() => { setUploadingSceneId(scene.id); sceneImageInputRef.current?.click(); }} className="p-1.5 text-gray-400 hover:text-gray-300 transition-colors" title="이미지 교체">
                             <UploadIcon className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -525,27 +730,11 @@ const AdTab: React.FC = () => {
       )}
 
       {/* Hidden file inputs */}
-      <input
-        ref={sceneImageInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleSceneImageUpload}
-        className="hidden"
-      />
-      <input
-        ref={scenarioFileInputRef}
-        type="file"
-        accept=".json"
-        onChange={handleScenarioFileChange}
-        className="hidden"
-      />
+      <input ref={sceneImageInputRef} type="file" accept="image/*" onChange={handleSceneImageUpload} className="hidden" />
+      <input ref={scenarioFileInputRef} type="file" accept=".json" onChange={handleScenarioFileChange} className="hidden" />
 
       {/* API 키 필요 모달 */}
-      <ApiKeyRequiredModal
-        isOpen={showApiKeyModal}
-        onClose={() => setShowApiKeyModal(false)}
-        featureName="광고 시나리오 생성"
-      />
+      <ApiKeyRequiredModal isOpen={showApiKeyModal} onClose={() => setShowApiKeyModal(false)} featureName="광고 시나리오 생성" />
     </div>
   );
 };

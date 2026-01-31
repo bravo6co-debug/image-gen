@@ -124,6 +124,24 @@ export interface GenerateAdScenarioV2Request {
     config: AdScenarioConfigV2;
 }
 
+// 광고 이미지 생성 엔진
+export type AdEngine = 'gemini' | 'flux';
+
+// 광고 씬 파이프라인 단계
+export type AdPipelineStep = 'anchor' | 'variation';
+
+// 광고 씬 이미지 생성 요청 (FLUX 파이프라인)
+export interface GenerateAdSceneImageRequest {
+    imagePrompt: string;           // 씬 이미지 프롬프트 (영어)
+    mood?: string;                 // 분위기
+    cameraAngle?: string;          // 카메라 앵글
+    pipelineStep: AdPipelineStep;
+    referenceImages?: ImageData[]; // 앵커 단계: 참조 이미지 (최대 4장)
+    anchorImage?: ImageData;       // 변형 단계: 앵커 이미지
+    strength?: number;             // 변형 단계: 변형 강도 (0-1)
+    aspectRatio: AspectRatio;
+}
+
 export interface VideoGenerationResult {
     videoUrl: string;
     thumbnailUrl: string;

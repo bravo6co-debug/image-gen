@@ -5,17 +5,25 @@ import {
   Scene,
   AdScenarioConfig,
   AdScenarioConfigV2,
+  AdEngine,
   ImageData,
 } from '../types';
 import {
   generateAdScenario as apiGenerateAdScenario,
   generateSceneImage as apiGenerateSceneImage,
 } from '../services/geminiService';
-import { generateAdScenarioV2 as apiGenerateAdScenarioV2, generateNarration, TTSVoice } from '../services/apiClient';
+import {
+  generateAdScenarioV2 as apiGenerateAdScenarioV2,
+  generateAdSceneImage as apiGenerateAdSceneImage,
+  getStrengthForBeat,
+  generateNarration,
+  TTSVoice,
+} from '../services/apiClient';
 
 interface GenerateAllOptions {
   includeTTS?: boolean;
   ttsVoice?: TTSVoice;
+  engine?: AdEngine;
 }
 
 interface UseAdScenarioReturn {
@@ -173,38 +181,121 @@ export function useAdScenario(): UseAdScenarioReturn {
     setError(null);
 
     let imageGenerationFailed = false;
+    const engine = options?.engine || 'gemini';
 
     // 1. 이미지 생성
     if (hasImagesToGenerate) {
-      const propImages: ImageData[] = adScenario.productImage
-        ? [adScenario.productImage]
-        : [];
-
-      for (const scene of scenesWithoutImages) {
-        setGeneratingImageSceneId(scene.id);
+      if (engine === 'flux') {
+        // =============================================
+        // FLUX 엔진: 3단계 파이프라인 (앵커 → 변형)
+        // =============================================
         try {
-          const imageData = await apiGenerateSceneImage(
-            scene,
-            [],
-            propImages,
-            null,
-            aspectRatio,
-            adScenario.imageStyle,
-            undefined
-          );
-          updateAdScene(scene.id, {
-            generatedImage: imageData,
+          const refImages: ImageData[] = [];
+          if (adScenario.productImage) refImages.push(adScenario.productImage);
+
+          // 앵커 씬 선택: Discovery > Story > 첫 번째
+          const anchorScene = scenesWithoutImages.find(s => s.storyBeat === 'Discovery')
+            || scenesWithoutImages.find(s => s.storyBeat === 'Story')
+            || scenesWithoutImages[0];
+          const remainingScenes = scenesWithoutImages.filter(s => s.id !== anchorScene.id);
+
+          // 1단계: 앵커 이미지 생성
+          setGeneratingImageSceneId(anchorScene.id);
+          console.log(`[FLUX Pipeline] Generating anchor: scene ${anchorScene.sceneNumber} (${anchorScene.storyBeat})`);
+
+          let anchorImage: ImageData;
+
+          if (refImages.length > 0) {
+            // 참조 이미지가 있으면 flux-2-turbo-edit 사용
+            anchorImage = await apiGenerateAdSceneImage({
+              imagePrompt: anchorScene.imagePrompt,
+              mood: anchorScene.mood,
+              cameraAngle: anchorScene.cameraAngle,
+              pipelineStep: 'anchor',
+              referenceImages: refImages,
+              aspectRatio,
+            });
+          } else {
+            // 참조 이미지 없으면 기존 방식으로 폴백
+            anchorImage = await apiGenerateSceneImage(
+              anchorScene, [], [], null, aspectRatio, adScenario.imageStyle, undefined
+            );
+          }
+
+          updateAdScene(anchorScene.id, {
+            generatedImage: anchorImage,
             imageSource: 'ai',
           });
+
+          // 2단계: 나머지 씬 변형 생성 (앵커 기반)
+          for (const scene of remainingScenes) {
+            setGeneratingImageSceneId(scene.id);
+            const strength = getStrengthForBeat(scene.storyBeat);
+            console.log(`[FLUX Pipeline] Generating variation: scene ${scene.sceneNumber} (${scene.storyBeat}, strength: ${strength})`);
+
+            try {
+              const imageData = await apiGenerateAdSceneImage({
+                imagePrompt: scene.imagePrompt,
+                mood: scene.mood,
+                cameraAngle: scene.cameraAngle,
+                pipelineStep: 'variation',
+                anchorImage,
+                strength,
+                aspectRatio,
+              });
+              updateAdScene(scene.id, {
+                generatedImage: imageData,
+                imageSource: 'ai',
+              });
+            } catch (e) {
+              console.error(`Failed to generate variation for scene ${scene.sceneNumber}:`, e);
+              const errorMessage = e instanceof Error ? e.message : '이미지 생성에 실패했습니다.';
+              setError(`씬 ${scene.sceneNumber} 이미지 생성 실패: ${errorMessage}`);
+              imageGenerationFailed = true;
+              break;
+            }
+          }
         } catch (e) {
-          console.error(`Failed to generate image for ad scene ${scene.sceneNumber}:`, e);
-          const errorMessage = e instanceof Error ? e.message : '이미지 생성에 실패했습니다.';
-          setError(`씬 ${scene.sceneNumber} 이미지 생성 실패: ${errorMessage}`);
+          console.error('FLUX pipeline anchor generation failed:', e);
+          const errorMessage = e instanceof Error ? e.message : '앵커 이미지 생성에 실패했습니다.';
+          setError(`FLUX 파이프라인 실패: ${errorMessage}`);
           imageGenerationFailed = true;
-          break;
         }
+        setGeneratingImageSceneId(null);
+      } else {
+        // =============================================
+        // Gemini 엔진: 기존 방식 (변경 없음)
+        // =============================================
+        const propImages: ImageData[] = adScenario.productImage
+          ? [adScenario.productImage]
+          : [];
+
+        for (const scene of scenesWithoutImages) {
+          setGeneratingImageSceneId(scene.id);
+          try {
+            const imageData = await apiGenerateSceneImage(
+              scene,
+              [],
+              propImages,
+              null,
+              aspectRatio,
+              adScenario.imageStyle,
+              undefined
+            );
+            updateAdScene(scene.id, {
+              generatedImage: imageData,
+              imageSource: 'ai',
+            });
+          } catch (e) {
+            console.error(`Failed to generate image for ad scene ${scene.sceneNumber}:`, e);
+            const errorMessage = e instanceof Error ? e.message : '이미지 생성에 실패했습니다.';
+            setError(`씬 ${scene.sceneNumber} 이미지 생성 실패: ${errorMessage}`);
+            imageGenerationFailed = true;
+            break;
+          }
+        }
+        setGeneratingImageSceneId(null);
       }
-      setGeneratingImageSceneId(null);
     }
 
     setIsGeneratingAllImages(false);

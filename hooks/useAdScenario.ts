@@ -39,6 +39,10 @@ interface UseAdScenarioReturn {
   // 이미지 교체
   replaceSceneImage: (sceneId: string, newImage: ImageData) => void;
 
+  // 저장/불러오기
+  saveAdScenarioToFile: () => void;
+  loadAdScenarioFromFile: (file: File) => Promise<void>;
+
   // 유틸리티
   clearError: () => void;
 }
@@ -265,6 +269,43 @@ export function useAdScenario(): UseAdScenarioReturn {
   }, [adScenario, updateAdScene]);
 
   // =============================================
+  // 저장/불러오기
+  // =============================================
+
+  const saveAdScenarioToFile = useCallback(() => {
+    if (!adScenario) return;
+
+    const dataStr = JSON.stringify(adScenario, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ad_scenario_${adScenario.title.replace(/\s+/g, '_')}_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [adScenario]);
+
+  const loadAdScenarioFromFile = useCallback(async (file: File): Promise<void> => {
+    try {
+      const text = await file.text();
+      const loaded = JSON.parse(text) as Scenario;
+
+      // 기본 구조 검증
+      if (!loaded.id || !loaded.title || !loaded.scenes || !Array.isArray(loaded.scenes)) {
+        throw new Error('Invalid scenario file format');
+      }
+
+      contextSetAdScenario(loaded);
+    } catch (e) {
+      const message = '광고 시나리오 파일을 불러오는데 실패했습니다.';
+      setError(message);
+      throw new Error(message);
+    }
+  }, [contextSetAdScenario]);
+
+  // =============================================
   // 유틸리티
   // =============================================
 
@@ -289,6 +330,9 @@ export function useAdScenario(): UseAdScenarioReturn {
     generateAllSceneImages,
 
     replaceSceneImage,
+
+    saveAdScenarioToFile,
+    loadAdScenarioFromFile,
 
     clearError,
   };

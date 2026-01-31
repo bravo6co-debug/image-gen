@@ -56,6 +56,12 @@ const TrashIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  </svg>
+);
+
 const AdTab: React.FC = () => {
   const { isAuthenticated, canUseApi } = useAuth();
   const { imageStyle: projectImageStyle } = useProject();
@@ -71,6 +77,8 @@ const AdTab: React.FC = () => {
     generateAllSceneImages,
     replaceSceneImage,
     setAdScenario,
+    saveAdScenarioToFile,
+    loadAdScenarioFromFile,
     clearError,
   } = useAdScenario();
 
@@ -83,6 +91,7 @@ const AdTab: React.FC = () => {
 
   const productImageInputRef = useRef<HTMLInputElement>(null);
   const sceneImageInputRef = useRef<HTMLInputElement>(null);
+  const scenarioFileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingSceneId, setUploadingSceneId] = useState<string | null>(null);
 
   // 광고 시나리오 생성
@@ -165,6 +174,17 @@ const AdTab: React.FC = () => {
   const handleNewScenario = useCallback(() => {
     setAdScenario(null);
   }, [setAdScenario]);
+
+  // 시나리오 파일 불러오기
+  const handleScenarioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await loadAdScenarioFromFile(file);
+    }
+    if (scenarioFileInputRef.current) {
+      scenarioFileInputRef.current.value = '';
+    }
+  };
 
   const hasAdScenario = adScenario !== null;
 
@@ -275,6 +295,15 @@ const AdTab: React.FC = () => {
                   </span>
                 )}
               </button>
+
+              {/* 시나리오 불러오기 */}
+              <button
+                onClick={() => scenarioFileInputRef.current?.click()}
+                className="w-full min-h-[44px] px-6 py-3 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600"
+              >
+                <UploadIcon className="w-4 h-4 inline mr-2" />
+                시나리오 불러오기
+              </button>
             </div>
           </div>
         </div>
@@ -301,6 +330,22 @@ const AdTab: React.FC = () => {
                 >
                   <ImageIcon className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">전체 생성</span>
+                </button>
+                <button
+                  onClick={saveAdScenarioToFile}
+                  className="min-h-[36px] px-3 py-1.5 text-xs font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center gap-1"
+                  title="시나리오 저장"
+                >
+                  <DownloadIcon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">저장</span>
+                </button>
+                <button
+                  onClick={() => scenarioFileInputRef.current?.click()}
+                  className="min-h-[36px] px-3 py-1.5 text-xs font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center gap-1"
+                  title="시나리오 불러오기"
+                >
+                  <UploadIcon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">불러오기</span>
                 </button>
                 <button
                   onClick={handleNewScenario}
@@ -485,6 +530,13 @@ const AdTab: React.FC = () => {
         type="file"
         accept="image/*"
         onChange={handleSceneImageUpload}
+        className="hidden"
+      />
+      <input
+        ref={scenarioFileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleScenarioFileChange}
         className="hidden"
       />
 

@@ -353,3 +353,128 @@ export async function getSettings(): Promise<UserSettings & { _id: string; updat
         updatedAt: new Date(),
     };
 }
+
+// ============================================
+// PROJECT CRUD (시나리오 저장/조회/삭제)
+// ============================================
+
+export interface SavedProject {
+    _id?: ObjectId;
+    userId: string;
+    type: 'ad-scenario' | 'story';
+    title: string;
+    synopsis?: string;
+    productName?: string;
+    scenarioData: Record<string, unknown>;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface ProjectListItem {
+    _id: string;
+    type: string;
+    title: string;
+    synopsis?: string;
+    productName?: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+/**
+ * 프로젝트 저장 (새로 생성)
+ */
+export async function saveProject(
+    userId: string,
+    data: { type: string; title: string; synopsis?: string; productName?: string; scenarioData: Record<string, unknown> }
+): Promise<string> {
+    const db = await getDatabase();
+    if (!db) throw new Error('데이터베이스 연결에 실패했습니다.');
+
+    const result = await db.collection<SavedProject>('projects').insertOne({
+        userId,
+        type: data.type as 'ad-scenario' | 'story',
+        title: data.title,
+        synopsis: data.synopsis,
+        productName: data.productName,
+        scenarioData: data.scenarioData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+    });
+    return result.insertedId.toString();
+}
+
+/**
+ * 프로젝트 업데이트 (덮어쓰기)
+ */
+export async function updateProject(
+    userId: string,
+    projectId: string,
+    data: { title?: string; synopsis?: string; productName?: string; scenarioData?: Record<string, unknown> }
+): Promise<boolean> {
+    const db = await getDatabase();
+    if (!db) throw new Error('데이터베이스 연결에 실패했습니다.');
+
+    const updateFields: Record<string, unknown> = { updatedAt: new Date() };
+    if (data.title !== undefined) updateFields.title = data.title;
+    if (data.synopsis !== undefined) updateFields.synopsis = data.synopsis;
+    if (data.productName !== undefined) updateFields.productName = data.productName;
+    if (data.scenarioData !== undefined) updateFields.scenarioData = data.scenarioData;
+
+    const result = await db.collection<SavedProject>('projects').updateOne(
+        { _id: new ObjectId(projectId), userId },
+        { $set: updateFields }
+    );
+    return result.modifiedCount > 0;
+}
+
+/**
+ * 사용자 프로젝트 목록 조회 (scenarioData 제외, 가벼운 목록)
+ */
+export async function getUserProjects(userId: string): Promise<ProjectListItem[]> {
+    const db = await getDatabase();
+    if (!db) throw new Error('데이터베이스 연결에 실패했습니다.');
+
+    const docs = await db.collection<SavedProject>('projects')
+        .find({ userId })
+        .sort({ updatedAt: -1 })
+        .project({ scenarioData: 0, userId: 0 })
+        .limit(50)
+        .toArray();
+
+    return docs.map(d => ({
+        _id: d._id!.toString(),
+        type: d.type,
+        title: d.title,
+        synopsis: d.synopsis,
+        productName: d.productName,
+        createdAt: d.createdAt,
+        updatedAt: d.updatedAt,
+    }));
+}
+
+/**
+ * 특정 프로젝트 조회 (scenarioData 포함)
+ */
+export async function getProject(userId: string, projectId: string): Promise<SavedProject | null> {
+    const db = await getDatabase();
+    if (!db) throw new Error('데이터베이스 연결에 실패했습니다.');
+
+    return db.collection<SavedProject>('projects').findOne({
+        _id: new ObjectId(projectId),
+        userId,
+    });
+}
+
+/**
+ * 프로젝트 삭제
+ */
+export async function deleteProject(userId: string, projectId: string): Promise<boolean> {
+    const db = await getDatabase();
+    if (!db) throw new Error('데이터베이스 연결에 실패했습니다.');
+
+    const result = await db.collection<SavedProject>('projects').deleteOne({
+        _id: new ObjectId(projectId),
+        userId,
+    });
+    return result.deletedCount > 0;
+}

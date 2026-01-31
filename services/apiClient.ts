@@ -5,6 +5,48 @@
  */
 
 import { Character, ImageData, AspectRatio, ScenarioConfig, AdScenarioConfig, AdScenarioConfigV2, Scenario, Scene, ImageStyle, NarrationAudio, StoryBeat } from '../types';
+
+// ============================================
+// CLOUD PROJECT TYPES
+// ============================================
+
+export interface CloudProjectListItem {
+    _id: string;
+    type: string;
+    title: string;
+    synopsis?: string;
+    productName?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+interface ProjectListResponse {
+    success: boolean;
+    projects: CloudProjectListItem[];
+}
+
+interface ProjectDetailResponse {
+    success: boolean;
+    project: {
+        _id: string;
+        type: string;
+        title: string;
+        synopsis?: string;
+        productName?: string;
+        scenarioData: Record<string, unknown>;
+        createdAt: string;
+        updatedAt: string;
+    };
+}
+
+interface ProjectSaveResponse {
+    success: boolean;
+    projectId: string;
+}
+
+interface ProjectDeleteResponse {
+    success: boolean;
+}
 import {
     ApiError,
     QuotaExceededError,
@@ -102,6 +144,44 @@ async function post<T>(endpoint: string, data: unknown, context: string = 'api')
             shouldRetry: (err) => err.retryable && err.code !== 'VALIDATION_ERROR',
         }
     );
+}
+
+// Generic GET request
+async function get<T>(endpoint: string, context: string = 'api'): Promise<T> {
+    const token = getAuthToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    let response: Response;
+    try {
+        response = await fetch(`${API_BASE}${endpoint}`, { method: 'GET', headers });
+    } catch (e) {
+        throw new NetworkError(
+            e instanceof Error ? e.message : '네트워크 요청 실패',
+            e instanceof Error ? e : undefined
+        );
+    }
+    return handleResponse<T>(response, context);
+}
+
+// Generic DELETE request
+async function del<T>(endpoint: string, context: string = 'api'): Promise<T> {
+    const token = getAuthToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    let response: Response;
+    try {
+        response = await fetch(`${API_BASE}${endpoint}`, { method: 'DELETE', headers });
+    } catch (e) {
+        throw new NetworkError(
+            e instanceof Error ? e.message : '네트워크 요청 실패',
+            e instanceof Error ? e : undefined
+        );
+    }
+    return handleResponse<T>(response, context);
 }
 
 // ============================================
@@ -578,4 +658,69 @@ export const generateAllNarrations = async (
     }
 
     return { results, failedSceneIds };
+};
+
+// ============================================
+// CLOUD PROJECT SAVE/LOAD
+// ============================================
+
+/**
+ * 시나리오에서 바이너리 데이터(이미지, 오디오)를 제거한 경량 복사본 생성
+ * MongoDB 저장용 (JSON 텍스트만 보관)
+ */
+function stripBinaryData(scenario: Scenario): Record<string, unknown> {
+    const stripped = {
+        ...scenario,
+        productImage: undefined,
+        scenes: scenario.scenes.map(scene => ({
+            ...scene,
+            generatedImage: undefined,
+            customImage: undefined,
+            imageHistory: undefined,
+            narrationAudio: undefined,
+        })),
+    };
+    return stripped as unknown as Record<string, unknown>;
+}
+
+/**
+ * 클라우드에 프로젝트 저장 (신규 또는 업데이트)
+ */
+export const saveProjectToCloud = async (
+    scenario: Scenario,
+    projectId?: string
+): Promise<string> => {
+    const scenarioData = stripBinaryData(scenario);
+    const response = await post<ProjectSaveResponse>('/api/projects', {
+        projectId,
+        type: scenario.scenarioType === 'ad' ? 'ad-scenario' : 'ad-scenario',
+        title: scenario.title,
+        synopsis: scenario.synopsis,
+        productName: scenario.productName,
+        scenarioData,
+    }, 'project-save');
+    return response.projectId;
+};
+
+/**
+ * 내 프로젝트 목록 조회
+ */
+export const getMyProjects = async (): Promise<CloudProjectListItem[]> => {
+    const response = await get<ProjectListResponse>('/api/projects', 'project-list');
+    return response.projects;
+};
+
+/**
+ * 프로젝트 상세 조회 (scenarioData 포함)
+ */
+export const loadProjectFromCloud = async (projectId: string): Promise<Scenario> => {
+    const response = await get<ProjectDetailResponse>(`/api/projects?id=${projectId}`, 'project-load');
+    return response.project.scenarioData as unknown as Scenario;
+};
+
+/**
+ * 프로젝트 삭제
+ */
+export const deleteProjectFromCloud = async (projectId: string): Promise<void> => {
+    await del<ProjectDeleteResponse>(`/api/projects?id=${projectId}`, 'project-delete');
 };

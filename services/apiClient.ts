@@ -4,7 +4,7 @@
  * to keep API keys secure on the server side.
  */
 
-import { Character, ImageData, AspectRatio, ScenarioConfig, AdScenarioConfig, AdScenarioConfigV2, Scenario, Scene, ImageStyle, NarrationAudio } from '../types';
+import { Character, ImageData, AspectRatio, ScenarioConfig, AdScenarioConfig, AdScenarioConfigV2, Scenario, Scene, ImageStyle, NarrationAudio, StoryBeat } from '../types';
 import {
     ApiError,
     QuotaExceededError,
@@ -252,6 +252,57 @@ export const generateAdScenario = async (config: AdScenarioConfig): Promise<Scen
 export const generateAdScenarioV2 = async (config: AdScenarioConfigV2): Promise<Scenario> => {
     const response = await post<GenerateScenarioResponse>('/api/generate-ad-scenario-v2', { config }, 'scenario');
     return response.scenario;
+};
+
+// ============================================
+// AD SCENE IMAGE PIPELINE (FLUX 엔진)
+// ============================================
+
+// HDSER Beat별 변형 강도 (strength)
+// 낮을수록 앵커 이미지에 가까움 (일관성 유지)
+const HDSER_BEAT_STRENGTH: Record<string, number> = {
+    'Hook': 0.75,        // 시선 끌기 → 앵커와 다른 분위기
+    'Discovery': 0.25,   // 상품 소개 → 앵커와 유사 유지
+    'Story': 0.45,       // 스토리 전개 → 적당한 변형
+    'Experience': 0.55,  // 체험/감동 → 중간 이상 변형
+    'Reason': 0.35,      // 구매 이유 → 상품 중심 유지
+};
+
+export function getStrengthForBeat(beat: StoryBeat): number {
+    return HDSER_BEAT_STRENGTH[beat] ?? 0.5;
+}
+
+interface AdSceneImageResponse {
+    image: ImageData;
+}
+
+export type AdPipelineStep = 'anchor' | 'variation';
+
+export interface GenerateAdSceneImageParams {
+    imagePrompt: string;
+    mood?: string;
+    cameraAngle?: string;
+    pipelineStep: AdPipelineStep;
+    referenceImages?: ImageData[];
+    anchorImage?: ImageData;
+    strength?: number;
+    aspectRatio: AspectRatio;
+}
+
+/**
+ * FLUX 파이프라인 전용: 광고 씬 이미지 생성
+ * - anchor: flux-2-turbo-edit (최대 4장 참조)
+ * - variation: flux-krea-i2i (앵커 기반 + strength 제어)
+ */
+export const generateAdSceneImage = async (
+    params: GenerateAdSceneImageParams
+): Promise<ImageData> => {
+    const response = await post<AdSceneImageResponse>(
+        '/api/generate-ad-scene-image',
+        params,
+        'image-ad-scene'
+    );
+    return response.image;
 };
 
 interface RegenerateSceneResponse {

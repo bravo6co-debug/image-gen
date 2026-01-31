@@ -8,12 +8,14 @@ import {
   IndustryCategory,
   TargetAudience,
   AdDuration,
+  AdEngine,
   ImageStyle,
   ScenarioTone,
   AD_TYPE_OPTIONS,
   INDUSTRY_OPTIONS,
   TARGET_AUDIENCE_OPTIONS,
   AD_DURATION_OPTIONS,
+  AD_ENGINE_OPTIONS,
   IMAGE_STYLE_OPTIONS,
   TONE_OPTIONS,
 } from '../../types';
@@ -128,6 +130,7 @@ const AdTab: React.FC = () => {
   const [tone, setTone] = useState<ScenarioTone>('inspirational');
   const [imageStyle, setImageStyle] = useState<ImageStyle>(projectImageStyle);
   const [duration, setDuration] = useState<AdDuration>(30);
+  const [engine, setEngine] = useState<AdEngine>('gemini');
 
   // Scene view refs
   const productImageInputRef = useRef<HTMLInputElement>(null);
@@ -216,8 +219,8 @@ const AdTab: React.FC = () => {
 
   const handleGenerateAllImages = useCallback(async () => {
     if (!isAuthenticated || !canUseApi) { setShowApiKeyModal(true); return; }
-    await generateAllSceneImages({ includeTTS: true, ttsVoice: 'Kore' });
-  }, [isAuthenticated, canUseApi, generateAllSceneImages]);
+    await generateAllSceneImages({ includeTTS: true, ttsVoice: 'Kore', engine });
+  }, [isAuthenticated, canUseApi, generateAllSceneImages, engine]);
 
   const handleNewScenario = useCallback(() => {
     setAdScenario(null);
@@ -418,6 +421,35 @@ const AdTab: React.FC = () => {
              * ============================================= */}
             {wizardStep === 3 && (
               <div className="space-y-4">
+                {/* 생성 엔진 */}
+                <div>
+                  <label className="text-xs font-medium text-gray-300 mb-1.5 block">이미지 생성 엔진</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {AD_ENGINE_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setEngine(opt.value)}
+                        className={`p-3 rounded-lg border text-left transition-all ${
+                          engine === opt.value
+                            ? opt.value === 'flux'
+                              ? 'border-blue-500 bg-blue-900/30 ring-1 ring-blue-500'
+                              : 'border-orange-500 bg-orange-900/30 ring-1 ring-orange-500'
+                            : 'border-gray-700 bg-gray-900/50 hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="text-sm font-bold text-white">{opt.label}</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">{opt.description}</div>
+                        <div className={`text-[10px] mt-1 ${opt.value === 'flux' ? 'text-blue-400' : 'text-green-400'}`}>{opt.cost}</div>
+                      </button>
+                    ))}
+                  </div>
+                  {engine === 'flux' && (
+                    <p className="text-[10px] text-blue-300 mt-1.5 px-1">
+                      FLUX 엔진: 앵커 이미지 기반 3단계 파이프라인으로 씬간 일관성을 강화합니다. EachLabs API 키 필요.
+                    </p>
+                  )}
+                </div>
+
                 {/* 톤 */}
                 <div>
                   <label className="text-xs font-medium text-gray-300 mb-1.5 block">톤/분위기</label>
@@ -486,6 +518,10 @@ const AdTab: React.FC = () => {
                     <span className="text-gray-300 truncate">{productName || '-'}</span>
                     <span className="text-gray-500">길이</span>
                     <span className="text-gray-300">{duration}초 / {AD_DURATION_OPTIONS.find(o => o.value === duration)?.scenes}씬</span>
+                    <span className="text-gray-500">이미지 엔진</span>
+                    <span className={engine === 'flux' ? 'text-blue-300' : 'text-gray-300'}>
+                      {AD_ENGINE_OPTIONS.find(o => o.value === engine)?.label}
+                    </span>
                   </div>
                 </div>
 
@@ -562,6 +598,25 @@ const AdTab: React.FC = () => {
                 </div>
               </div>
               <div className="flex gap-1.5 flex-shrink-0">
+                {/* 엔진 선택 토글 */}
+                <div className="flex items-center bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
+                  {AD_ENGINE_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setEngine(opt.value)}
+                      className={`min-h-[36px] px-2 py-1.5 text-[10px] font-medium transition-colors ${
+                        engine === opt.value
+                          ? opt.value === 'flux'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-orange-600 text-white'
+                          : 'text-gray-400 hover:text-gray-300'
+                      }`}
+                      title={opt.description}
+                    >
+                      {opt.value === 'gemini' ? 'Gemini' : 'FLUX'}
+                    </button>
+                  ))}
+                </div>
                 <button
                   onClick={handleGenerateAllImages}
                   disabled={isGeneratingAllImages || isGenerating}

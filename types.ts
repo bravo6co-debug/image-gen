@@ -462,6 +462,19 @@ export const AD_DURATION_OPTIONS: {
   { value: 60, label: '60초', scenes: 6 },
 ];
 
+// 광고 이미지 생성 엔진
+export type AdEngine = 'gemini' | 'flux';
+
+export const AD_ENGINE_OPTIONS: {
+  value: AdEngine;
+  label: string;
+  description: string;
+  cost: string;
+}[] = [
+  { value: 'gemini', label: 'Gemini 엔진', description: '안정적, 참조 이미지 무제한', cost: '무료 (API 키)' },
+  { value: 'flux', label: 'FLUX 엔진', description: '고품질, 씬간 일관성 강화', cost: '~$0.12 / 5씬' },
+];
+
 // V2 광고 시나리오 설정
 export interface AdScenarioConfigV2 {
   adType: AdType;

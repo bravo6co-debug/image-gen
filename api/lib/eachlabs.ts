@@ -73,6 +73,101 @@ async function downloadImageAsBase64(url: string): Promise<ImageData> {
     };
 }
 
+// =============================================
+// 공통 헬퍼 함수 (Common Helpers)
+// =============================================
+
+/**
+ * EachLabs Prediction 생성 (공통)
+ */
+async function createPrediction(apiKey: string, modelName: string, input: Record<string, unknown>): Promise<string> {
+    console.log(`[${modelName}] Creating prediction...`);
+    const createResponse = await fetch(`${EACHLABS_API_URL}/`, {
+        method: 'POST',
+        headers: {
+            'X-API-Key': apiKey,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            model: modelName,
+            version: EACHLABS_VERSION,
+            input,
+            webhook_url: '',
+        }),
+    });
+
+    const createResult = await createResponse.json() as Record<string, unknown>;
+
+    if (createResult.status !== 'success' || !createResult.predictionID) {
+        const errMsg = (createResult.error as string) || (createResult.message as string) || JSON.stringify(createResult);
+        if (String(errMsg).includes('401') || String(errMsg).includes('Unauthorized')) {
+            throw new Error('EachLabs API 키가 유효하지 않습니다. 키를 확인해 주세요.');
+        }
+        throw new Error(`[${modelName}] 이미지 생성 요청 실패: ${errMsg}`);
+    }
+
+    const predictionId = createResult.predictionID as string;
+    console.log(`[${modelName}] Prediction created: ${predictionId}`);
+    return predictionId;
+}
+
+/**
+ * EachLabs Prediction 결과 폴링 (공통, 최대 2분)
+ * 성공 시 출력 이미지 URL 반환
+ */
+async function pollPrediction(apiKey: string, predictionId: string, modelName: string): Promise<string> {
+    const maxPollingTime = 120000;
+    const pollInterval = 3000;
+    const startTime = Date.now();
+    let pollCount = 0;
+    let consecutiveErrors = 0;
+
+    while (true) {
+        pollCount++;
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+
+        if (Date.now() - startTime > maxPollingTime) {
+            throw new Error(`[${modelName}] 이미지 생성 시간 초과 (${elapsed}초 경과). 다시 시도해 주세요.`);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        console.log(`[${modelName}] Polling #${pollCount} - ${elapsed}s elapsed...`);
+
+        try {
+            const pollResponse = await fetch(`${EACHLABS_API_URL}/${predictionId}`, {
+                headers: { 'X-API-Key': apiKey },
+            });
+            const pollResult = await pollResponse.json() as Record<string, unknown>;
+
+            if (pollResult.status === 'success' && pollResult.output) {
+                const totalTime = Math.round((Date.now() - startTime) / 1000);
+                console.log(`[${modelName}] Image generated in ${totalTime}s`);
+                return pollResult.output as string;
+            }
+
+            if (pollResult.status === 'error') {
+                const errDetail = (pollResult.error as string) || (pollResult.message as string) || '알 수 없는 오류';
+                throw new Error(`[${modelName}] 이미지 생성 실패: ${errDetail}`);
+            }
+
+            consecutiveErrors = 0;
+        } catch (pollError) {
+            if (pollError instanceof Error && pollError.message.includes(modelName)) {
+                throw pollError;
+            }
+            consecutiveErrors++;
+            console.error(`[${modelName}] Poll #${pollCount} failed:`, pollError);
+            if (consecutiveErrors >= 3) {
+                throw new Error(`[${modelName}] 이미지 생성 상태 확인이 반복 실패했습니다.`);
+            }
+        }
+    }
+}
+
+// =============================================
+// FLUX Kontext 이미지 생성 (기존)
+// =============================================
+
 export interface FluxGenerationOptions {
     apiKey: string;
     model: string;             // flux-kontext-pro 또는 flux-kontext-max
@@ -91,19 +186,16 @@ export async function generateFluxImage(options: FluxGenerationOptions): Promise
     const blobUrls: string[] = [];
 
     try {
-        // 참조 이미지 수에 따라 적절한 EachLabs 모델 선택
         const useMultiImage = referenceImages && referenceImages.length >= 2;
         const eachLabsModel = useMultiImage
             ? (FLUX_MULTI_MODELS[model] || FLUX_MULTI_MODELS['flux-kontext-pro'])
             : (FLUX_SINGLE_MODELS[model] || FLUX_SINGLE_MODELS['flux-kontext-pro']);
 
-        // 입력 파라미터 구성
         const input: Record<string, unknown> = {
             prompt,
             output_format: 'png',
         };
 
-        // 종횡비 설정
         if (aspectRatio === '16:9') {
             input.aspect_ratio = '16:9';
         } else if (aspectRatio === '9:16') {
@@ -112,117 +204,132 @@ export async function generateFluxImage(options: FluxGenerationOptions): Promise
             input.aspect_ratio = '1:1';
         }
 
-        // 참조 이미지 업로드 및 설정
         if (useMultiImage) {
-            // 멀티 이미지 모델: safety_tolerance 범위 0-2
             input.safety_tolerance = 2;
-
             const url1 = await uploadImageToBlob(referenceImages[0]);
             blobUrls.push(url1);
             input.input_image_1 = url1;
-
             const url2 = await uploadImageToBlob(referenceImages[1]);
             blobUrls.push(url2);
             input.input_image_2 = url2;
         } else if (referenceImages && referenceImages.length === 1) {
-            // 단일 이미지 모델 + 참조: safety_tolerance 범위 1-6
             input.safety_tolerance = 6;
-
             const url = await uploadImageToBlob(referenceImages[0]);
             blobUrls.push(url);
             input.input_image = url;
         } else {
-            // 텍스트만 (text-to-image): safety_tolerance 범위 1-6
             input.safety_tolerance = 6;
         }
 
-        // EachLabs Prediction 생성
-        console.log(`[FLUX] Creating prediction (model: ${eachLabsModel})...`);
-        const createResponse = await fetch(`${EACHLABS_API_URL}/`, {
-            method: 'POST',
-            headers: {
-                'X-API-Key': apiKey,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: eachLabsModel,
-                version: EACHLABS_VERSION,
-                input,
-                webhook_url: '',
-            }),
-        });
-
-        const createResult = await createResponse.json() as Record<string, unknown>;
-
-        if (createResult.status !== 'success' || !createResult.predictionID) {
-            const errMsg = (createResult.error as string) || (createResult.message as string) || JSON.stringify(createResult);
-
-            if (String(errMsg).includes('401') || String(errMsg).includes('Unauthorized')) {
-                throw new Error('EachLabs API 키가 유효하지 않습니다. 키를 확인해 주세요.');
-            }
-
-            throw new Error(`FLUX 이미지 생성 요청 실패: ${errMsg}`);
-        }
-
-        const predictionId = createResult.predictionID as string;
-        console.log(`[FLUX] Prediction created: ${predictionId}`);
-
-        // 결과 폴링 (최대 2분)
-        const maxPollingTime = 120000;
-        const pollInterval = 3000;
-        const startTime = Date.now();
-        let pollCount = 0;
-        let consecutiveErrors = 0;
-
-        while (true) {
-            pollCount++;
-            const elapsed = Math.round((Date.now() - startTime) / 1000);
-
-            if (Date.now() - startTime > maxPollingTime) {
-                throw new Error(`FLUX 이미지 생성 시간 초과 (${elapsed}초 경과). 다시 시도해 주세요.`);
-            }
-
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
-            console.log(`[FLUX] Polling #${pollCount} - ${elapsed}s elapsed...`);
-
-            try {
-                const pollResponse = await fetch(`${EACHLABS_API_URL}/${predictionId}`, {
-                    headers: { 'X-API-Key': apiKey },
-                });
-                const pollResult = await pollResponse.json() as Record<string, unknown>;
-
-                if (pollResult.status === 'success' && pollResult.output) {
-                    const totalTime = Math.round((Date.now() - startTime) / 1000);
-                    console.log(`[FLUX] Image generated in ${totalTime}s`);
-
-                    // 생성된 이미지 다운로드
-                    const imageData = await downloadImageAsBase64(pollResult.output as string);
-                    return imageData;
-                }
-
-                if (pollResult.status === 'error') {
-                    const errDetail = (pollResult.error as string) || (pollResult.message as string) || '알 수 없는 오류';
-                    throw new Error(`FLUX 이미지 생성 실패: ${errDetail}`);
-                }
-
-                // 아직 처리 중 → 계속 폴링
-                consecutiveErrors = 0;
-            } catch (pollError) {
-                // FLUX 관련 에러는 바로 throw
-                if (pollError instanceof Error && pollError.message.includes('FLUX')) {
-                    throw pollError;
-                }
-                consecutiveErrors++;
-                console.error(`[FLUX] Poll #${pollCount} failed:`, pollError);
-                if (consecutiveErrors >= 3) {
-                    throw new Error('FLUX 이미지 생성 상태 확인이 반복 실패했습니다.');
-                }
-            }
-        }
+        const predictionId = await createPrediction(apiKey, eachLabsModel, input);
+        const outputUrl = await pollPrediction(apiKey, predictionId, 'FLUX');
+        return await downloadImageAsBase64(outputUrl);
     } finally {
-        // Blob URL 정리
         for (const url of blobUrls) {
             try { await del(url); } catch (e) { console.warn('[FLUX] Blob cleanup failed:', e); }
+        }
+    }
+}
+
+// =============================================
+// FLUX 2 Turbo Edit (앵커 이미지 생성, 최대 4장 참조)
+// =============================================
+
+export interface Flux2EditOptions {
+    apiKey: string;
+    prompt: string;
+    referenceImages: ImageData[];  // 1~4장 참조 이미지
+    aspectRatio?: '16:9' | '9:16' | '1:1';
+    guidanceScale?: number;
+}
+
+/**
+ * FLUX 2 Turbo Edit로 앵커 이미지 생성
+ * 최대 4장의 참조 이미지를 동시에 사용 가능
+ */
+export async function generateFlux2Edit(options: Flux2EditOptions): Promise<ImageData> {
+    const { apiKey, prompt, referenceImages, aspectRatio, guidanceScale } = options;
+    const blobUrls: string[] = [];
+
+    try {
+        // 참조 이미지 업로드 (최대 4장)
+        const imageUrls: string[] = [];
+        for (const img of referenceImages.slice(0, 4)) {
+            const url = await uploadImageToBlob(img);
+            blobUrls.push(url);
+            imageUrls.push(url);
+        }
+
+        const input: Record<string, unknown> = {
+            prompt,
+            image_urls: imageUrls,
+            guidance_scale: guidanceScale || 2.5,
+            num_images: 1,
+            output_format: 'png',
+            enable_safety_checker: true,
+        };
+
+        // 종횡비 → image_size 매핑
+        if (aspectRatio === '16:9') {
+            input.image_size = 'landscape_16_9';
+        } else if (aspectRatio === '9:16') {
+            input.image_size = 'portrait_16_9';
+        } else {
+            input.image_size = 'square_hd';
+        }
+
+        const predictionId = await createPrediction(apiKey, 'flux-2-turbo-edit', input);
+        const outputUrl = await pollPrediction(apiKey, predictionId, 'FLUX2-Edit');
+        return await downloadImageAsBase64(outputUrl);
+    } finally {
+        for (const url of blobUrls) {
+            try { await del(url); } catch (e) { console.warn('[FLUX2-Edit] Blob cleanup:', e); }
+        }
+    }
+}
+
+// =============================================
+// FLUX Krea Image-to-Image (씬별 변형, Strength 제어)
+// =============================================
+
+export interface FluxI2IOptions {
+    apiKey: string;
+    prompt: string;
+    sourceImage: ImageData;     // 앵커 이미지 (변형 기반)
+    strength: number;           // 0~1 (0=원본 유지, 1=완전 재생성)
+    numInferenceSteps?: number;
+    guidanceScale?: number;
+}
+
+/**
+ * FLUX Krea Image-to-Image로 앵커 기반 씬 변형
+ * strength가 낮을수록 앵커 이미지에 가까운 결과
+ */
+export async function generateFluxI2I(options: FluxI2IOptions): Promise<ImageData> {
+    const { apiKey, prompt, sourceImage, strength, numInferenceSteps, guidanceScale } = options;
+    const blobUrls: string[] = [];
+
+    try {
+        const imageUrl = await uploadImageToBlob(sourceImage);
+        blobUrls.push(imageUrl);
+
+        const input: Record<string, unknown> = {
+            prompt,
+            image_url: imageUrl,
+            strength: Math.max(0, Math.min(1, strength)),
+            num_inference_steps: numInferenceSteps || 40,
+            guidance_scale: guidanceScale || 4.5,
+            num_images: 1,
+            output_format: 'png',
+            enable_safety_checker: true,
+        };
+
+        const predictionId = await createPrediction(apiKey, 'flux-krea-image-to-image', input);
+        const outputUrl = await pollPrediction(apiKey, predictionId, 'FLUX-I2I');
+        return await downloadImageAsBase64(outputUrl);
+    } finally {
+        for (const url of blobUrls) {
+            try { await del(url); } catch (e) { console.warn('[FLUX-I2I] Blob cleanup:', e); }
         }
     }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useProject } from '../../contexts/ProjectContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAdScenario } from '../../hooks/useAdScenario';
@@ -84,6 +84,18 @@ const ChevronRightIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+const CloudIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+  </svg>
+);
+
+const FolderIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+  </svg>
+);
+
 // =============================================
 // Wizard Step Types
 // =============================================
@@ -106,6 +118,15 @@ const AdTab: React.FC = () => {
     setAdScenario,
     saveAdScenarioToFile,
     loadAdScenarioFromFile,
+    cloudProjectId,
+    isSavingToCloud,
+    isLoadingFromCloud,
+    cloudProjects,
+    isLoadingProjects,
+    saveToCloud,
+    loadFromCloud,
+    deleteFromCloud,
+    fetchProjects,
     clearError,
   } = useAdScenario();
 
@@ -131,6 +152,9 @@ const AdTab: React.FC = () => {
   const [imageStyle, setImageStyle] = useState<ImageStyle>(projectImageStyle);
   const [duration, setDuration] = useState<AdDuration>(30);
   const [engine, setEngine] = useState<AdEngine>('gemini');
+
+  // 프로젝트 목록 패널
+  const [showProjectList, setShowProjectList] = useState(false);
 
   // Scene view refs
   const productImageInputRef = useRef<HTMLInputElement>(null);
@@ -225,7 +249,29 @@ const AdTab: React.FC = () => {
   const handleNewScenario = useCallback(() => {
     setAdScenario(null);
     setWizardStep(1);
+    setShowProjectList(false);
   }, [setAdScenario]);
+
+  const handleCloudSave = useCallback(async () => {
+    if (!isAuthenticated) { setShowApiKeyModal(true); return; }
+    await saveToCloud();
+  }, [isAuthenticated, saveToCloud]);
+
+  const handleToggleProjectList = useCallback(async () => {
+    if (!showProjectList && isAuthenticated) {
+      await fetchProjects();
+    }
+    setShowProjectList(prev => !prev);
+  }, [showProjectList, isAuthenticated, fetchProjects]);
+
+  const handleLoadProject = useCallback(async (projectId: string) => {
+    await loadFromCloud(projectId);
+    setShowProjectList(false);
+  }, [loadFromCloud]);
+
+  const handleDeleteProject = useCallback(async (projectId: string) => {
+    await deleteFromCloud(projectId);
+  }, [deleteFromCloud]);
 
   const handleScenarioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -261,13 +307,24 @@ const AdTab: React.FC = () => {
                 </div>
                 <h2 className="text-sm sm:text-base font-bold text-white">광고 시나리오</h2>
               </div>
-              <button
-                onClick={() => scenarioFileInputRef.current?.click()}
-                className="text-xs text-gray-400 hover:text-gray-300 flex items-center gap-1"
-              >
-                <UploadIcon className="w-3.5 h-3.5" />
-                불러오기
-              </button>
+              <div className="flex items-center gap-2">
+                {isAuthenticated && (
+                  <button
+                    onClick={handleToggleProjectList}
+                    className="text-xs text-gray-400 hover:text-gray-300 flex items-center gap-1"
+                  >
+                    <FolderIcon className="w-3.5 h-3.5" />
+                    내 프로젝트
+                  </button>
+                )}
+                <button
+                  onClick={() => scenarioFileInputRef.current?.click()}
+                  className="text-xs text-gray-400 hover:text-gray-300 flex items-center gap-1"
+                >
+                  <UploadIcon className="w-3.5 h-3.5" />
+                  파일 불러오기
+                </button>
+              </div>
             </div>
             {/* Step indicator */}
             <div className="flex items-center gap-2">
@@ -294,6 +351,60 @@ const AdTab: React.FC = () => {
               ))}
             </div>
           </div>
+
+          {/* 프로젝트 목록 패널 (위저드 뷰) */}
+          {showProjectList && (
+            <div className="flex-shrink-0 border-b border-gray-700 bg-gray-900/80 p-3 sm:p-4 max-h-60 overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                  <FolderIcon className="w-3.5 h-3.5" />
+                  내 프로젝트
+                </h4>
+                <button onClick={() => setShowProjectList(false)} className="text-gray-500 hover:text-gray-300 text-xs">닫기</button>
+              </div>
+              {isLoadingProjects ? (
+                <div className="flex items-center justify-center py-4">
+                  <svg className="animate-spin w-5 h-5 text-gray-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                </div>
+              ) : cloudProjects.length === 0 ? (
+                <p className="text-xs text-gray-500 text-center py-4">저장된 프로젝트가 없습니다.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {cloudProjects.map(project => (
+                    <div
+                      key={project._id}
+                      className="flex items-center gap-2 p-2 rounded-lg border border-gray-700 bg-gray-800/50 hover:border-gray-600 transition-colors"
+                    >
+                      <div className="flex-grow min-w-0 cursor-pointer" onClick={() => handleLoadProject(project._id)}>
+                        <p className="text-xs font-medium text-gray-200 truncate">{project.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {project.productName && (
+                            <span className="text-[10px] text-gray-500">{project.productName}</span>
+                          )}
+                          <span className="text-[10px] text-gray-600">
+                            {new Date(project.updatedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteProject(project._id)}
+                        className="flex-shrink-0 p-1.5 text-gray-600 hover:text-red-400 transition-colors"
+                        title="삭제"
+                      >
+                        <TrashIcon className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {isLoadingFromCloud && (
+                <div className="flex items-center justify-center py-2 mt-2 border-t border-gray-700">
+                  <svg className="animate-spin w-4 h-4 text-blue-400 mr-2" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  <span className="text-xs text-gray-400">불러오는 중...</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Wizard Content */}
           <div className="flex-grow overflow-y-auto p-3 sm:p-4">
@@ -625,21 +736,46 @@ const AdTab: React.FC = () => {
                   <ImageIcon className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">전체 생성</span>
                 </button>
+                {isAuthenticated && (
+                  <button
+                    onClick={handleCloudSave}
+                    disabled={isSavingToCloud}
+                    className="min-h-[36px] px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-500 disabled:opacity-50 flex items-center gap-1"
+                    title={cloudProjectId ? '클라우드 업데이트' : '클라우드 저장'}
+                  >
+                    {isSavingToCloud ? (
+                      <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    ) : (
+                      <CloudIcon className="w-3.5 h-3.5" />
+                    )}
+                    <span className="hidden sm:inline">{cloudProjectId ? '업데이트' : '클라우드 저장'}</span>
+                  </button>
+                )}
+                {isAuthenticated && (
+                  <button
+                    onClick={handleToggleProjectList}
+                    className="min-h-[36px] px-3 py-1.5 text-xs font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center gap-1"
+                    title="내 프로젝트"
+                  >
+                    <FolderIcon className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">프로젝트</span>
+                  </button>
+                )}
                 <button
                   onClick={saveAdScenarioToFile}
                   className="min-h-[36px] px-3 py-1.5 text-xs font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center gap-1"
-                  title="시나리오 저장"
+                  title="파일로 저장"
                 >
                   <DownloadIcon className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">저장</span>
+                  <span className="hidden sm:inline">파일</span>
                 </button>
                 <button
                   onClick={() => scenarioFileInputRef.current?.click()}
                   className="min-h-[36px] px-3 py-1.5 text-xs font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center gap-1"
-                  title="시나리오 불러오기"
+                  title="파일 불러오기"
                 >
                   <UploadIcon className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">불러오기</span>
+                  <span className="hidden sm:inline">파일</span>
                 </button>
                 <button
                   onClick={handleNewScenario}
@@ -651,6 +787,69 @@ const AdTab: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* 프로젝트 목록 패널 (결과 뷰) */}
+          {showProjectList && (
+            <div className="flex-shrink-0 border-b border-gray-700 bg-gray-900/80 p-3 sm:p-4 max-h-60 overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-bold text-gray-300 flex items-center gap-1.5">
+                  <FolderIcon className="w-3.5 h-3.5" />
+                  내 프로젝트
+                </h4>
+                <button onClick={() => setShowProjectList(false)} className="text-gray-500 hover:text-gray-300 text-xs">닫기</button>
+              </div>
+              {isLoadingProjects ? (
+                <div className="flex items-center justify-center py-4">
+                  <svg className="animate-spin w-5 h-5 text-gray-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                </div>
+              ) : cloudProjects.length === 0 ? (
+                <p className="text-xs text-gray-500 text-center py-4">저장된 프로젝트가 없습니다.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {cloudProjects.map(project => (
+                    <div
+                      key={project._id}
+                      className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${
+                        cloudProjectId === project._id
+                          ? 'border-green-600/50 bg-green-900/20'
+                          : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className="flex-grow min-w-0 cursor-pointer" onClick={() => handleLoadProject(project._id)}>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-medium text-gray-200 truncate">{project.title}</p>
+                          {cloudProjectId === project._id && (
+                            <span className="text-[9px] text-green-400 flex-shrink-0">현재</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {project.productName && (
+                            <span className="text-[10px] text-gray-500">{project.productName}</span>
+                          )}
+                          <span className="text-[10px] text-gray-600">
+                            {new Date(project.updatedAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteProject(project._id)}
+                        className="flex-shrink-0 p-1.5 text-gray-600 hover:text-red-400 transition-colors"
+                        title="삭제"
+                      >
+                        <TrashIcon className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {isLoadingFromCloud && (
+                <div className="flex items-center justify-center py-2 mt-2 border-t border-gray-700">
+                  <svg className="animate-spin w-4 h-4 text-blue-400 mr-2" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  <span className="text-xs text-gray-400">불러오는 중...</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Content */}
           <div className="flex-grow overflow-y-auto p-3 sm:p-4 space-y-4">
@@ -772,6 +971,16 @@ const AdTab: React.FC = () => {
                 );
               })}
             </div>
+
+            {/* 클라우드 저장 상태 */}
+            {cloudProjectId && (
+              <div className="p-3 bg-green-900/20 border border-green-700/30 rounded-lg flex items-center gap-2">
+                <CloudIcon className="w-4 h-4 text-green-400 flex-shrink-0" />
+                <p className="text-xs text-green-300">
+                  클라우드에 저장됨 &middot; 변경 사항은 &quot;클라우드 저장&quot; 버튼을 눌러 업데이트하세요.
+                </p>
+              </div>
+            )}
 
             {/* 안내 메시지 */}
             <div className="p-3 bg-blue-900/20 border border-blue-700/30 rounded-lg">

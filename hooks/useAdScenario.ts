@@ -18,6 +18,11 @@ import {
   getStrengthForBeat,
   generateNarration,
   TTSVoice,
+  saveProjectToCloud,
+  getMyProjects,
+  loadProjectFromCloud,
+  deleteProjectFromCloud,
+  CloudProjectListItem,
 } from '../services/apiClient';
 
 interface GenerateAllOptions {
@@ -49,9 +54,20 @@ interface UseAdScenarioReturn {
   // 이미지 교체
   replaceSceneImage: (sceneId: string, newImage: ImageData) => void;
 
-  // 저장/불러오기
+  // 저장/불러오기 (파일)
   saveAdScenarioToFile: () => void;
   loadAdScenarioFromFile: (file: File) => Promise<void>;
+
+  // 클라우드 저장/불러오기
+  cloudProjectId: string | null;
+  isSavingToCloud: boolean;
+  isLoadingFromCloud: boolean;
+  cloudProjects: CloudProjectListItem[];
+  isLoadingProjects: boolean;
+  saveToCloud: () => Promise<string | null>;
+  loadFromCloud: (projectId: string) => Promise<void>;
+  deleteFromCloud: (projectId: string) => Promise<void>;
+  fetchProjects: () => Promise<void>;
 
   // 유틸리티
   clearError: () => void;
@@ -71,6 +87,13 @@ export function useAdScenario(): UseAdScenarioReturn {
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
   const [ttsProgress, setTtsProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
+
+  // 클라우드 저장 상태
+  const [cloudProjectId, setCloudProjectId] = useState<string | null>(null);
+  const [isSavingToCloud, setIsSavingToCloud] = useState(false);
+  const [isLoadingFromCloud, setIsLoadingFromCloud] = useState(false);
+  const [cloudProjects, setCloudProjects] = useState<CloudProjectListItem[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
 
   // =============================================
   // 광고 시나리오 관리
@@ -416,6 +439,73 @@ export function useAdScenario(): UseAdScenarioReturn {
   }, [contextSetAdScenario]);
 
   // =============================================
+  // 클라우드 저장/불러오기
+  // =============================================
+
+  const saveToCloud = useCallback(async (): Promise<string | null> => {
+    if (!adScenario) return null;
+
+    setIsSavingToCloud(true);
+    setError(null);
+
+    try {
+      const projectId = await saveProjectToCloud(adScenario, cloudProjectId || undefined);
+      setCloudProjectId(projectId);
+      return projectId;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '클라우드 저장에 실패했습니다.';
+      setError(message);
+      return null;
+    } finally {
+      setIsSavingToCloud(false);
+    }
+  }, [adScenario, cloudProjectId]);
+
+  const loadFromCloud = useCallback(async (projectId: string): Promise<void> => {
+    setIsLoadingFromCloud(true);
+    setError(null);
+
+    try {
+      const scenario = await loadProjectFromCloud(projectId);
+      contextSetAdScenario(scenario);
+      setCloudProjectId(projectId);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '프로젝트를 불러오는데 실패했습니다.';
+      setError(message);
+    } finally {
+      setIsLoadingFromCloud(false);
+    }
+  }, [contextSetAdScenario]);
+
+  const deleteFromCloud = useCallback(async (projectId: string): Promise<void> => {
+    setError(null);
+
+    try {
+      await deleteProjectFromCloud(projectId);
+      setCloudProjects(prev => prev.filter(p => p._id !== projectId));
+      if (cloudProjectId === projectId) {
+        setCloudProjectId(null);
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '프로젝트 삭제에 실패했습니다.';
+      setError(message);
+    }
+  }, [cloudProjectId]);
+
+  const fetchProjects = useCallback(async (): Promise<void> => {
+    setIsLoadingProjects(true);
+
+    try {
+      const projects = await getMyProjects();
+      setCloudProjects(projects);
+    } catch (e) {
+      console.error('Failed to fetch projects:', e);
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  }, []);
+
+  // =============================================
   // 유틸리티
   // =============================================
 
@@ -444,6 +534,16 @@ export function useAdScenario(): UseAdScenarioReturn {
 
     saveAdScenarioToFile,
     loadAdScenarioFromFile,
+
+    cloudProjectId,
+    isSavingToCloud,
+    isLoadingFromCloud,
+    cloudProjects,
+    isLoadingProjects,
+    saveToCloud,
+    loadFromCloud,
+    deleteFromCloud,
+    fetchProjects,
 
     clearError,
   };

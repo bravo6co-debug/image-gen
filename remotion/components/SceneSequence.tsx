@@ -21,10 +21,11 @@ export const SceneSequence: React.FC<SceneSequenceProps> = ({
         animation={scene.animation}
       />
 
-      {/* 자막 */}
+      {/* 자막 (오디오 시간 내에서만 세그먼트 분할 표시) */}
       {showSubtitle && scene.narration && (
         <Subtitles
           text={scene.narration}
+          audioDurationMs={scene.narrationAudio?.durationMs}
           position="bottom"
           fadeIn={true}
           fadeOut={true}

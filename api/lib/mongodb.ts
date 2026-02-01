@@ -139,8 +139,15 @@ function decryptUserApiKeys(user: User): User {
 // PASSWORD HASHING
 // ============================================
 
+const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_LEGACY_ITERATIONS = 10000;
+
 function hashPassword(password: string, salt: string): string {
-    return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+    return crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, 64, 'sha512').toString('hex');
+}
+
+function hashPasswordLegacy(password: string, salt: string): string {
+    return crypto.pbkdf2Sync(password, salt, PBKDF2_LEGACY_ITERATIONS, 64, 'sha512').toString('hex');
 }
 
 function generateSalt(): string {
@@ -150,6 +157,45 @@ function generateSalt(): string {
 export function verifyUserPassword(password: string, hash: string, salt: string): boolean {
     const inputHash = hashPassword(password, salt);
     return inputHash === hash;
+}
+
+/**
+ * 비밀번호 검증 + 레거시 해시 자동 마이그레이션
+ * 100,000 iterations로 먼저 검증 → 실패 시 10,000으로 재시도 → 성공 시 자동 재해싱
+ */
+export async function verifyAndMigratePassword(
+    userId: string,
+    password: string,
+    hash: string,
+    salt: string
+): Promise<boolean> {
+    // 1) 새 iteration으로 검증
+    if (verifyUserPassword(password, hash, salt)) {
+        return true;
+    }
+
+    // 2) 레거시 iteration으로 재시도
+    const legacyHash = hashPasswordLegacy(password, salt);
+    if (legacyHash !== hash) {
+        return false; // 비밀번호 자체가 틀림
+    }
+
+    // 3) 레거시 매칭 성공 → 새 iteration으로 재해싱 후 DB 업데이트
+    const newHash = hashPassword(password, salt);
+    const db = await getDatabase();
+    if (db) {
+        try {
+            await db.collection<User>('users').updateOne(
+                { _id: new ObjectId(userId) },
+                { $set: { passwordHash: newHash, updatedAt: new Date() } }
+            );
+            console.log(`[auth] Migrated password hash for user ${userId} (10k → 100k iterations)`);
+        } catch (error) {
+            console.error('[auth] Failed to migrate password hash:', error);
+        }
+    }
+
+    return true;
 }
 
 // ============================================

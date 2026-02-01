@@ -32,14 +32,27 @@ export interface LongformRenderResult {
 
 export type LongformProgressCallback = (progress: LongformRenderProgress) => void;
 
+// ─── 씬 타이밍 상수 ─────────────────────────────
+const BUFFER_SEC = 1;       // 오디오 끝 → 씬 전환까지 여유
+const MIN_SCENE_SEC = 8;    // 오디오 없는 씬의 최소 표시 시간
+
 // ─── 변환 유틸 ─────────────────────────────────
 
 export function longformSceneToRemotionScene(scene: LongformScene): RemotionSceneData | null {
   if (!scene.generatedImage) return null;
+
+  // 씬 duration: 오디오 길이 + 버퍼 (오디오 없으면 최소값)
+  const audioDurationSec = scene.narrationAudio?.durationMs
+    ? scene.narrationAudio.durationMs / 1000
+    : 0;
+  const duration = audioDurationSec > 0
+    ? Math.max(MIN_SCENE_SEC, Math.ceil(audioDurationSec + BUFFER_SEC))
+    : MIN_SCENE_SEC;
+
   return {
     id: scene.id,
     sceneNumber: scene.sceneNumber,
-    duration: 60,
+    duration,
     imageData: scene.generatedImage,
     narration: scene.narration,
     narrationAudio: scene.narrationAudio,
@@ -488,22 +501,32 @@ export async function renderLongformPart(
               drawImageCover(ctx, canvas, img, 1 + progress * 0.09, progress * 12);
             }
           } else {
-            // 10초 단위 세그먼트별 카메라 이동
-            const segmentIndex = Math.floor(frameInScene / SEGMENT_FRAMES);
-            const segmentProgress = (frameInScene % SEGMENT_FRAMES) / SEGMENT_FRAMES;
+            // 가변 씬 길이에 맞춰 Ken Burns 세그먼트 분할
+            const totalKBSegments = Math.max(1, Math.ceil(sceneDurationFrames / SEGMENT_FRAMES));
+            const actualSegFrames = sceneDurationFrames / totalKBSegments;
+            const segmentIndex = Math.floor(frameInScene / actualSegFrames);
+            const segmentProgress = (frameInScene % actualSegFrames) / actualSegFrames;
             const anim = getSegmentAnimation(segmentIndex, segmentProgress);
             drawImageCover(ctx, canvas, img, anim.scale, anim.offsetX, anim.offsetY);
           }
 
-          // 자막 (10초 단위 세그먼트)
+          // 자막 (오디오 재생 시간 내에서만 비례 분할 표시)
           if (scene.narration) {
             const sceneDurationSec = sceneDurationFrames / FPS;
-            const segments = splitNarrationSegments(scene.narration, sceneDurationSec);
-            const segmentIndex = Math.min(
-              Math.floor(frameInScene / SEGMENT_FRAMES),
-              segments.length - 1
-            );
-            const currentText = segments[segmentIndex] || '';
+            const audioDurationSec = scene.narrationAudio?.durationMs
+              ? scene.narrationAudio.durationMs / 1000
+              : sceneDurationSec;
+            const audioDurationFrames = Math.round(audioDurationSec * FPS);
+
+            // 오디오 범위 안에서만 자막 표시
+            if (frameInScene < audioDurationFrames) {
+              const segments = splitNarrationSegments(scene.narration, audioDurationSec);
+              const segDurationFrames = audioDurationFrames / segments.length;
+              const segmentIndex = Math.min(
+                Math.floor(frameInScene / segDurationFrames),
+                segments.length - 1
+              );
+              const currentText = segments[segmentIndex] || '';
 
             if (currentText) {
               const fontSize = Math.round(canvas.height * 0.05);
@@ -540,7 +563,7 @@ export async function renderLongformPart(
               const boxWidth = maxWidth + padding * 2;
 
               // 세그먼트 전환 시 페이드인 효과 (첫 10프레임)
-              const frameInSegment = frameInScene % SEGMENT_FRAMES;
+              const frameInSegment = frameInScene % Math.round(segDurationFrames);
               const fadeAlpha = Math.min(1, frameInSegment / 10);
 
               ctx.globalAlpha = fadeAlpha;
@@ -562,6 +585,7 @@ export async function renderLongformPart(
               ctx.shadowBlur = 0;
               ctx.globalAlpha = 1;
             }
+            } // end: frameInScene < audioDurationFrames
           }
         }
 

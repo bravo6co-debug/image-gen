@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { setCorsHeaders } from '../lib/gemini.js';
 import { generateToken } from '../lib/auth.js';
-import { findUserByEmail, verifyUserPassword, updateUserLogin } from '../lib/mongodb.js';
+import { findUserByEmail, verifyAndMigratePassword, updateUserLogin } from '../lib/mongodb.js';
 
 /**
  * POST /api/auth/login
@@ -45,8 +45,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
         }
 
-        // 비밀번호 확인
-        if (!verifyUserPassword(password, user.passwordHash, user.salt)) {
+        // 비밀번호 확인 (레거시 해시 자동 마이그레이션 포함)
+        if (!await verifyAndMigratePassword(user._id.toString(), password, user.passwordHash, user.salt)) {
             return res.status(401).json({
                 success: false,
                 error: '이메일 또는 비밀번호가 올바르지 않습니다.',

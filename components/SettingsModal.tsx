@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   AVAILABLE_TEXT_MODELS,
   AVAILABLE_IMAGE_MODELS,
+  AVAILABLE_TTS_MODELS,
   AVAILABLE_TTS_VOICES,
   DEFAULT_MODEL_CONFIG,
 } from '../types';
@@ -22,6 +23,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const [textModel, setTextModel] = useState(DEFAULT_MODEL_CONFIG.textModel);
   const [imageModel, setImageModel] = useState(DEFAULT_MODEL_CONFIG.imageModel);
   const [videoModel, setVideoModel] = useState(DEFAULT_MODEL_CONFIG.videoModel);
+  const [ttsModel, setTtsModel] = useState(DEFAULT_MODEL_CONFIG.ttsModel);
   const [ttsVoice, setTtsVoice] = useState(DEFAULT_MODEL_CONFIG.ttsVoice);
 
   const [error, setError] = useState('');
@@ -33,6 +35,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       setTextModel(settings.textModel || DEFAULT_MODEL_CONFIG.textModel);
       setImageModel(settings.imageModel || DEFAULT_MODEL_CONFIG.imageModel);
       setVideoModel(settings.videoModel || DEFAULT_MODEL_CONFIG.videoModel);
+      setTtsModel(settings.ttsModel || DEFAULT_MODEL_CONFIG.ttsModel);
       setTtsVoice(settings.ttsVoice || DEFAULT_MODEL_CONFIG.ttsVoice);
       setApiKey(''); // API 키는 보안상 표시하지 않음
       setHailuoApiKey('');
@@ -55,6 +58,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
       textModel,
       imageModel,
       videoModel,
+      ttsModel,
       ttsVoice,
     };
 
@@ -256,6 +260,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                 Gemini/Imagen 모델은 Gemini API 키를 사용합니다
               </p>
             )}
+          </div>
+
+          {/* TTS 모델 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              TTS 모델 (나레이션 생성)
+            </label>
+            <select
+              value={ttsModel}
+              onChange={(e) => setTtsModel(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              {AVAILABLE_TTS_MODELS.map((model) => (
+                <option key={model.value} value={model.value}>
+                  {model.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* TTS 음성 */}

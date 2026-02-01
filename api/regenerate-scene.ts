@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, Type, sanitizePrompt, setCorsHeaders } from './lib/gemini.js';
+import { ai, MODELS, Type, sanitizePrompt, setCorsHeaders, getThinkingConfig } from './lib/gemini.js';
 import type { RegenerateSceneRequest, Scene, CameraAngle, ApiErrorResponse } from './lib/types.js';
 
 /**
@@ -85,6 +85,7 @@ ${sanitizedInstruction ? `**사용자 지시**: ${sanitizedInstruction}` : '새�
                     },
                     required: ["duration", "visualDescription", "narration", "cameraAngle", "mood", "imagePrompt"],
                 },
+                ...getThinkingConfig(MODELS.TEXT),
             },
         });
 

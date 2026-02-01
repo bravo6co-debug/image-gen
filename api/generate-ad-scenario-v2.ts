@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, Type, sanitizePrompt, setCorsHeaders, STYLE_PROMPTS } from './lib/gemini.js';
+import { ai, MODELS, Type, sanitizePrompt, setCorsHeaders, STYLE_PROMPTS, getThinkingConfig } from './lib/gemini.js';
 import type {
     GenerateAdScenarioV2Request, Scenario, Scene, ScenarioTone, ImageStyle,
     StoryBeat, CameraAngle, ApiErrorResponse, AdType, IndustryCategory, TargetAudience, AdDuration
@@ -350,6 +350,7 @@ ${priceOrPromotion ? `- **가격/혜택 정보**: ${sanitizePrompt(priceOrPromot
                     },
                     required: ["title", "synopsis", "scenes"],
                 },
+                ...getThinkingConfig(MODELS.TEXT),
             },
         });
 

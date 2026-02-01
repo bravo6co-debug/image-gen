@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sanitizePrompt, setCorsHeaders, getAIClientForUser } from './lib/gemini.js';
+import { sanitizePrompt, setCorsHeaders, getAIClientForUser, getUserTextModel, getThinkingConfig } from './lib/gemini.js';
 import { requireAuth } from './lib/auth.js';
 import type { ApiErrorResponse } from './lib/types.js';
 
@@ -50,9 +50,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log('Korean prompt:', sanitizedPrompt);
 
         const aiClient = await getAIClientForUser(auth.userId);
+        const textModel = await getUserTextModel(auth.userId);
 
         const translationResponse = await aiClient.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: textModel,
+            config: {
+                ...getThinkingConfig(textModel),
+            },
             contents: [
                 {
                     role: 'user',

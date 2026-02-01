@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, Type, sanitizePrompt, setCorsHeaders } from './lib/gemini.js';
+import { ai, MODELS, Type, sanitizePrompt, setCorsHeaders, getThinkingConfig } from './lib/gemini.js';
 import type { ExtractCharacterRequest, ExtractCharacterResponse, ApiErrorResponse } from './lib/types.js';
 
 /**
@@ -57,6 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     },
                     required: ["name", "age", "personality", "outfit", "englishDescription"],
                 },
+                ...getThinkingConfig(MODELS.TEXT),
             },
         });
 

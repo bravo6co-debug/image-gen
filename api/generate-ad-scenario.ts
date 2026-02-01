@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ai, MODELS, Type, sanitizePrompt, setCorsHeaders, STYLE_PROMPTS } from './lib/gemini.js';
+import { ai, MODELS, Type, sanitizePrompt, setCorsHeaders, STYLE_PROMPTS, getThinkingConfig } from './lib/gemini.js';
 import type { GenerateAdScenarioRequest, Scenario, Scene, ScenarioTone, ImageStyle, StoryBeat, CameraAngle, ApiErrorResponse } from './lib/types.js';
 
 const TONE_DESCRIPTIONS: Record<ScenarioTone, string> = {
@@ -147,6 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     },
                     required: ["title", "synopsis", "scenes"],
                 },
+                ...getThinkingConfig(MODELS.TEXT),
             },
         });
 

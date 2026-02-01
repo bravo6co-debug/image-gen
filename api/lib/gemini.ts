@@ -172,8 +172,8 @@ export async function getUserTTSVoice(userId: string): Promise<string> {
 // MODEL CONFIGURATION
 // ============================================
 export const MODELS = {
-    // Text/prompt generation model
-    TEXT: 'gemini-2.5-flash',
+    // Text/prompt generation model (Gemini 3 Flash - fast with Pro-grade reasoning)
+    TEXT: 'gemini-3-flash-preview',
 
     // Image generation models (Gemini native image generation)
     IMAGE_PORTRAIT: 'gemini-2.5-flash-image',  // Character/prop/background portraits
@@ -185,6 +185,20 @@ export const MODELS = {
     // Text-to-Speech (TTS) model for narration
     TTS: 'gemini-2.5-flash-preview-tts',
 } as const;
+
+// ============================================
+// GEMINI 3 THINKING CONFIGURATION
+// ============================================
+export function isGemini3Model(modelId: string): boolean {
+    return modelId.startsWith('gemini-3-');
+}
+
+export function getThinkingConfig(modelId: string): Record<string, unknown> {
+    if (isGemini3Model(modelId)) {
+        return { thinkingConfig: { thinkingLevel: 'LOW' } };
+    }
+    return {};
+}
 
 // ============================================
 // TTS VOICE CONFIGURATION

@@ -573,9 +573,10 @@ export interface GeminiModelConfig {
 
 // 사용 가능한 텍스트 모델
 export const AVAILABLE_TEXT_MODELS: { value: string; label: string }[] = [
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (빠름)' },
+  { value: 'gemini-3-pro-preview', label: 'Gemini 3 Pro (최고 추론 품질)' },
+  { value: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (빠르고 저렴)' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (안정)' },
   { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (고품질)' },
-  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
 ];
 
 // 사용 가능한 이미지 모델
@@ -597,7 +598,8 @@ export const AVAILABLE_VIDEO_MODELS: { value: string; label: string }[] = [
 
 // 사용 가능한 TTS 모델
 export const AVAILABLE_TTS_MODELS: { value: string; label: string }[] = [
-  { value: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash TTS' },
+  { value: 'gemini-2.5-flash-preview-tts', label: 'Gemini 2.5 Flash TTS (빠름)' },
+  { value: 'gemini-2.5-pro-preview-tts', label: 'Gemini 2.5 Pro TTS (고품질)' },
 ];
 
 // 사용 가능한 TTS 음성
@@ -611,7 +613,7 @@ export const AVAILABLE_TTS_VOICES: { value: string; label: string }[] = [
 
 // 기본 모델 설정
 export const DEFAULT_MODEL_CONFIG: GeminiModelConfig = {
-  textModel: 'gemini-2.5-flash',
+  textModel: 'gemini-3-flash-preview',
   imageModel: 'gemini-2.5-flash-image',
   videoModel: 'minimax-hailuo-v2-3-fast-standard-image-to-video',
   ttsModel: 'gemini-2.5-flash-preview-tts',

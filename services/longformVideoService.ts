@@ -249,6 +249,78 @@ const FPS = 30;
 const WIDTH = 1920;
 const HEIGHT = 1080;
 const TRANSITION_FRAMES = 15;
+const SEGMENT_SECONDS = 10; // 10초 단위 자막/애니메이션 세그먼트
+const SEGMENT_FRAMES = SEGMENT_SECONDS * FPS;
+const CHARS_PER_SEGMENT = 50; // 세그먼트당 표시할 대략적 글자 수
+
+/**
+ * 나레이션 텍스트를 10초 단위 세그먼트로 분할
+ * 문장 경계(. ! ? 등) 또는 공백에서 자연스럽게 나눔
+ */
+function splitNarrationSegments(narration: string, sceneDurationSec: number): string[] {
+  const segmentCount = Math.max(1, Math.floor(sceneDurationSec / SEGMENT_SECONDS));
+  const targetLen = Math.ceil(narration.length / segmentCount);
+
+  const segments: string[] = [];
+  let remaining = narration;
+
+  for (let i = 0; i < segmentCount - 1; i++) {
+    if (!remaining) break;
+
+    // 목표 길이 근처에서 문장 경계 찾기
+    let cutIdx = Math.min(targetLen, remaining.length);
+
+    // 먼저 문장 끝(. ! ?) 찾기 (targetLen ± 15 범위)
+    let bestCut = -1;
+    for (let j = Math.max(0, cutIdx - 15); j <= Math.min(remaining.length - 1, cutIdx + 15); j++) {
+      if ('.!?。'.includes(remaining[j]) && j > 10) {
+        bestCut = j + 1;
+        break;
+      }
+    }
+
+    // 문장 경계 없으면 쉼표/공백에서 자르기
+    if (bestCut === -1) {
+      for (let j = cutIdx; j >= Math.max(0, cutIdx - 20); j--) {
+        if (',، '.includes(remaining[j])) {
+          bestCut = j + 1;
+          break;
+        }
+      }
+    }
+
+    cutIdx = bestCut > 0 ? bestCut : cutIdx;
+    segments.push(remaining.slice(0, cutIdx).trim());
+    remaining = remaining.slice(cutIdx).trim();
+  }
+
+  if (remaining) segments.push(remaining.trim());
+  return segments;
+}
+
+/**
+ * 10초 세그먼트별 카메라 이동 방향 결정
+ * 0: 오른쪽→왼쪽, 1: 위→아래, 2: 왼쪽→오른쪽, 3: 아래→위
+ */
+function getSegmentAnimation(segmentIndex: number, segmentProgress: number): { scale: number; offsetX: number; offsetY: number } {
+  // 기본 줌: 모든 세그먼트에서 미세하게 확대
+  const baseScale = 1.02 + segmentProgress * 0.04;
+  const panAmount = segmentProgress * 30; // 10초간 30px 이동
+
+  const direction = segmentIndex % 4;
+  switch (direction) {
+    case 0: // 오른쪽 → 왼쪽
+      return { scale: baseScale, offsetX: panAmount, offsetY: 0 };
+    case 1: // 위 → 아래
+      return { scale: baseScale, offsetX: 0, offsetY: panAmount };
+    case 2: // 왼쪽 → 오른쪽
+      return { scale: baseScale, offsetX: -panAmount, offsetY: 0 };
+    case 3: // 아래 → 위
+      return { scale: baseScale, offsetX: 0, offsetY: -panAmount };
+    default:
+      return { scale: baseScale, offsetX: panAmount, offsetY: 0 };
+  }
+}
 
 export async function renderLongformPart(
   scenes: RemotionSceneData[],
@@ -416,64 +488,80 @@ export async function renderLongformPart(
               drawImageCover(ctx, canvas, img, 1 + progress * 0.09, progress * 12);
             }
           } else {
-            // Ken Burns (intensity 0.3)
-            const progress = frameInScene / sceneDurationFrames;
-            const scale = 1 + progress * 0.09;
-            const offsetX = progress * 12;
-            drawImageCover(ctx, canvas, img, scale, offsetX);
+            // 10초 단위 세그먼트별 카메라 이동
+            const segmentIndex = Math.floor(frameInScene / SEGMENT_FRAMES);
+            const segmentProgress = (frameInScene % SEGMENT_FRAMES) / SEGMENT_FRAMES;
+            const anim = getSegmentAnimation(segmentIndex, segmentProgress);
+            drawImageCover(ctx, canvas, img, anim.scale, anim.offsetX, anim.offsetY);
           }
 
-          // 자막
+          // 자막 (10초 단위 세그먼트)
           if (scene.narration) {
-            const fontSize = Math.round(canvas.height * 0.05);
-            ctx.font = `bold ${fontSize}px Pretendard, sans-serif`;
-            ctx.textAlign = 'center';
+            const sceneDurationSec = sceneDurationFrames / FPS;
+            const segments = splitNarrationSegments(scene.narration, sceneDurationSec);
+            const segmentIndex = Math.min(
+              Math.floor(frameInScene / SEGMENT_FRAMES),
+              segments.length - 1
+            );
+            const currentText = segments[segmentIndex] || '';
 
-            const maxLineWidth = canvas.width * 0.9;
-            const lines: string[] = [];
-            let currentLine = '';
-            for (const char of scene.narration) {
-              const testLine = currentLine + char;
-              if (ctx.measureText(testLine).width > maxLineWidth && currentLine) {
-                lines.push(currentLine);
-                currentLine = char;
-              } else {
-                currentLine = testLine;
+            if (currentText) {
+              const fontSize = Math.round(canvas.height * 0.05);
+              ctx.font = `bold ${fontSize}px Pretendard, sans-serif`;
+              ctx.textAlign = 'center';
+
+              const maxLineWidth = canvas.width * 0.9;
+              const lines: string[] = [];
+              let currentLine = '';
+              for (const char of currentText) {
+                const testLine = currentLine + char;
+                if (ctx.measureText(testLine).width > maxLineWidth && currentLine) {
+                  lines.push(currentLine);
+                  currentLine = char;
+                } else {
+                  currentLine = testLine;
+                }
               }
+              if (currentLine) lines.push(currentLine);
+
+              const lineHeight = fontSize * 1.5;
+              const padding = 24;
+              const textX = canvas.width / 2;
+
+              let maxWidth = 0;
+              for (const line of lines) {
+                const w = ctx.measureText(line).width;
+                if (w > maxWidth) maxWidth = w;
+              }
+
+              const boxHeight = lines.length * lineHeight + padding;
+              const boxY = canvas.height * 0.92 - boxHeight;
+              const boxX = textX - maxWidth / 2 - padding;
+              const boxWidth = maxWidth + padding * 2;
+
+              // 세그먼트 전환 시 페이드인 효과 (첫 10프레임)
+              const frameInSegment = frameInScene % SEGMENT_FRAMES;
+              const fadeAlpha = Math.min(1, frameInSegment / 10);
+
+              ctx.globalAlpha = fadeAlpha;
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+              ctx.beginPath();
+              ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 12);
+              ctx.fill();
+
+              ctx.fillStyle = '#fff';
+              ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+              ctx.shadowBlur = 4;
+              ctx.shadowOffsetX = 1;
+              ctx.shadowOffsetY = 1;
+              lines.forEach((line, index) => {
+                const textY = boxY + padding / 2 + fontSize + (index * lineHeight);
+                ctx.fillText(line, textX, textY);
+              });
+              ctx.shadowColor = 'transparent';
+              ctx.shadowBlur = 0;
+              ctx.globalAlpha = 1;
             }
-            if (currentLine) lines.push(currentLine);
-
-            const lineHeight = fontSize * 1.5;
-            const padding = 24;
-            const textX = canvas.width / 2;
-
-            let maxWidth = 0;
-            for (const line of lines) {
-              const w = ctx.measureText(line).width;
-              if (w > maxWidth) maxWidth = w;
-            }
-
-            const boxHeight = lines.length * lineHeight + padding;
-            const boxY = canvas.height * 0.92 - boxHeight;
-            const boxX = textX - maxWidth / 2 - padding;
-            const boxWidth = maxWidth + padding * 2;
-
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-            ctx.beginPath();
-            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 12);
-            ctx.fill();
-
-            ctx.fillStyle = '#fff';
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 1;
-            lines.forEach((line, index) => {
-              const textY = boxY + padding / 2 + fontSize + (index * lineHeight);
-              ctx.fillText(line, textX, textY);
-            });
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
           }
         }
 

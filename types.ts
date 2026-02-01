@@ -123,7 +123,7 @@ export interface SceneAssets {
 // =============================================
 
 // 앱 모드 (시나리오, 광고, 영상 제작, 음식 영상)
-export type AppMode = 'scenario' | 'video' | 'ad' | 'foodvideo';
+export type AppMode = 'scenario' | 'video' | 'ad' | 'foodvideo' | 'longform';
 
 // =============================================
 // 프로젝트 상태 (Project State)

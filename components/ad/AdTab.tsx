@@ -139,13 +139,41 @@ const AdTab: React.FC = () => {
   // Step 1: 광고 유형
   const [adType, setAdType] = useState<AdType>('product-intro');
 
-  // Step 2: 상품/서비스 정보
+  // Step 2: 상품/서비스 정보 (공통)
   const [industry, setIndustry] = useState<IndustryCategory>('other');
   const [productName, setProductName] = useState('');
+  const [selectedTargets, setSelectedTargets] = useState<TargetAudience[]>(['all']);
+
+  // Step 2: 제품 소개 (product-intro)
   const [usp1, setUsp1] = useState('');
   const [usp2, setUsp2] = useState('');
-  const [selectedTargets, setSelectedTargets] = useState<TargetAudience[]>(['all']);
-  const [priceOrPromotion, setPriceOrPromotion] = useState('');
+  const [launchReason, setLaunchReason] = useState('');
+  const [priceInfo, setPriceInfo] = useState('');
+
+  // Step 2: 문제 해결 (problem-solution)
+  const [painPoint, setPainPoint] = useState('');
+  const [solution, setSolution] = useState('');
+  const [effectResult, setEffectResult] = useState('');
+
+  // Step 2: 라이프스타일 (lifestyle)
+  const [brandMood, setBrandMood] = useState('');
+  const [usageScene, setUsageScene] = useState('');
+  const [stylingKeywords, setStylingKeywords] = useState('');
+
+  // Step 2: 후기/체험 (testimonial)
+  const [beforeState, setBeforeState] = useState('');
+  const [afterChange, setAfterChange] = useState('');
+  const [experienceHighlight, setExperienceHighlight] = useState('');
+
+  // Step 2: 이벤트/혜택 (promotion)
+  const [offerDetails, setOfferDetails] = useState('');
+  const [periodCondition, setPeriodCondition] = useState('');
+  const [discountInfo, setDiscountInfo] = useState('');
+
+  // Step 2: 브랜드 스토리 (brand-story)
+  const [brandPhilosophy, setBrandPhilosophy] = useState('');
+  const [originStory, setOriginStory] = useState('');
+  const [coreMessage, setCoreMessage] = useState('');
 
   // Step 3: 표현 스타일
   const [tone, setTone] = useState<ScenarioTone>('inspirational');
@@ -187,18 +215,45 @@ const AdTab: React.FC = () => {
     }
     if (!productName.trim()) return;
 
-    const usps = [usp1.trim(), usp2.trim()].filter(Boolean);
-
     const config: AdScenarioConfigV2 = {
       adType,
       industry,
       productName: productName.trim(),
-      usps,
       targetAudiences: selectedTargets,
       tone,
       imageStyle,
       duration,
-      priceOrPromotion: priceOrPromotion.trim() || undefined,
+      // 유형별 고유 필드
+      ...(adType === 'product-intro' && {
+        usps: [usp1.trim(), usp2.trim()].filter(Boolean),
+        launchReason: launchReason.trim() || undefined,
+        priceInfo: priceInfo.trim() || undefined,
+      }),
+      ...(adType === 'problem-solution' && {
+        painPoint: painPoint.trim() || undefined,
+        solution: solution.trim() || undefined,
+        effectResult: effectResult.trim() || undefined,
+      }),
+      ...(adType === 'lifestyle' && {
+        brandMood: brandMood.trim() || undefined,
+        usageScene: usageScene.trim() || undefined,
+        stylingKeywords: stylingKeywords.trim() || undefined,
+      }),
+      ...(adType === 'testimonial' && {
+        beforeState: beforeState.trim() || undefined,
+        afterChange: afterChange.trim() || undefined,
+        experienceHighlight: experienceHighlight.trim() || undefined,
+      }),
+      ...(adType === 'promotion' && {
+        offerDetails: offerDetails.trim() || undefined,
+        periodCondition: periodCondition.trim() || undefined,
+        discountInfo: discountInfo.trim() || undefined,
+      }),
+      ...(adType === 'brand-story' && {
+        brandPhilosophy: brandPhilosophy.trim() || undefined,
+        originStory: originStory.trim() || undefined,
+        coreMessage: coreMessage.trim() || undefined,
+      }),
     };
 
     try {
@@ -206,7 +261,14 @@ const AdTab: React.FC = () => {
     } catch {
       // error handled by hook
     }
-  }, [isAuthenticated, canUseApi, adType, industry, productName, usp1, usp2, selectedTargets, tone, imageStyle, duration, priceOrPromotion, generateAdScenarioV2]);
+  }, [isAuthenticated, canUseApi, adType, industry, productName, selectedTargets, tone, imageStyle, duration,
+    usp1, usp2, launchReason, priceInfo,
+    painPoint, solution, effectResult,
+    brandMood, usageScene, stylingKeywords,
+    beforeState, afterChange, experienceHighlight,
+    offerDetails, periodCondition, discountInfo,
+    brandPhilosophy, originStory, coreMessage,
+    generateAdScenarioV2]);
 
   // =============================================
   // Scene handlers (same as before)
@@ -469,30 +531,158 @@ const AdTab: React.FC = () => {
                   />
                 </div>
 
-                {/* USP */}
-                <div>
-                  <label className="text-xs font-medium text-gray-300 mb-1.5 block">핵심 강점 (USP)</label>
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={usp1}
-                      onChange={(e) => setUsp1(e.target.value)}
-                      placeholder="강점 1: 예) 유기농 원두, 특허 성분"
-                      className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm"
-                      disabled={isGenerating}
-                    />
-                    <input
-                      type="text"
-                      value={usp2}
-                      onChange={(e) => setUsp2(e.target.value)}
-                      placeholder="강점 2: 예) 48시간 보습 유지 (선택)"
-                      className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm"
-                      disabled={isGenerating}
-                    />
-                  </div>
-                </div>
+                {/* ===== 유형별 고유 필드 ===== */}
 
-                {/* 타겟 고객 */}
+                {/* 제품 소개 */}
+                {adType === 'product-intro' && (
+                  <>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">핵심 특징/차별점 (USP)</label>
+                      <div className="space-y-2">
+                        <input type="text" value={usp1} onChange={(e) => setUsp1(e.target.value)}
+                          placeholder="특징 1: 예) 유기농 원두 100%, 특허받은 성분"
+                          className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                        <input type="text" value={usp2} onChange={(e) => setUsp2(e.target.value)}
+                          placeholder="특징 2: 예) 48시간 보습 유지 (선택)"
+                          className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">출시 배경/이유 <span className="text-gray-500">(선택)</span></label>
+                      <input type="text" value={launchReason} onChange={(e) => setLaunchReason(e.target.value)}
+                        placeholder="예: 고객 요청으로 개발, 3년간 연구 끝에 완성"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">가격대 <span className="text-gray-500">(선택)</span></label>
+                      <input type="text" value={priceInfo} onChange={(e) => setPriceInfo(e.target.value)}
+                        placeholder="예: 월 9,900원, 29,000원~"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                  </>
+                )}
+
+                {/* 문제 해결 */}
+                {adType === 'problem-solution' && (
+                  <>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">고객의 문제/불편점</label>
+                      <input type="text" value={painPoint} onChange={(e) => setPainPoint(e.target.value)}
+                        placeholder="예: 매일 아침 푸석한 피부, 두피 가려움이 심한 직장인"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">해결 방법/원리</label>
+                      <input type="text" value={solution} onChange={(e) => setSolution(e.target.value)}
+                        placeholder="예: 특허 세라마이드 성분이 피부 장벽을 복구"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">효과/결과</label>
+                      <input type="text" value={effectResult} onChange={(e) => setEffectResult(e.target.value)}
+                        placeholder="예: 2주 만에 피부 수분량 40% 증가, 사용자 95% 만족"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                  </>
+                )}
+
+                {/* 라이프스타일 */}
+                {adType === 'lifestyle' && (
+                  <>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">브랜드 분위기/무드</label>
+                      <input type="text" value={brandMood} onChange={(e) => setBrandMood(e.target.value)}
+                        placeholder="예: 미니멀하고 따뜻한, 자연친화적이고 여유로운"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">사용 장면/상황</label>
+                      <input type="text" value={usageScene} onChange={(e) => setUsageScene(e.target.value)}
+                        placeholder="예: 주말 아침 창가에서 커피 한잔, 퇴근 후 홈카페"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">연출 키워드 <span className="text-gray-500">(선택)</span></label>
+                      <input type="text" value={stylingKeywords} onChange={(e) => setStylingKeywords(e.target.value)}
+                        placeholder="예: 자연광, 린넨 소재, 우드톤, 식물"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                  </>
+                )}
+
+                {/* 후기/체험 */}
+                {adType === 'testimonial' && (
+                  <>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">사용 전 고민/상태</label>
+                      <input type="text" value={beforeState} onChange={(e) => setBeforeState(e.target.value)}
+                        placeholder="예: 다크서클이 심해서 항상 피곤해 보였음"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">사용 후 변화</label>
+                      <input type="text" value={afterChange} onChange={(e) => setAfterChange(e.target.value)}
+                        placeholder="예: 2주 사용 후 눈가가 확 밝아짐, 주변에서 먼저 알아봄"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">체험 포인트 <span className="text-gray-500">(선택)</span></label>
+                      <input type="text" value={experienceHighlight} onChange={(e) => setExperienceHighlight(e.target.value)}
+                        placeholder="예: 발림성이 좋고 끈적임 없음, 향이 은은해서 좋음"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                  </>
+                )}
+
+                {/* 이벤트/혜택 */}
+                {adType === 'promotion' && (
+                  <>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">이벤트/혜택 내용</label>
+                      <input type="text" value={offerDetails} onChange={(e) => setOfferDetails(e.target.value)}
+                        placeholder="예: 오픈 기념 전 메뉴 50% 할인, 1+1 이벤트"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">기간/조건</label>
+                      <input type="text" value={periodCondition} onChange={(e) => setPeriodCondition(e.target.value)}
+                        placeholder="예: 12월 한 달간, 선착순 100명, 앱 회원 한정"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">가격/할인 정보</label>
+                      <input type="text" value={discountInfo} onChange={(e) => setDiscountInfo(e.target.value)}
+                        placeholder="예: 정가 39,000원 → 19,500원, 첫 구매 30% 쿠폰"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                  </>
+                )}
+
+                {/* 브랜드 스토리 */}
+                {adType === 'brand-story' && (
+                  <>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">브랜드 철학/가치</label>
+                      <input type="text" value={brandPhilosophy} onChange={(e) => setBrandPhilosophy(e.target.value)}
+                        placeholder="예: 좋은 재료로 정직하게, 지속 가능한 뷰티"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">브랜드 탄생 배경 <span className="text-gray-500">(선택)</span></label>
+                      <input type="text" value={originStory} onChange={(e) => setOriginStory(e.target.value)}
+                        placeholder="예: 아토피 자녀를 위해 시작한 천연 화장품 연구"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-300 mb-1.5 block">핵심 메시지</label>
+                      <input type="text" value={coreMessage} onChange={(e) => setCoreMessage(e.target.value)}
+                        placeholder="예: 당신의 피부에도 정직한 시간을 선물하세요"
+                        className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm" disabled={isGenerating} />
+                    </div>
+                  </>
+                )}
+
+                {/* 타겟 고객 (공통) */}
                 <div>
                   <label className="text-xs font-medium text-gray-300 mb-1.5 block">타겟 고객</label>
                   <div className="flex flex-wrap gap-1.5">
@@ -510,19 +700,6 @@ const AdTab: React.FC = () => {
                       </button>
                     ))}
                   </div>
-                </div>
-
-                {/* 가격/혜택 (선택) */}
-                <div>
-                  <label className="text-xs font-medium text-gray-300 mb-1.5 block">가격/혜택 정보 <span className="text-gray-500">(선택)</span></label>
-                  <input
-                    type="text"
-                    value={priceOrPromotion}
-                    onChange={(e) => setPriceOrPromotion(e.target.value)}
-                    placeholder="예: 첫 방문 30% 할인, 월 9,900원"
-                    className="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent focus:outline-none text-[16px] sm:text-sm"
-                    disabled={isGenerating}
-                  />
                 </div>
               </div>
             )}

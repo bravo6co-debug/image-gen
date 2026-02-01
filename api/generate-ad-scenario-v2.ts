@@ -215,16 +215,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             adType,
             industry,
             productName,
-            usps = [],
             targetAudiences = ['all'],
             tone = 'inspirational',
             imageStyle = 'photorealistic',
             duration = 30,
-            priceOrPromotion,
+            // 제품 소개
+            usps = [],
+            launchReason,
+            priceInfo,
+            // 문제 해결
+            painPoint,
+            solution,
+            effectResult,
+            // 라이프스타일
+            brandMood,
+            usageScene,
+            stylingKeywords,
+            // 후기/체험
+            beforeState,
+            afterChange,
+            experienceHighlight,
+            // 이벤트/혜택
+            offerDetails,
+            periodCondition,
+            discountInfo,
+            // 브랜드 스토리
+            brandPhilosophy,
+            originStory,
+            coreMessage,
         } = config;
 
         const sanitizedName = sanitizePrompt(productName, 200);
-        const sanitizedUsps = usps.map(u => sanitizePrompt(u, 200));
         const toneDescription = TONE_DESCRIPTIONS[tone] || TONE_DESCRIPTIONS.inspirational;
         const stylePromptText = STYLE_PROMPTS[imageStyle] || STYLE_PROMPTS.photorealistic;
         const hdserConfig = HDSER_CONFIGS[adType];
@@ -264,11 +285,22 @@ ${sceneStructureText}
 
 - **업종**: ${industryLabel}
 - **상품/서비스명**: "${sanitizedName}"
-- **핵심 강점 (USP)**: ${sanitizedUsps.length > 0 ? sanitizedUsps.map((u, i) => `${i + 1}. ${u}`).join(' / ') : '(미입력)'}
 - **타겟 고객**: ${targetLabels}
 - **톤/분위기**: ${tone} - ${toneDescription}
 - **이미지 스타일**: ${imageStyle}
-${priceOrPromotion ? `- **가격/혜택 정보**: ${sanitizePrompt(priceOrPromotion, 500)}` : ''}
+${adType === 'product-intro' ? `- **핵심 특징 (USP)**: ${usps.length > 0 ? usps.map((u: string, i: number) => `${i + 1}. ${sanitizePrompt(u, 200)}`).join(' / ') : '(미입력)'}
+${launchReason ? `- **출시 배경**: ${sanitizePrompt(launchReason, 300)}` : ''}
+${priceInfo ? `- **가격대**: ${sanitizePrompt(priceInfo, 200)}` : ''}` : ''}${adType === 'problem-solution' ? `- **고객 문제점**: ${painPoint ? sanitizePrompt(painPoint, 300) : '(미입력)'}
+- **해결 방법/원리**: ${solution ? sanitizePrompt(solution, 300) : '(미입력)'}
+- **효과/결과**: ${effectResult ? sanitizePrompt(effectResult, 300) : '(미입력)'}` : ''}${adType === 'lifestyle' ? `- **브랜드 분위기/무드**: ${brandMood ? sanitizePrompt(brandMood, 300) : '(미입력)'}
+- **사용 장면/상황**: ${usageScene ? sanitizePrompt(usageScene, 300) : '(미입력)'}
+${stylingKeywords ? `- **연출 키워드**: ${sanitizePrompt(stylingKeywords, 300)}` : ''}` : ''}${adType === 'testimonial' ? `- **사용 전 고민/상태**: ${beforeState ? sanitizePrompt(beforeState, 300) : '(미입력)'}
+- **사용 후 변화**: ${afterChange ? sanitizePrompt(afterChange, 300) : '(미입력)'}
+${experienceHighlight ? `- **체험 포인트**: ${sanitizePrompt(experienceHighlight, 300)}` : ''}` : ''}${adType === 'promotion' ? `- **이벤트/혜택 내용**: ${offerDetails ? sanitizePrompt(offerDetails, 300) : '(미입력)'}
+- **기간/조건**: ${periodCondition ? sanitizePrompt(periodCondition, 300) : '(미입력)'}
+- **가격/할인 정보**: ${discountInfo ? sanitizePrompt(discountInfo, 300) : '(미입력)'}` : ''}${adType === 'brand-story' ? `- **브랜드 철학/가치**: ${brandPhilosophy ? sanitizePrompt(brandPhilosophy, 300) : '(미입력)'}
+${originStory ? `- **브랜드 탄생 배경**: ${sanitizePrompt(originStory, 300)}` : ''}
+- **핵심 메시지**: ${coreMessage ? sanitizePrompt(coreMessage, 300) : '(미입력)'}` : ''}
 
 ---
 

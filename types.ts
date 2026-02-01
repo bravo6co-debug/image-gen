@@ -480,13 +480,41 @@ export interface AdScenarioConfigV2 {
   adType: AdType;
   industry: IndustryCategory;
   productName: string;
-  usps: string[];                // 핵심 강점 (1~2개)
   targetAudiences: TargetAudience[];
   tone: ScenarioTone;
   imageStyle: ImageStyle;
   duration: AdDuration;
-  priceOrPromotion?: string;     // 가격/혜택 정보 (선택)
   referenceImages?: ImageData[]; // 참고 이미지 (최대 3장)
+
+  // 제품 소개 (product-intro)
+  usps?: string[];               // 핵심 특징/차별점 (1~2개)
+  launchReason?: string;         // 출시 배경/이유
+  priceInfo?: string;            // 가격대
+
+  // 문제 해결 (problem-solution)
+  painPoint?: string;            // 고객의 문제/불편점
+  solution?: string;             // 해결 방법/원리
+  effectResult?: string;         // 효과/결과
+
+  // 라이프스타일 (lifestyle)
+  brandMood?: string;            // 브랜드 분위기/무드
+  usageScene?: string;           // 사용 장면/상황
+  stylingKeywords?: string;      // 연출 키워드
+
+  // 후기/체험 (testimonial)
+  beforeState?: string;          // 사용 전 고민/상태
+  afterChange?: string;          // 사용 후 변화
+  experienceHighlight?: string;  // 체험 포인트
+
+  // 이벤트/혜택 (promotion)
+  offerDetails?: string;         // 이벤트/혜택 내용
+  periodCondition?: string;      // 기간/조건
+  discountInfo?: string;         // 가격/할인 정보
+
+  // 브랜드 스토리 (brand-story)
+  brandPhilosophy?: string;      // 브랜드 철학/가치
+  originStory?: string;          // 브랜드 탄생 배경
+  coreMessage?: string;          // 핵심 메시지
 }
 
 // =============================================

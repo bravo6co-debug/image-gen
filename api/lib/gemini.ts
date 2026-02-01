@@ -69,20 +69,29 @@ export async function getAIClientForUser(userId: string): Promise<GoogleGenAI> {
         throw new Error('사용자를 찾을 수 없습니다.');
     }
 
+    console.log(`[getAIClientForUser] userId=${userId}, isAdmin=${user.isAdmin}, hasPersonalKey=${!!user.settings?.geminiApiKey}, hasEnvKey=${!!defaultApiKey}`);
+
     // 어드민은 환경변수 API 키 사용
     if (user.isAdmin) {
         if (!defaultApiKey) {
             throw new Error('서버 API 키가 설정되지 않았습니다.');
         }
+        console.log(`[getAIClientForUser] Using env key (admin), keyPrefix=${defaultApiKey.substring(0, 6)}...`);
         return new GoogleGenAI({ apiKey: defaultApiKey });
     }
 
     // 일반 사용자는 본인의 API 키 사용
     const userApiKey = user.settings?.geminiApiKey;
     if (!userApiKey) {
+        // 환경변수 키가 있으면 폴백으로 사용 (관리자 공유 키)
+        if (defaultApiKey) {
+            console.log(`[getAIClientForUser] No personal key, falling back to env key, keyPrefix=${defaultApiKey.substring(0, 6)}...`);
+            return new GoogleGenAI({ apiKey: defaultApiKey });
+        }
         throw new Error('API 키가 설정되지 않았습니다. 설정에서 Gemini API 키를 입력해 주세요.');
     }
 
+    console.log(`[getAIClientForUser] Using personal key, keyPrefix=${userApiKey.substring(0, 6)}...`);
     return new GoogleGenAI({ apiKey: userApiKey });
 }
 

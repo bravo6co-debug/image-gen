@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import type { LongformConfig, LongformDuration, LongformImageModel, TtsProvider, OpenAiVoice, GeminiVoice, OpenAiTtsModel } from '../../types/longform';
 import { IMAGE_MODEL_OPTIONS, OPENAI_VOICE_OPTIONS, GEMINI_VOICE_OPTIONS, DURATION_OPTIONS, DEFAULT_TTS_CONFIG, DEFAULT_LONGFORM_CONFIG, calculateSceneCount, estimateImageCost, estimateTtsCost } from '../../types/longform';
+import { AVAILABLE_TEXT_MODELS } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Step1BasicSetupProps {
   onGenerate: (config: LongformConfig) => void;
@@ -8,13 +10,20 @@ interface Step1BasicSetupProps {
 }
 
 export const Step1BasicSetup: React.FC<Step1BasicSetupProps> = ({ onGenerate, isGenerating }) => {
+  const { hasApiKey, hasOpenaiApiKey, isAdmin, settings, openSettingsModal } = useAuth();
+
   const [topic, setTopic] = useState('');
   const [duration, setDuration] = useState<LongformDuration>(DEFAULT_LONGFORM_CONFIG.duration);
   const [imageModel, setImageModel] = useState<LongformImageModel>(DEFAULT_LONGFORM_CONFIG.imageModel);
+  const [textModel, setTextModel] = useState<string>(settings?.textModel || 'gemini-3-flash-preview');
   const [ttsProvider, setTtsProvider] = useState<TtsProvider>(DEFAULT_TTS_CONFIG.provider);
   const [openaiModel, setOpenaiModel] = useState<OpenAiTtsModel>('tts-1');
   const [openaiVoice, setOpenaiVoice] = useState<OpenAiVoice>('nova');
   const [geminiVoice, setGeminiVoice] = useState<GeminiVoice>('Kore');
+
+  // API 키 경고 모달
+  const [showKeyWarning, setShowKeyWarning] = useState(false);
+  const [pendingConfig, setPendingConfig] = useState<LongformConfig | null>(null);
 
   const sceneCount = useMemo(() => calculateSceneCount(duration), [duration]);
   const ttsModel = ttsProvider === 'openai' ? openaiModel : 'gemini-2.5-flash-preview-tts';
@@ -24,18 +33,54 @@ export const Step1BasicSetup: React.FC<Step1BasicSetupProps> = ({ onGenerate, is
   const googleModels = IMAGE_MODEL_OPTIONS.filter(m => m.provider === 'google');
   const fluxModels = IMAGE_MODEL_OPTIONS.filter(m => m.provider === 'eachlabs');
 
+  const isOpenAIModel = (model: string) => model.startsWith('gpt-') || model.startsWith('o3-') || model.startsWith('o4-');
+  const selectedModelLabel = AVAILABLE_TEXT_MODELS.find(m => m.value === textModel)?.label || textModel;
+
+  const buildConfig = (overrideTextModel?: string): LongformConfig => ({
+    topic: topic.trim(),
+    duration,
+    imageModel,
+    textModel: overrideTextModel,
+    tts: {
+      provider: ttsProvider,
+      model: ttsModel,
+      voice: ttsProvider === 'openai' ? openaiVoice : geminiVoice,
+    },
+  });
+
   const handleSubmit = () => {
     if (!topic.trim()) return;
-    onGenerate({
-      topic: topic.trim(),
-      duration,
-      imageModel,
-      tts: {
-        provider: ttsProvider,
-        model: ttsModel,
-        voice: ttsProvider === 'openai' ? openaiVoice : geminiVoice,
-      },
-    });
+
+    const needsOpenAIKey = isOpenAIModel(textModel);
+    const needsGeminiKey = !needsOpenAIKey;
+
+    // API 키 검증
+    if (needsOpenAIKey && !hasOpenaiApiKey) {
+      setPendingConfig(buildConfig(textModel));
+      setShowKeyWarning(true);
+      return;
+    }
+    if (needsGeminiKey && !isAdmin && !hasApiKey) {
+      setPendingConfig(buildConfig(textModel));
+      setShowKeyWarning(true);
+      return;
+    }
+
+    onGenerate(buildConfig(textModel));
+  };
+
+  // 모달: 설정 모델로 폴백 진행
+  const handleFallbackProceed = () => {
+    setShowKeyWarning(false);
+    // textModel을 undefined로 보내서 백엔드가 설정 모델 사용
+    onGenerate(buildConfig(undefined));
+  };
+
+  // 모달: 설정으로 이동
+  const handleGoToSettings = () => {
+    setShowKeyWarning(false);
+    setPendingConfig(null);
+    openSettingsModal();
   };
 
   return (
@@ -53,6 +98,40 @@ export const Step1BasicSetup: React.FC<Step1BasicSetupProps> = ({ onGenerate, is
           disabled={isGenerating}
         />
         <p className="text-xs text-gray-500 mt-1 text-right">{topic.length}/200</p>
+      </div>
+
+      {/* 텍스트 모델 (시나리오 생성) */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-1.5">텍스트 모델 (시나리오 생성)</label>
+        <select
+          value={textModel}
+          onChange={(e) => setTextModel(e.target.value)}
+          disabled={isGenerating}
+          className="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent min-h-[44px]"
+        >
+          <optgroup label="Google Gemini (Gemini API 키)">
+            {AVAILABLE_TEXT_MODELS.filter(m => m.provider !== 'openai').map((model) => (
+              <option key={model.value} value={model.value}>
+                {model.label}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="OpenAI (OpenAI API 키)">
+            {AVAILABLE_TEXT_MODELS.filter(m => m.provider === 'openai').map((model) => (
+              <option key={model.value} value={model.value}>
+                {model.label}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+        {isOpenAIModel(textModel) ? (
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs">
+            <span className="text-blue-400">OpenAI API 키 필요</span>
+            {!hasOpenaiApiKey && <span className="text-yellow-400 font-medium">(미설정)</span>}
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-gray-500">Gemini API 키를 사용합니다</p>
+        )}
       </div>
 
       {/* 영상 길이 */}
@@ -249,6 +328,51 @@ export const Step1BasicSetup: React.FC<Step1BasicSetupProps> = ({ onGenerate, is
           '시나리오 생성하기'
         )}
       </button>
+
+      {/* API 키 경고 모달 */}
+      {showKeyWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-base font-semibold text-white">API 키 필요</h3>
+            </div>
+
+            <p className="text-sm text-gray-300 mb-2">
+              선택한 모델 <span className="text-teal-400 font-medium">{selectedModelLabel}</span>의{' '}
+              {isOpenAIModel(textModel) ? 'OpenAI' : 'Gemini'} API 키가 설정되지 않았습니다.
+            </p>
+            <p className="text-xs text-gray-400 mb-5">
+              설정에 저장된 기본 모델로 대체하여 진행하거나, 설정에서 API 키를 입력하세요.
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleFallbackProceed}
+                className="flex-1 py-2.5 px-4 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors min-h-[44px]"
+              >
+                기본 모델로 진행
+              </button>
+              <button
+                onClick={handleGoToSettings}
+                className="flex-1 py-2.5 px-4 bg-gray-700 text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-600 transition-colors min-h-[44px]"
+              >
+                설정으로 이동
+              </button>
+            </div>
+            <button
+              onClick={() => { setShowKeyWarning(false); setPendingConfig(null); }}
+              className="w-full mt-2 py-2 text-xs text-gray-500 hover:text-gray-400 transition-colors"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

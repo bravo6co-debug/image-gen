@@ -6,6 +6,7 @@ import { isOpenAIModel, getOpenAIKeyForUser, generateTextWithOpenAI } from '../l
 interface GenerateLongformRequest {
   topic: string;
   duration: number;
+  textModel?: string;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -20,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { topic, duration } = req.body as GenerateLongformRequest;
+    const { topic, duration, textModel: requestTextModel } = req.body as GenerateLongformRequest;
 
     if (!topic || !duration) {
       return res.status(400).json({ error: 'topic and duration are required' });
@@ -28,7 +29,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const sanitizedTopic = sanitizePrompt(topic, 200);
     const totalScenes = duration - 1;
-    const textModel = await getUserTextModel(auth.userId);
+    // 요청 모델 우선, 없으면 설정 모델 폴백
+    const textModel = requestTextModel || await getUserTextModel(auth.userId);
 
     const prompt = `당신은 YouTube 롱폼 영상의 시나리오 작가입니다.
 주어진 주제로 ${duration}분 길이의 영상 시나리오를 작성합니다.

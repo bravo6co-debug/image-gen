@@ -81,7 +81,7 @@ export function useLongformScenario(): UseLongformScenarioReturn {
 
     try {
       const prevScene = scenario.scenes.find(s => s.sceneNumber === sceneNumber - 1);
-      const result = await validateNarration(scene.narration, prevScene?.narration);
+      const result = await validateNarration(scene.narration, prevScene?.narration, scenario.config?.textModel);
 
       updateScene(sceneNumber, {
         narration: result.narration,

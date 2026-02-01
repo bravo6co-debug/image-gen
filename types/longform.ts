@@ -34,6 +34,7 @@ export interface LongformConfig {
   topic: string;
   duration: LongformDuration;
   imageModel: LongformImageModel;
+  textModel?: string;
   tts: TtsConfig;
 }
 

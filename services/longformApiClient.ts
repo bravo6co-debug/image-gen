@@ -34,6 +34,7 @@ export async function generateLongformScenario(config: LongformConfig): Promise<
   const result = await post<{ scenario: any }>('/api/longform/generate-scenario', {
     topic: config.topic,
     duration: config.duration,
+    ...(config.textModel && { textModel: config.textModel }),
   }, 'Generate Longform Scenario');
 
   return {
@@ -49,13 +50,15 @@ export async function generateLongformScenario(config: LongformConfig): Promise<
 // ─── 나레이션 보정 ────────────────────────────────
 export async function validateNarration(
   narration: string,
-  context?: string
+  context?: string,
+  textModel?: string
 ): Promise<{ narration: string; charCount: number; adjusted: boolean }> {
   return post('/api/longform/validate-narration', {
     narration,
     targetMin: 280,
     targetMax: 300,
     context,
+    ...(textModel && { textModel }),
   }, 'Validate Narration');
 }
 

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from "@google/genai";
-import { Part, sanitizePrompt, setCorsHeaders, getStylePrompt, getAIClientForUser, getUserImageModel, MODELS } from './lib/gemini.js';
+import { Part, sanitizePrompt, setCorsHeaders, getStylePrompt, getAIClientForUser, getUserImageModel, MODELS, extractSafetyError } from './lib/gemini.js';
 import { requireAuth } from './lib/auth.js';
 import { isFluxModel, getEachLabsApiKey, generateFluxImage } from './lib/eachlabs.js';
 import type { GenerateImagesRequest, ImageData, ApiErrorResponse, ImageStyle, NamedCharacterImage } from './lib/types.js';
@@ -173,6 +173,12 @@ ${variationPrompt}
         contents: parts,
     });
 
+    // 안전 정책 위반 확인
+    const safetyError = extractSafetyError(response as any);
+    if (safetyError) {
+        throw new Error(safetyError.message);
+    }
+
     // Extract image from response parts
     const imagePart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
     if (imagePart && imagePart.inlineData) {
@@ -183,8 +189,8 @@ ${variationPrompt}
     }
 
     const textPart = response.candidates?.[0]?.content?.parts?.find(p => p.text);
-    const errorMessage = textPart?.text || "AI failed to return an image for this scene.";
-    throw new Error(`Image generation failed: ${errorMessage}`);
+    const errorMessage = textPart?.text || "AI가 이미지를 생성하지 못했습니다. 프롬프트를 수정해 보세요.";
+    throw new Error(errorMessage);
 };
 
 /**
@@ -317,9 +323,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (e) {
         console.error("Error during image generation:", e);
         const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-        return res.status(500).json({
-            error: `Image generation failed: ${errorMessage}`,
-            code: 'GENERATION_FAILED'
+        const isSafety = errorMessage.includes('생성할 수 없습니다') || errorMessage.includes('차단') || errorMessage.includes('중단');
+        return res.status(isSafety ? 400 : 500).json({
+            error: isSafety ? errorMessage : `이미지 생성 실패: ${errorMessage}`,
+            code: isSafety ? 'SAFETY_VIOLATION' : 'GENERATION_FAILED'
         } as ApiErrorResponse);
     }
 }

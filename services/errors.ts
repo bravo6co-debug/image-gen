@@ -121,6 +121,24 @@ export class VideoGenerationError extends ApiError {
     }
 }
 
+export class SafetyViolationError extends ApiError {
+    constructor(
+        public readonly category?: string,
+        public readonly detail?: string,
+        originalError?: Error
+    ) {
+        const message = detail || '안전 정책에 의해 이미지 생성이 차단되었습니다.';
+        super(
+            message,
+            'SAFETY_VIOLATION',
+            400,
+            false,
+            originalError
+        );
+        this.name = 'SafetyViolationError';
+    }
+}
+
 // Parse error from API response
 export function parseApiError(error: unknown): ApiError {
     if (error instanceof ApiError) {
@@ -129,6 +147,10 @@ export function parseApiError(error: unknown): ApiError {
 
     if (error instanceof Error) {
         const msg = error.message.toLowerCase();
+
+        if (msg.includes('safety') || msg.includes('blocked') || msg.includes('prohibited')) {
+            return new SafetyViolationError(undefined, error.message, error);
+        }
 
         if (msg.includes('quota') || msg.includes('429') || msg.includes('resource exhausted')) {
             return new QuotaExceededError(error.message, error);
@@ -225,6 +247,8 @@ export function getErrorMessage(error: unknown): string {
             return '⏰ 처리 시간이 초과되었습니다. 다시 시도해주세요.';
         case 'NETWORK_ERROR':
             return '🌐 네트워크 오류가 발생했습니다. 인터넷 연결을 확인하세요.';
+        case 'SAFETY_VIOLATION':
+            return `🛡️ ${apiError.message}`;
         case 'IMAGE_GENERATION_FAILED':
             return `🖼️ 이미지 생성 실패: ${apiError.message}`;
         case 'VIDEO_GENERATION_FAILED':

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from "@google/genai";
-import { sanitizePrompt, setCorsHeaders, getStylePrompt, getAIClientForUser, getUserImageModel, MODELS } from './lib/gemini.js';
+import { sanitizePrompt, setCorsHeaders, getStylePrompt, getAIClientForUser, getUserImageModel, MODELS, extractSafetyError } from './lib/gemini.js';
 import { requireAuth } from './lib/auth.js';
 import { isFluxModel, getEachLabsApiKey, generateFluxImage } from './lib/eachlabs.js';
 import type { GeneratePortraitsRequest, ImageData, ApiErrorResponse, ImageStyle } from './lib/types.js';
@@ -69,14 +69,20 @@ Generate only the image, no text response needed.
         contents: finalPrompt,
     });
 
+    // 안전 정책 위반 확인
+    const safetyError = extractSafetyError(response as any);
+    if (safetyError) {
+        throw new Error(safetyError.message);
+    }
+
     // Extract image from response parts
     if (!response.candidates || response.candidates.length === 0) {
-        throw new Error("AI did not return any response.");
+        throw new Error("AI가 응답을 반환하지 않았습니다.");
     }
 
     const parts = response.candidates[0].content?.parts;
     if (!parts || parts.length === 0) {
-        throw new Error("AI did not return any content parts.");
+        throw new Error("AI가 이미지를 생성하지 못했습니다.");
     }
 
     // Find the image part
@@ -89,7 +95,7 @@ Generate only the image, no text response needed.
         }
     }
 
-    throw new Error("AI did not return any images. This could be due to a safety policy violation or a temporary service issue.");
+    throw new Error("AI가 이미지를 생성하지 못했습니다. 프롬프트를 수정해 보세요.");
 };
 
 /**
@@ -168,9 +174,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (e) {
         console.error("Error during character portrait generation:", e);
         const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-        return res.status(500).json({
-            error: `Character generation failed: ${errorMessage}`,
-            code: 'GENERATION_FAILED'
+        const isSafety = errorMessage.includes('생성할 수 없습니다') || errorMessage.includes('차단') || errorMessage.includes('중단');
+        return res.status(isSafety ? 400 : 500).json({
+            error: isSafety ? errorMessage : `캐릭터 생성 실패: ${errorMessage}`,
+            code: isSafety ? 'SAFETY_VIOLATION' : 'GENERATION_FAILED'
         } as ApiErrorResponse);
     }
 }

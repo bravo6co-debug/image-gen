@@ -296,6 +296,66 @@ export { Modality, Type };
 export type { Part };
 
 // ============================================
+// SAFETY VIOLATION DETECTION
+// ============================================
+
+/** HarmCategory → 한글 메시지 매핑 */
+const HARM_CATEGORY_MESSAGES: Record<string, string> = {
+    HARM_CATEGORY_SEXUALLY_EXPLICIT: '성적 콘텐츠가 포함된 이미지는 생성할 수 없습니다.',
+    HARM_CATEGORY_HATE_SPEECH: '혐오 표현이 포함된 이미지는 생성할 수 없습니다.',
+    HARM_CATEGORY_HARASSMENT: '괴롭힘/폭력적 내용이 포함된 이미지는 생성할 수 없습니다.',
+    HARM_CATEGORY_DANGEROUS_CONTENT: '위험한 내용이 포함된 이미지는 생성할 수 없습니다.',
+    HARM_CATEGORY_CIVIC_INTEGRITY: '시민 윤리에 반하는 이미지는 생성할 수 없습니다.',
+};
+
+const BLOCK_REASON_MESSAGES: Record<string, string> = {
+    SAFETY: '안전 정책에 의해 차단되었습니다.',
+    BLOCKLIST: '금지된 용어가 포함되어 차단되었습니다.',
+    PROHIBITED_CONTENT: '금지된 콘텐츠로 판단되어 차단되었습니다.',
+    OTHER: '콘텐츠 정책에 의해 차단되었습니다.',
+};
+
+const FINISH_REASON_MESSAGES: Record<string, string> = {
+    SAFETY: '안전 정책 위반으로 생성이 중단되었습니다.',
+    PROHIBITED_CONTENT: '금지된 콘텐츠로 판단되어 생성이 중단되었습니다.',
+    BLOCKLIST: '금지된 용어가 포함되어 생성이 중단되었습니다.',
+};
+
+/**
+ * Gemini 응답에서 안전 정책 위반 정보를 추출.
+ * 위반이 감지되면 구체적인 한글 메시지를 반환, 없으면 null.
+ */
+export function extractSafetyError(response: {
+    promptFeedback?: { blockReason?: string; blockReasonMessage?: string; safetyRatings?: Array<{ category?: string; blocked?: boolean }> };
+    candidates?: Array<{ finishReason?: string; safetyRatings?: Array<{ category?: string; blocked?: boolean }> }>;
+}): { category?: string; message: string } | null {
+    // 1) promptFeedback.blockReason 확인 (프롬프트 자체가 차단된 경우)
+    const pf = response.promptFeedback;
+    if (pf?.blockReason && pf.blockReason !== 'BLOCKED_REASON_UNSPECIFIED') {
+        const blockedCategory = pf.safetyRatings?.find(r => r.blocked)?.category;
+        const categoryMsg = blockedCategory ? HARM_CATEGORY_MESSAGES[blockedCategory] : undefined;
+        const reasonMsg = BLOCK_REASON_MESSAGES[pf.blockReason];
+        return {
+            category: blockedCategory || pf.blockReason,
+            message: categoryMsg || reasonMsg || `프롬프트가 차단되었습니다: ${pf.blockReasonMessage || pf.blockReason}`,
+        };
+    }
+
+    // 2) candidate.finishReason 확인 (생성 도중 차단된 경우)
+    const candidate = response.candidates?.[0];
+    if (candidate?.finishReason && FINISH_REASON_MESSAGES[candidate.finishReason]) {
+        const blockedCategory = candidate.safetyRatings?.find(r => r.blocked)?.category;
+        const categoryMsg = blockedCategory ? HARM_CATEGORY_MESSAGES[blockedCategory] : undefined;
+        return {
+            category: blockedCategory || candidate.finishReason,
+            message: categoryMsg || FINISH_REASON_MESSAGES[candidate.finishReason],
+        };
+    }
+
+    return null;
+}
+
+// ============================================
 // PHOTOREALISTIC STYLE PROMPTS
 // ============================================
 export const PHOTOREALISTIC_STYLES = [

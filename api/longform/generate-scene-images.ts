@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from '../lib/auth.js';
-import { getAIClientForUser, setCorsHeaders, Modality } from '../lib/gemini.js';
+import { getAIClientForUser, setCorsHeaders, Modality, extractSafetyError } from '../lib/gemini.js';
 import { isFluxModel, getEachLabsApiKey, generateFluxImage } from '../lib/eachlabs.js';
 
 interface SceneInput {
@@ -47,6 +47,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
           });
 
+          // 안전 정책 위반 확인
+          const safetyError = extractSafetyError(response as any);
+          if (safetyError) {
+            return { sceneNumber: scene.sceneNumber, success: false, error: safetyError.message };
+          }
+
           const parts = response.candidates?.[0]?.content?.parts || [];
           for (const part of parts) {
             if (part.inlineData) {
@@ -57,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               };
             }
           }
-          return { sceneNumber: scene.sceneNumber, success: false, error: 'No image generated' };
+          return { sceneNumber: scene.sceneNumber, success: false, error: 'AI가 이미지를 생성하지 못했습니다.' };
         } catch (err) {
           return {
             sceneNumber: scene.sceneNumber,

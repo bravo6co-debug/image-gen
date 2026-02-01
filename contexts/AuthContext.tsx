@@ -19,13 +19,14 @@ interface AuthContextType {
   settings: GeminiModelConfig | null;
   hasApiKey: boolean;
   hasHailuoApiKey: boolean;
+  hasOpenaiApiKey: boolean;
   isAdmin: boolean;
   canUseApi: boolean; // 어드민이거나 본인 API 키가 있으면 true
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   loadSettings: () => Promise<void>;
-  saveSettings: (settings: Partial<GeminiModelConfig & { geminiApiKey?: string; hailuoApiKey?: string }>) => Promise<{ success: boolean; error?: string }>;
+  saveSettings: (settings: Partial<GeminiModelConfig & { geminiApiKey?: string; hailuoApiKey?: string; openaiApiKey?: string }>) => Promise<{ success: boolean; error?: string }>;
   openLoginModal: () => void;
   openSettingsModal: () => void;
   isLoginModalOpen: boolean;
@@ -51,6 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [settings, setSettings] = useState<GeminiModelConfig | null>(null);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [hasHailuoApiKey, setHasHailuoApiKey] = useState(false);
+  const [hasOpenaiApiKey, setHasOpenaiApiKey] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
@@ -146,6 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSettings(null);
     setHasApiKey(false);
     setHasHailuoApiKey(false);
+    setHasOpenaiApiKey(false);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   }, []);
@@ -181,6 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         setHasApiKey(data.settings.hasApiKey || false);
         setHasHailuoApiKey(data.settings.hasHailuoApiKey || false);
+        setHasOpenaiApiKey(data.settings.hasOpenaiApiKey || false);
 
         // user 상태도 업데이트
         if (user) {
@@ -232,6 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         setHasApiKey(data.settings.hasApiKey || false);
         setHasHailuoApiKey(data.settings.hasHailuoApiKey || false);
+        setHasOpenaiApiKey(data.settings.hasOpenaiApiKey || false);
 
         // user 상태도 업데이트
         if (user) {
@@ -269,6 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         settings,
         hasApiKey,
         hasHailuoApiKey,
+        hasOpenaiApiKey,
         isAdmin,
         canUseApi,
         login,

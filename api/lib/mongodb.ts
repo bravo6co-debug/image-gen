@@ -61,6 +61,7 @@ export interface User {
 export interface UserSettings {
     geminiApiKey?: string;
     hailuoApiKey?: string;
+    openaiApiKey?: string;
     textModel: string;
     imageModel: string;
     videoModel: string;
@@ -74,6 +75,7 @@ export interface UserSettings {
 export const DEFAULT_SETTINGS: UserSettings = {
     geminiApiKey: undefined,
     hailuoApiKey: undefined,
+    openaiApiKey: undefined,
     textModel: 'gemini-3-flash-preview',
     imageModel: 'gemini-2.5-flash-image',
     videoModel: 'minimax-hailuo-v2-3-fast-standard-image-to-video',

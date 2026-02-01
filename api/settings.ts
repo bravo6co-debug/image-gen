@@ -36,8 +36,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 hailuoApiKey: settings.hailuoApiKey
                     ? maskApiKey(settings.hailuoApiKey)
                     : undefined,
+                openaiApiKey: settings.openaiApiKey
+                    ? maskApiKey(settings.openaiApiKey)
+                    : undefined,
                 hasApiKey: !!settings.geminiApiKey,
                 hasHailuoApiKey: !!settings.hailuoApiKey,
+                hasOpenaiApiKey: !!settings.openaiApiKey,
             };
 
             return res.status(200).json({
@@ -52,6 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const {
                 geminiApiKey,
                 hailuoApiKey,
+                openaiApiKey,
                 textModel,
                 imageModel,
                 videoModel,
@@ -83,6 +88,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     updates.hailuoApiKey = undefined;
                 } else if (typeof hailuoApiKey === 'string' && hailuoApiKey.trim()) {
                     updates.hailuoApiKey = hailuoApiKey.trim();
+                }
+            }
+
+            // OpenAI API 키 (TTS 나레이션용)
+            if (openaiApiKey !== undefined) {
+                if (openaiApiKey === null || openaiApiKey === '') {
+                    updates.openaiApiKey = undefined;
+                } else if (typeof openaiApiKey === 'string' && openaiApiKey.trim()) {
+                    updates.openaiApiKey = openaiApiKey.trim();
                 }
             }
 
@@ -133,8 +147,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 hailuoApiKey: newSettings.hailuoApiKey
                     ? maskApiKey(newSettings.hailuoApiKey)
                     : undefined,
+                openaiApiKey: newSettings.openaiApiKey
+                    ? maskApiKey(newSettings.openaiApiKey)
+                    : undefined,
                 hasApiKey: !!newSettings.geminiApiKey,
                 hasHailuoApiKey: !!newSettings.hailuoApiKey,
+                hasOpenaiApiKey: !!newSettings.openaiApiKey,
             };
 
             return res.status(200).json({

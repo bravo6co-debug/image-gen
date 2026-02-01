@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 1. 이미지 스타일은 "애니메이션" 고정
 2. 후킹 시나리오: 본편과 관련되지만 시청자의 호기심을 극도로 자극하는 충격적/궁금증 유발 장면 (10초)
 3. 본편은 ${totalScenes}개의 씬으로 구성
-4. 각 씬의 나레이션은 반드시 280~300자 (한국어 기준) — 이 범위를 벗어나면 안 됩니다
+4. 각 씬의 나레이션은 반드시 330~350자 (한국어 기준) — 이 범위를 벗어나면 안 됩니다
 5. 스토리 구조: 도입(~20%) → 전개(~25%) → 심화(~25%) → 절정(~20%) → 마무리(~10%)
 6. 각 씬의 이미지 프롬프트는 영어로, 애니메이션 스타일로 상세히 기술
 7. 이미지 프롬프트에 텍스트/글자/워터마크 포함 금지
@@ -60,7 +60,7 @@ ${sanitizedTopic}
       "sceneNumber": 1,
       "timeRange": "0:10~1:10",
       "imagePrompt": "이미지 프롬프트 (영어, 애니메이션 스타일, 텍스트 없이)",
-      "narration": "나레이션 텍스트 (한국어, 280~300자)",
+      "narration": "나레이션 텍스트 (한국어, 330~350자)",
       "narrationCharCount": 290,
       "storyPhase": "도입/전개/심화/절정/마무리",
       "mood": "분위기 (한국어, 2~3단어)"
@@ -112,7 +112,7 @@ ${sanitizedTopic}
                     sceneNumber: { type: Type.NUMBER, description: '씬 번호 (1부터)' },
                     timeRange: { type: Type.STRING, description: '시간 범위 (예: 0:10~1:10)' },
                     imagePrompt: { type: Type.STRING, description: '이미지 프롬프트 (영어, 애니메이션 스타일, 텍스트 없이)' },
-                    narration: { type: Type.STRING, description: '나레이션 텍스트 (한국어, 280~300자)' },
+                    narration: { type: Type.STRING, description: '나레이션 텍스트 (한국어, 330~350자)' },
                     narrationCharCount: { type: Type.NUMBER, description: '나레이션 글자 수' },
                     storyPhase: { type: Type.STRING, description: '스토리 단계: 도입/전개/심화/절정/마무리' },
                     mood: { type: Type.STRING, description: '분위기 (한국어, 2~3단어)' },

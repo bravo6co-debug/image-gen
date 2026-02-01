@@ -264,7 +264,7 @@ const HEIGHT = 1080;
 const TRANSITION_FRAMES = 15;
 const SEGMENT_SECONDS = 10; // 10초 단위 자막/애니메이션 세그먼트
 const SEGMENT_FRAMES = SEGMENT_SECONDS * FPS;
-const CHARS_PER_SEGMENT = 50; // 세그먼트당 표시할 대략적 글자 수
+const CHARS_PER_SEGMENT = 58; // 세그먼트당 표시할 대략적 글자 수 (350자/분 ÷ 6세그먼트)
 
 /**
  * 나레이션 텍스트를 10초 단위 세그먼트로 분할

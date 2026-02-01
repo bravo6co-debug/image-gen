@@ -55,8 +55,8 @@ export async function validateNarration(
 ): Promise<{ narration: string; charCount: number; adjusted: boolean }> {
   return post('/api/longform/validate-narration', {
     narration,
-    targetMin: 280,
-    targetMax: 300,
+    targetMin: 330,
+    targetMax: 350,
     context,
     ...(textModel && { textModel }),
   }, 'Validate Narration');

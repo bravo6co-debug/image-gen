@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { narration, targetMin = 280, targetMax = 300, context, textModel: requestTextModel } = req.body;
+    const { narration, targetMin = 330, targetMax = 350, context, textModel: requestTextModel } = req.body;
 
     if (!narration) {
       return res.status(400).json({ error: 'narration is required' });

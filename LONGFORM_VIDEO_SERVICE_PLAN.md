@@ -40,24 +40,72 @@
 | `topic` | string | 자유 입력 | 영상 주제 (예: "한국 전통 음식의 역사") |
 | `duration` | enum | `10 \| 20 \| 30 \| 40 \| 50 \| 60` | 총 영상 길이 (분) |
 | `imageModel` | enum | 아래 모델 목록 참조 | 이미지 생성 모델 선택 |
+| `ttsProvider` | enum | `openai \| gemini` | TTS 엔진 선택 |
+| `ttsModel` | enum | 아래 TTS 모델 목록 참조 | TTS 모델 선택 |
 
 #### 이미지 생성 모델 선택지
 
 사용자의 설정(Settings)에 저장된 모델을 기본값으로 사용하되, STEP 1에서 변경 가능.
+모든 모델은 API 키가 필요하며 사용량에 따라 비용이 발생한다.
+
+| 모델 ID | 표시명 | 제공사 | 비용/장 | 비고 |
+|---------|--------|--------|---------|------|
+| `gemini-2.5-flash-image` | Gemini 2.5 Flash Image | Google | ~$0.039 (1K) | **기본값**, 빠른 생성 |
+| `gemini-3-pro-image-preview` | Gemini 3 Pro Image | Google | ~$0.24 (4K) | 최고 품질 (4K) |
+| `imagen-4.0-generate-001` | Imagen 4.0 | Google | ~$0.039 (1K) | 고품질 |
+| `imagen-4.0-fast-generate-001` | Imagen 4.0 Fast | Google | ~$0.039 (1K) | 속도 우선 |
+| `flux-kontext-pro` | FLUX Kontext Pro | EachLabs | $0.04 | 고품질 |
+| `flux-kontext-max` | FLUX Kontext Max | EachLabs | $0.08 | 최고 품질 |
+
+> **이미지 비용 예시 (30분 영상 = 30장 기준)**
+>
+> | 모델 | 30분 (30장) | 60분 (60장) |
+> |------|------------|------------|
+> | Gemini Flash/Imagen (1K) | ~$1.17 | ~$2.34 |
+> | Gemini 3 Pro (4K) | ~$7.20 | ~$14.40 |
+> | FLUX Kontext Pro | $1.20 | $2.40 |
+> | FLUX Kontext Max | $2.40 | $4.80 |
+>
+> * Google AI Studio 무료 티어: 일 1,500장 한도 내 무료 (초과 시 유료)
+> * FLUX: EachLabs API 키 필요, 항상 유료
+
+#### TTS 모델 선택지
+
+Gemini TTS는 일일 호출 제한이 있어 대량 생성 시 한계가 있으므로,
+**OpenAI TTS를 기본 권장**하며 Gemini TTS도 선택 가능하게 한다.
 
 | 모델 ID | 표시명 | 제공사 | 비용 | 비고 |
 |---------|--------|--------|------|------|
-| `gemini-3-pro-image-preview` | Gemini 3 Pro Image | Google | 무료 (API 키) | 최고 품질 (4K) |
-| `gemini-2.5-flash-image` | Gemini 2.5 Flash Image | Google | 무료 (API 키) | **기본값**, 빠른 생성 |
-| `imagen-4.0-generate-001` | Imagen 4.0 | Google | 무료 (API 키) | 고품질 |
-| `imagen-4.0-fast-generate-001` | Imagen 4.0 Fast | Google | 무료 (API 키) | 속도 우선 |
-| `flux-kontext-pro` | FLUX Kontext Pro | EachLabs | $0.04/장 | 고품질, 유료 |
-| `flux-kontext-max` | FLUX Kontext Max | EachLabs | $0.08/장 | 최고 품질, 유료 |
+| `tts-1` | OpenAI TTS Standard | OpenAI | $15/100만자 (~$0.0045/300자) | **기본 추천**, 가성비 최고 |
+| `tts-1-hd` | OpenAI TTS HD | OpenAI | $30/100만자 (~$0.009/300자) | 고품질 음성 |
+| `gemini-2.5-flash-preview-tts` | Gemini Flash TTS | Google | API 키 종량제 | 일일 호출 제한 있음 |
+| `gemini-2.5-pro-preview-tts` | Gemini Pro TTS | Google | API 키 종량제 | 고품질, 일일 제한 |
 
-> **비용 예시 (FLUX 사용 시)**
-> - 30분 영상 (30장): FLUX Pro $1.20 / FLUX Max $2.40
-> - 60분 영상 (60장): FLUX Pro $2.40 / FLUX Max $4.80
-> - Gemini 모델은 API 키만 있으면 무료
+**OpenAI TTS 음성 목록 (6종):**
+
+| 음성 ID | 특징 |
+|---------|------|
+| `alloy` | 중성적, 균형 잡힌 톤 |
+| `echo` | 남성적, 따뜻한 톤 |
+| `fable` | 표현력 풍부, 내레이터 스타일 |
+| `onyx` | 깊고 굵은 남성 음성 |
+| `nova` | 밝고 활기찬 여성 음성 **(한국어 추천)** |
+| `shimmer` | 부드럽고 차분한 여성 음성 |
+
+**Gemini TTS 음성 목록 (5종, 기존 서비스와 동일):**
+Kore, Aoede, Charon, Fenrir, Puck
+
+> **TTS 비용 예시 (30분 영상 = 29개 나레이션 × 300자 기준)**
+>
+> | 모델 | 30분 (8,700자) | 60분 (17,700자) |
+> |------|---------------|----------------|
+> | OpenAI tts-1 | ~$0.13 (약 170원) | ~$0.27 (약 350원) |
+> | OpenAI tts-1-hd | ~$0.26 (약 340원) | ~$0.53 (약 690원) |
+> | Gemini TTS | API 키 종량제 | 일일 제한 주의 |
+>
+> * OpenAI TTS: 한 번 호출에 최대 4,096자 지원 (300자 대비 13배 여유)
+> * OpenAI TTS: 스트리밍 지원, 지연시간 ~0.5초
+> * Gemini TTS: 일일 호출 제한으로 60분 영상(59개) 생성 시 제한에 걸릴 수 있음
 
 ### 2.2 출력 (다운로드 가능한 3개 파일)
 
@@ -90,8 +138,11 @@
 |------|-----|
 | 1분당 나레이션 글자 수 | **280~300자** (반드시 준수) |
 | 언어 | 한국어 |
-| 음성 | TTS 5종 선택 가능 (Kore, Aoede, Charon, Fenrir, Puck) |
-| 오디오 포맷 | WAV (base64) |
+| TTS 엔진 | **OpenAI TTS (추천)** 또는 Gemini TTS 선택 |
+| OpenAI 음성 | 6종: Alloy, Echo, Fable, Onyx, Nova, Shimmer |
+| Gemini 음성 | 5종: Kore, Aoede, Charon, Fenrir, Puck |
+| 오디오 포맷 | OpenAI: MP3/WAV, Gemini: WAV (base64) |
+| 호출 제한 | OpenAI: 제한 없음 (종량제), Gemini: **일일 호출 제한 있음** |
 
 ---
 
@@ -112,6 +163,7 @@
 │  │  주제 입력: [_________________________________]        │  │
 │  │  영상 길이: [10분 ▼] [20분] [30분] [40분] [50분] [60분]│  │
 │  │  이미지 모델: [Gemini 2.5 Flash Image ▼]               │  │
+│  │  TTS 엔진:   [● OpenAI TTS (추천)] [○ Gemini TTS]     │  │
 │  │                                                        │  │
 │  │  [시나리오 생성하기]                                     │  │
 │  └────────────────────────────────────────────────────────┘  │
@@ -165,8 +217,12 @@
 - 주제 입력 (텍스트 필드, 최대 200자)
 - 영상 길이 선택 (10/20/30/40/50/60분 라디오 버튼 또는 드롭다운)
 - 이미지 모델 선택 (드롭다운, Gemini 4종 + FLUX 2종, 기본값: 사용자 Settings 설정)
-  - FLUX 모델 선택 시 예상 비용 안내 표시 (예: "30장 × $0.04 = $1.20")
+  - 모든 모델에 예상 비용 안내 표시 (예: "30장 × ~$0.039 = ~$1.17")
   - EachLabs API 키 미설정 시 FLUX 모델 비활성화
+- TTS 엔진 선택 (OpenAI TTS 기본 추천 / Gemini TTS 선택 가능)
+  - OpenAI TTS 선택 시: 모델 (tts-1 / tts-1-hd) + 음성 (6종) 선택
+  - Gemini TTS 선택 시: 음성 (5종) 선택 + 일일 제한 경고 표시
+  - OpenAI API 키 미설정 시 OpenAI TTS 비활성화
 - "시나리오 생성하기" 버튼 클릭 시 STEP 2로 자동 전환
 
 #### STEP 2: 시나리오 확인/편집
@@ -290,7 +346,8 @@ function validateNarration(narration: string): { valid: boolean; text: string } 
 │   │   ├── generate-hook-image.ts         # 후킹 이미지 생성
 │   │   ├── generate-hook-video.ts         # 후킹 영상 생성 (Hailuo)
 │   │   ├── generate-scene-images.ts       # 본편 씬 이미지 일괄 생성
-│   │   ├── generate-narrations.ts         # 나레이션 일괄 생성
+│   │   ├── generate-narrations.ts         # 나레이션 일괄 생성 (OpenAI/Gemini 라우팅)
+│   │   ├── generate-narration-openai.ts   # OpenAI TTS 나레이션 생성
 │   │   └── validate-narration.ts          # 나레이션 글자 수 보정
 │   │
 ├── components/
@@ -329,7 +386,8 @@ function validateNarration(narration: string): { valid: boolean; text: string } 
 |------|------|------|
 | Remotion 렌더링 | **재활용** | `remotion/components/` 하위 컴포넌트 재사용 (KenBurns, Transitions, Subtitles, NarrationAudio) |
 | Canvas 비디오 렌더링 | **재활용** | `services/videoService.ts`의 `renderVideo()` 재사용 |
-| TTS 나레이션 | **재활용** | `/api/generate-narration.ts` 기존 엔드포인트 호출 |
+| TTS 나레이션 (Gemini) | **재활용** | `/api/generate-narration.ts` 기존 엔드포인트 호출 |
+| TTS 나레이션 (OpenAI) | **신규** | OpenAI TTS API 연동 (`tts-1`, `tts-1-hd`) |
 | Hailuo AI 영상 | **재활용** | `/api/generate-video.ts` 기존 엔드포인트 호출 |
 | 이미지 생성 (Gemini) | **재활용** | `/api/generate-images.ts` 기존 엔드포인트 호출 |
 | 이미지 생성 (FLUX) | **재활용** | `/api/lib/eachlabs.ts` 기존 FLUX 라우팅 로직 재사용 |
@@ -347,18 +405,35 @@ function validateNarration(narration: string): { valid: boolean; text: string } 
 
 // ─── 이미지 모델 ──────────────────────────────────
 type LongformImageModel =
-  | 'gemini-3-pro-image-preview'       // Gemini 3 Pro Image (최고 품질)
-  | 'gemini-2.5-flash-image'           // Gemini 2.5 Flash Image (기본값)
-  | 'imagen-4.0-generate-001'          // Imagen 4.0 (고품질)
-  | 'imagen-4.0-fast-generate-001'     // Imagen 4.0 Fast (속도 우선)
+  | 'gemini-3-pro-image-preview'       // Gemini 3 Pro (~$0.24/장, 4K)
+  | 'gemini-2.5-flash-image'           // Gemini 2.5 Flash (~$0.039/장, 기본값)
+  | 'imagen-4.0-generate-001'          // Imagen 4.0 (~$0.039/장)
+  | 'imagen-4.0-fast-generate-001'     // Imagen 4.0 Fast (~$0.039/장)
   | 'flux-kontext-pro'                 // FLUX Kontext Pro ($0.04/장)
   | 'flux-kontext-max';                // FLUX Kontext Max ($0.08/장)
+
+// ─── TTS 모델 ────────────────────────────────────
+type TtsProvider = 'openai' | 'gemini';
+
+type OpenAiTtsModel = 'tts-1' | 'tts-1-hd';
+type GeminiTtsModel = 'gemini-2.5-flash-preview-tts' | 'gemini-2.5-pro-preview-tts';
+type LongformTtsModel = OpenAiTtsModel | GeminiTtsModel;
+
+type OpenAiVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+type GeminiVoice = 'Kore' | 'Aoede' | 'Charon' | 'Fenrir' | 'Puck';
+
+interface TtsConfig {
+  provider: TtsProvider;             // TTS 엔진 선택
+  model: LongformTtsModel;           // TTS 모델
+  voice: OpenAiVoice | GeminiVoice;  // 음성 선택
+}
 
 // ─── 기본 설정 ────────────────────────────────────
 interface LongformConfig {
   topic: string;                    // 영상 주제
   duration: 10 | 20 | 30 | 40 | 50 | 60;  // 영상 길이 (분)
   imageModel: LongformImageModel;   // 이미지 생성 모델
+  tts: TtsConfig;                   // TTS 설정
 }
 
 // ─── 후킹 씬 ─────────────────────────────────────
@@ -455,9 +530,16 @@ interface LongformState {
   scenario: LongformScenario | null;
   progress: GenerationProgress | null;
   output: LongformOutput | null;
-  voice: 'Kore' | 'Aoede' | 'Charon' | 'Fenrir' | 'Puck';
   imageModel: LongformImageModel;   // 선택된 이미지 모델
+  tts: TtsConfig;                   // 선택된 TTS 설정
 }
+
+// ─── 기본값 ──────────────────────────────────────
+const DEFAULT_TTS_CONFIG: TtsConfig = {
+  provider: 'openai',               // OpenAI TTS 기본 추천
+  model: 'tts-1',                   // Standard 모델 (가성비)
+  voice: 'nova',                    // 한국어에 적합한 음성
+};
 ```
 
 ---
@@ -591,7 +673,8 @@ FLUX 모델의 경우 `isFluxModel()` 판별 후 EachLabs API 호출.
 
 ### 6.5 POST /api/longform/generate-narrations
 
-나레이션 TTS를 일괄 생성한다. (5개씩 병렬 처리)
+나레이션 TTS를 일괄 생성한다. `ttsProvider`에 따라 OpenAI 또는 Gemini TTS로 라우팅.
+**OpenAI TTS를 기본 추천** (일일 호출 제한 없음, 가성비 우수).
 
 **Request:**
 ```json
@@ -599,10 +682,12 @@ FLUX 모델의 경우 `isFluxModel()` 판별 후 EachLabs API 호출.
   "scenes": [
     {
       "sceneNumber": 1,
-      "narration": "한국의 음식 문화는...(289자)",
-      "voice": "Kore"
+      "narration": "한국의 음식 문화는...(289자)"
     }
   ],
+  "ttsProvider": "openai",
+  "ttsModel": "tts-1",
+  "voice": "nova",
   "batchSize": 5
 }
 ```
@@ -614,14 +699,46 @@ FLUX 모델의 경우 `isFluxModel()` 판별 후 EachLabs API 호출.
     {
       "sceneNumber": 1,
       "success": true,
-      "audio": { "mimeType": "audio/wav", "data": "base64..." },
+      "audio": { "mimeType": "audio/mp3", "data": "base64..." },
       "durationSeconds": 62.3
     }
   ]
 }
 ```
 
-### 6.6 POST /api/longform/validate-narration
+### 6.6 POST /api/longform/generate-narration-openai
+
+OpenAI TTS 전용 나레이션 생성 엔드포인트 (신규).
+
+**Request:**
+```json
+{
+  "text": "한국의 음식 문화는...(289자)",
+  "model": "tts-1",
+  "voice": "nova",
+  "response_format": "mp3",
+  "speed": 1.0
+}
+```
+
+**Response:**
+```json
+{
+  "audio": { "mimeType": "audio/mp3", "data": "base64..." },
+  "durationSeconds": 58.2,
+  "charCount": 289,
+  "cost": 0.004335
+}
+```
+
+> **OpenAI TTS 기술 사양:**
+> - 최대 입력: 4,096자/요청 (300자 대비 13배 여유)
+> - 출력 포맷: MP3 (기본), WAV, FLAC, Opus, AAC, PCM
+> - 스트리밍: 지원 (~0.5초 지연)
+> - 가격: tts-1 $15/100만자, tts-1-hd $30/100만자
+> - 스티어링: 프롬프트로 톤/감정 조절 가능 ("차분하고 따뜻한 톤으로")
+
+### 6.7 POST /api/longform/validate-narration
 
 나레이션 글자 수가 280~300자를 벗어날 경우 AI에게 보정을 요청한다.
 
@@ -865,29 +982,40 @@ type AppMode = 'scenario' | 'video' | 'ad' | 'foodvideo' | 'longform';
 │                                                            │
 │  이미지 모델                                                │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │  ── Google Gemini (무료) ──                            │  │
-│  │  Gemini 3 Pro Image (최고 품질)                        │  │
-│  │  Gemini 2.5 Flash Image (기본) ← 선택됨               │  │
-│  │  Imagen 4.0 (고품질)                                   │  │
-│  │  Imagen 4.0 Fast (속도 우선)                           │  │
-│  │  ── EachLabs FLUX (유료) ──                            │  │
+│  │  ── Google Gemini ──                                   │  │
+│  │  Gemini 2.5 Flash Image (~$0.039/장) ← 선택됨        │  │
+│  │  Gemini 3 Pro Image (~$0.24/장, 4K)                   │  │
+│  │  Imagen 4.0 (~$0.039/장)                               │  │
+│  │  Imagen 4.0 Fast (~$0.039/장)                          │  │
+│  │  ── EachLabs FLUX ──                                   │  │
 │  │  FLUX Kontext Pro ($0.04/장)                           │  │
 │  │  FLUX Kontext Max ($0.08/장)                           │  │
 │  └──────────────────────────────────────────────────────┘  │
-│  ⓘ 예상 비용: 무료 (Gemini API 키 사용)                     │
+│  ⓘ 예상 이미지 비용: 30장 × ~$0.039 = ~$1.17              │
+│                                                            │
+│  TTS 엔진                                                  │
+│  ┌────────────────────────┐ ┌────────────────────────┐    │
+│  │ ● OpenAI TTS (추천)    │ │ ○ Gemini TTS           │    │
+│  └────────────────────────┘ └────────────────────────┘    │
+│                                                            │
+│  TTS 모델                                                  │
+│  ┌────────────────────────┐ ┌────────────────────────┐    │
+│  │ ● tts-1 (가성비)       │ │ ○ tts-1-hd (고품질)    │    │
+│  └────────────────────────┘ └────────────────────────┘    │
+│                                                            │
+│  음성 선택                                                  │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ │
+│  │Alloy │ │ Echo │ │Fable │ │ Onyx │ │ Nova │ │Shimmer│ │
+│  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘ └──────┘ │
+│                                         ↑ 추천            │
 │                                                            │
 │  예상 정보                                                  │
 │  · 총 씬 수: 29개                                          │
 │  · 후킹 영상: 10초 (실사 동영상)                             │
 │  · 본편: 29분 50초 (이미지 + 나레이션)                       │
-│  · 예상 이미지 생성: 30장                                   │
-│  · 예상 나레이션: 29개 (280~300자/분)                        │
-│  · 예상 이미지 비용: 무료 (FLUX 선택 시 비용 표시)            │
-│                                                            │
-│  음성 선택                                                  │
-│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐           │
-│  │ Kore │ │Aoede │ │Charon│ │Fenrir│ │ Puck │           │
-│  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘           │
+│  · 예상 이미지 비용: ~$1.17 (Gemini Flash 30장)             │
+│  · 예상 TTS 비용: ~$0.13 (OpenAI tts-1, 8,700자)           │
+│  · 예상 총 비용: ~$1.30                                     │
 │                                                            │
 │                         [시나리오 생성하기]                   │
 └────────────────────────────────────────────────────────────┘
@@ -1042,14 +1170,14 @@ type AppMode = 'scenario' | 'video' | 'ad' | 'foodvideo' | 'longform';
   │ 에셋 생성   │
   └────┬───────┘
        │
-       ├──→ [후킹 이미지] ──→ Gemini Imagen ──→ 이미지
+       ├──→ [후킹 이미지] ──→ 선택된 모델 (Gemini/FLUX) ──→ 이미지
        │         │
        │         ▼
        │    [후킹 영상] ──→ Hailuo AI ──→ 10초 MP4 ──→ [파일 1]
        │
-       ├──→ [씬 이미지 ×N] ──→ Gemini Imagen (5개씩 병렬) ──→ 이미지 N장
+       ├──→ [씬 이미지 ×N] ──→ 선택된 모델 (5개씩 병렬) ──→ 이미지 N장
        │
-       └──→ [나레이션 ×N] ──→ Gemini TTS (5개씩 병렬) ──→ WAV N개
+       └──→ [나레이션 ×N] ──→ OpenAI TTS 또는 Gemini TTS ──→ MP3/WAV N개
                                                               │
                                                               ▼
   ┌────────────┐    ┌──────────────────────┐
@@ -1099,11 +1227,20 @@ FLUX Kontext (flux-kontext-*):
   - 60분 영상 (60장): 약 4분 소요 예상
   - 비용: Pro $0.04/장, Max $0.08/장
 
-Gemini TTS:
+OpenAI TTS (tts-1, tts-1-hd) [추천]:
+  - RPM: 50회 (Tier 1 기준, Tier에 따라 증가)
+  - 배치 크기 5 + 대기 시간 2초 = 분당 ~25회
+  - 30분 영상 (29개): 약 1.2분 소요 예상
+  - 60분 영상 (59개): 약 2.4분 소요 예상
+  - 일일 호출 제한: 없음 (종량제)
+  - 비용: tts-1 $15/100만자, tts-1-hd $30/100만자
+
+Gemini TTS (비추천 - 대량 생성 시):
   - RPM: 15회
   - 배치 크기 5 + 대기 시간 5초 = 분당 ~12회
   - 30분 영상 (29개): 약 2.5분 소요 예상
   - 60분 영상 (59개): 약 5분 소요 예상
+  - ⚠️ 일일 호출 제한 있음 → 60분 영상 생성 시 제한에 걸릴 수 있음
 
 Hailuo AI:
   - 1회 요청 (후킹 영상만): 30초~2분 소요
@@ -1120,6 +1257,8 @@ Hailuo AI:
 | 시나리오 생성 실패 | 자동 재시도 1회 → 수동 재시도 | "시나리오 생성에 실패했습니다. 다시 시도해주세요." |
 | 개별 씬 이미지 실패 | 자동 재시도 3회 (지수 백오프) | 해당 씬에 실패 아이콘 + 재시도 버튼 |
 | 나레이션 생성 실패 | 자동 재시도 3회 | 해당 씬에 실패 아이콘 + 재시도 버튼 |
+| Gemini TTS 일일 제한 초과 | OpenAI TTS로 자동 전환 제안 | "Gemini TTS 일일 한도 초과. OpenAI TTS로 전환하시겠습니까?" |
+| OpenAI API 키 미설정 | Gemini TTS 폴백 | "OpenAI API 키가 없습니다. Gemini TTS로 진행합니다." |
 | 후킹 영상 생성 실패 | 자동 재시도 2회 → Fallback: 이미지+줌 효과 | "동영상 생성 실패. Ken Burns 효과로 대체합니다." |
 | API 할당량 초과 | 대기 후 자동 재시도 | "API 할당량 초과. 잠시 후 자동으로 재시도합니다." |
 | 나레이션 글자수 벗어남 | AI 자동 보정 (최대 2회) | 글자수 카운터 빨간색 표시 + 보정 버튼 |
@@ -1164,7 +1303,8 @@ Hailuo AI:
 14. `api/longform/generate-hook-image.ts` - 후킹 이미지 API
 15. `api/longform/generate-hook-video.ts` - 후킹 영상 API
 16. `api/longform/generate-scene-images.ts` - 씬 이미지 일괄 API
-17. `api/longform/generate-narrations.ts` - 나레이션 일괄 API
+17. `api/longform/generate-narrations.ts` - 나레이션 일괄 API (OpenAI/Gemini 라우팅)
+17-1. `api/longform/generate-narration-openai.ts` - OpenAI TTS 전용 API
 18. `hooks/useLongformGeneration.ts` - 일괄 생성 관리 훅
 19. `components/longform/Step3AssetGeneration.tsx` - 에셋 생성 UI
 20. `components/longform/GenerationProgress.tsx` - 진행률 컴포넌트
@@ -1210,13 +1350,14 @@ Hailuo AI:
 | 19 | `api/longform/generate-hook-video.ts` | API | 신규 |
 | 20 | `api/longform/generate-scene-images.ts` | API | 신규 |
 | 21 | `api/longform/generate-narrations.ts` | API | 신규 |
-| 22 | `api/longform/validate-narration.ts` | API | 신규 |
-| 23 | `remotion/LongformVideo.tsx` | Remotion | 신규 |
-| 24 | `remotion/LongformRoot.tsx` | Remotion | 신규 |
-| 25 | `App.tsx` | 메인 | 수정 |
-| 26 | `components/common/TabNavigation.tsx` | 컴포넌트 | 수정 |
+| 22 | `api/longform/generate-narration-openai.ts` | API | 신규 |
+| 23 | `api/longform/validate-narration.ts` | API | 신규 |
+| 24 | `remotion/LongformVideo.tsx` | Remotion | 신규 |
+| 25 | `remotion/LongformRoot.tsx` | Remotion | 신규 |
+| 26 | `App.tsx` | 메인 | 수정 |
+| 27 | `components/common/TabNavigation.tsx` | 컴포넌트 | 수정 |
 
-**신규 파일: 24개 / 수정 파일: 2개 / 총 26개**
+**신규 파일: 25개 / 수정 파일: 2개 / 총 27개**
 
 ---
 
@@ -1225,12 +1366,14 @@ Hailuo AI:
 | 항목 | 내용 |
 |------|------|
 | **서비스명** | 롱폼 영상 생성 서비스 |
-| **입력** | 주제 (텍스트) + 영상 길이 (10~60분) + 이미지 모델 선택 |
-| **이미지 모델** | Gemini 4종 (무료) + FLUX 2종 (유료) 선택 가능 |
+| **입력** | 주제 + 영상 길이 (10~60분) + 이미지 모델 + TTS 엔진/모델 |
+| **이미지 모델** | Gemini 4종 (~$0.039~$0.24/장) + FLUX 2종 ($0.04~$0.08/장) |
+| **TTS 엔진** | **OpenAI TTS 추천** (tts-1/tts-1-hd, 6음성) + Gemini TTS (5음성) |
 | **출력** | 3개 파일: 후킹 MP4 (10초) + 본편 전반부 MP4 + 본편 후반부 MP4 |
 | **씬 단위** | 1분 1이미지 + 1분 나레이션 (280~300자) |
 | **스타일** | 애니메이션 고정 (설정 불필요) |
 | **워크플로우** | 단일 연속 4단계 (설정→시나리오→생성→다운로드) |
 | **기존 서비스** | 완전 독립 (공통 유틸리티만 공유) |
 | **비용 절감** | 기존 대비 API 호출 83% 절감 |
-| **핵심 기술** | Gemini AI + FLUX AI + Hailuo AI + Remotion + Canvas |
+| **예상 비용** | 30분 기준: 이미지 ~$1.17 + TTS ~$0.13 = **~$1.30** (Gemini Flash + OpenAI tts-1) |
+| **핵심 기술** | Gemini AI + FLUX AI + OpenAI TTS + Hailuo AI + Remotion + Canvas |

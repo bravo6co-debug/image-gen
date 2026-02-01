@@ -39,6 +39,25 @@
 |------|------|-----|------|
 | `topic` | string | 자유 입력 | 영상 주제 (예: "한국 전통 음식의 역사") |
 | `duration` | enum | `10 \| 20 \| 30 \| 40 \| 50 \| 60` | 총 영상 길이 (분) |
+| `imageModel` | enum | 아래 모델 목록 참조 | 이미지 생성 모델 선택 |
+
+#### 이미지 생성 모델 선택지
+
+사용자의 설정(Settings)에 저장된 모델을 기본값으로 사용하되, STEP 1에서 변경 가능.
+
+| 모델 ID | 표시명 | 제공사 | 비용 | 비고 |
+|---------|--------|--------|------|------|
+| `gemini-3-pro-image-preview` | Gemini 3 Pro Image | Google | 무료 (API 키) | 최고 품질 (4K) |
+| `gemini-2.5-flash-image` | Gemini 2.5 Flash Image | Google | 무료 (API 키) | **기본값**, 빠른 생성 |
+| `imagen-4.0-generate-001` | Imagen 4.0 | Google | 무료 (API 키) | 고품질 |
+| `imagen-4.0-fast-generate-001` | Imagen 4.0 Fast | Google | 무료 (API 키) | 속도 우선 |
+| `flux-kontext-pro` | FLUX Kontext Pro | EachLabs | $0.04/장 | 고품질, 유료 |
+| `flux-kontext-max` | FLUX Kontext Max | EachLabs | $0.08/장 | 최고 품질, 유료 |
+
+> **비용 예시 (FLUX 사용 시)**
+> - 30분 영상 (30장): FLUX Pro $1.20 / FLUX Max $2.40
+> - 60분 영상 (60장): FLUX Pro $2.40 / FLUX Max $4.80
+> - Gemini 모델은 API 키만 있으면 무료
 
 ### 2.2 출력 (다운로드 가능한 3개 파일)
 
@@ -92,6 +111,7 @@
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │  주제 입력: [_________________________________]        │  │
 │  │  영상 길이: [10분 ▼] [20분] [30분] [40분] [50분] [60분]│  │
+│  │  이미지 모델: [Gemini 2.5 Flash Image ▼]               │  │
 │  │                                                        │  │
 │  │  [시나리오 생성하기]                                     │  │
 │  └────────────────────────────────────────────────────────┘  │
@@ -144,6 +164,9 @@
 #### STEP 1: 기본 설정
 - 주제 입력 (텍스트 필드, 최대 200자)
 - 영상 길이 선택 (10/20/30/40/50/60분 라디오 버튼 또는 드롭다운)
+- 이미지 모델 선택 (드롭다운, Gemini 4종 + FLUX 2종, 기본값: 사용자 Settings 설정)
+  - FLUX 모델 선택 시 예상 비용 안내 표시 (예: "30장 × $0.04 = $1.20")
+  - EachLabs API 키 미설정 시 FLUX 모델 비활성화
 - "시나리오 생성하기" 버튼 클릭 시 STEP 2로 자동 전환
 
 #### STEP 2: 시나리오 확인/편집
@@ -157,9 +180,9 @@
 #### STEP 3: 에셋 생성 (자동 일괄 처리)
 - 사용자 조작 없이 자동으로 모든 에셋을 순차/병렬 생성
 - 생성 순서:
-  1. 후킹 이미지 생성 (Gemini imagen)
+  1. 후킹 이미지 생성 (선택된 이미지 모델)
   2. 후킹 영상 생성 (Hailuo AI, 이미지 → 10초 동영상)
-  3. 본편 씬 이미지 일괄 생성 (5개씩 병렬 처리)
+  3. 본편 씬 이미지 일괄 생성 (선택된 이미지 모델, 5개씩 병렬 처리)
   4. 나레이션 일괄 생성 (5개씩 병렬 처리)
 - 프로그레스 바 + 체크리스트로 진행 상태 실시간 표시
 - 개별 씬 실패 시 해당 씬만 자동 재시도 (최대 3회)
@@ -308,7 +331,9 @@ function validateNarration(narration: string): { valid: boolean; text: string } 
 | Canvas 비디오 렌더링 | **재활용** | `services/videoService.ts`의 `renderVideo()` 재사용 |
 | TTS 나레이션 | **재활용** | `/api/generate-narration.ts` 기존 엔드포인트 호출 |
 | Hailuo AI 영상 | **재활용** | `/api/generate-video.ts` 기존 엔드포인트 호출 |
-| 이미지 생성 | **재활용** | `/api/generate-images.ts` 기존 엔드포인트 호출 |
+| 이미지 생성 (Gemini) | **재활용** | `/api/generate-images.ts` 기존 엔드포인트 호출 |
+| 이미지 생성 (FLUX) | **재활용** | `/api/lib/eachlabs.ts` 기존 FLUX 라우팅 로직 재사용 |
+| 이미지 모델 라우팅 | **재활용** | `isFluxModel()` 판별 함수 + 모델별 API 분기 로직 재사용 |
 | 시나리오 생성 | **신규** | 롱폼 전용 프롬프트/응답 구조 필요 |
 | 워크플로우 UI | **신규** | 단계형 단일 페이지 UI 전체 신규 |
 | 글자 수 보정 | **신규** | 280~300자 보정 로직 |
@@ -320,10 +345,20 @@ function validateNarration(narration: string): { valid: boolean; text: string } 
 ```typescript
 // types/longform.ts
 
+// ─── 이미지 모델 ──────────────────────────────────
+type LongformImageModel =
+  | 'gemini-3-pro-image-preview'       // Gemini 3 Pro Image (최고 품질)
+  | 'gemini-2.5-flash-image'           // Gemini 2.5 Flash Image (기본값)
+  | 'imagen-4.0-generate-001'          // Imagen 4.0 (고품질)
+  | 'imagen-4.0-fast-generate-001'     // Imagen 4.0 Fast (속도 우선)
+  | 'flux-kontext-pro'                 // FLUX Kontext Pro ($0.04/장)
+  | 'flux-kontext-max';                // FLUX Kontext Max ($0.08/장)
+
 // ─── 기본 설정 ────────────────────────────────────
 interface LongformConfig {
   topic: string;                    // 영상 주제
   duration: 10 | 20 | 30 | 40 | 50 | 60;  // 영상 길이 (분)
+  imageModel: LongformImageModel;   // 이미지 생성 모델
 }
 
 // ─── 후킹 씬 ─────────────────────────────────────
@@ -421,6 +456,7 @@ interface LongformState {
   progress: GenerationProgress | null;
   output: LongformOutput | null;
   voice: 'Kore' | 'Aoede' | 'Charon' | 'Fenrir' | 'Puck';
+  imageModel: LongformImageModel;   // 선택된 이미지 모델
 }
 ```
 
@@ -470,13 +506,14 @@ interface LongformState {
 
 ### 6.2 POST /api/longform/generate-hook-image
 
-후킹 장면의 이미지를 생성한다.
+후킹 장면의 이미지를 생성한다. 사용자가 선택한 이미지 모델에 따라 Gemini 또는 FLUX로 라우팅.
 
 **Request:**
 ```json
 {
   "visualDescription": "거대한 불꽃 위에서 끓어오르는 전통 가마솥...",
-  "style": "animation"
+  "style": "animation",
+  "imageModel": "gemini-2.5-flash-image"
 }
 ```
 
@@ -513,7 +550,8 @@ interface LongformState {
 
 ### 6.4 POST /api/longform/generate-scene-images
 
-본편 씬 이미지를 일괄 생성한다. (5개씩 병렬 처리)
+본편 씬 이미지를 일괄 생성한다. 선택된 모델에 따라 Gemini 또는 FLUX API로 라우팅.
+FLUX 모델의 경우 `isFluxModel()` 판별 후 EachLabs API 호출.
 
 **Request:**
 ```json
@@ -528,6 +566,7 @@ interface LongformState {
       "imagePrompt": "..."
     }
   ],
+  "imageModel": "gemini-2.5-flash-image",
   "batchSize": 5
 }
 ```
@@ -824,12 +863,26 @@ type AppMode = 'scenario' | 'video' | 'ad' | 'foodvideo' | 'longform';
 │  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘ └──────┘  │
 │                        ↑ 선택됨                             │
 │                                                            │
+│  이미지 모델                                                │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │  ── Google Gemini (무료) ──                            │  │
+│  │  Gemini 3 Pro Image (최고 품질)                        │  │
+│  │  Gemini 2.5 Flash Image (기본) ← 선택됨               │  │
+│  │  Imagen 4.0 (고품질)                                   │  │
+│  │  Imagen 4.0 Fast (속도 우선)                           │  │
+│  │  ── EachLabs FLUX (유료) ──                            │  │
+│  │  FLUX Kontext Pro ($0.04/장)                           │  │
+│  │  FLUX Kontext Max ($0.08/장)                           │  │
+│  └──────────────────────────────────────────────────────┘  │
+│  ⓘ 예상 비용: 무료 (Gemini API 키 사용)                     │
+│                                                            │
 │  예상 정보                                                  │
 │  · 총 씬 수: 29개                                          │
 │  · 후킹 영상: 10초 (실사 동영상)                             │
 │  · 본편: 29분 50초 (이미지 + 나레이션)                       │
 │  · 예상 이미지 생성: 30장                                   │
 │  · 예상 나레이션: 29개 (280~300자/분)                        │
+│  · 예상 이미지 비용: 무료 (FLUX 선택 시 비용 표시)            │
 │                                                            │
 │  음성 선택                                                  │
 │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐           │
@@ -1033,11 +1086,18 @@ type AppMode = 'scenario' | 'video' | 'ad' | 'foodvideo' | 'longform';
 ### 12.3 API Rate Limiting 대응
 
 ```
-Gemini Imagen:
+Gemini Imagen (gemini-*, imagen-*):
   - RPM (분당 요청): 10회
   - 배치 크기 5 + 대기 시간 7초 = 분당 ~8.5회
   - 30분 영상 (30장): 약 3.5분 소요 예상
   - 60분 영상 (60장): 약 7분 소요 예상
+
+FLUX Kontext (flux-kontext-*):
+  - EachLabs API 기반, 별도 Rate Limit
+  - 배치 크기 5 + 대기 시간 3초 = 분당 ~15회
+  - 30분 영상 (30장): 약 2분 소요 예상 (Gemini보다 빠름)
+  - 60분 영상 (60장): 약 4분 소요 예상
+  - 비용: Pro $0.04/장, Max $0.08/장
 
 Gemini TTS:
   - RPM: 15회
@@ -1165,11 +1225,12 @@ Hailuo AI:
 | 항목 | 내용 |
 |------|------|
 | **서비스명** | 롱폼 영상 생성 서비스 |
-| **입력** | 주제 (텍스트) + 영상 길이 (10~60분) |
+| **입력** | 주제 (텍스트) + 영상 길이 (10~60분) + 이미지 모델 선택 |
+| **이미지 모델** | Gemini 4종 (무료) + FLUX 2종 (유료) 선택 가능 |
 | **출력** | 3개 파일: 후킹 MP4 (10초) + 본편 전반부 MP4 + 본편 후반부 MP4 |
 | **씬 단위** | 1분 1이미지 + 1분 나레이션 (280~300자) |
 | **스타일** | 애니메이션 고정 (설정 불필요) |
 | **워크플로우** | 단일 연속 4단계 (설정→시나리오→생성→다운로드) |
 | **기존 서비스** | 완전 독립 (공통 유틸리티만 공유) |
 | **비용 절감** | 기존 대비 API 호출 83% 절감 |
-| **핵심 기술** | Gemini AI + Hailuo AI + Remotion + Canvas |
+| **핵심 기술** | Gemini AI + FLUX AI + Hailuo AI + Remotion + Canvas |

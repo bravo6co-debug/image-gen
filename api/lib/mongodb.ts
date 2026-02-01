@@ -84,11 +84,63 @@ export const DEFAULT_SETTINGS: UserSettings = {
 };
 
 // ============================================
+// API KEY ENCRYPTION (AES-256-GCM)
+// ============================================
+
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY; // 32-byte hex string
+
+function encryptApiKey(plaintext: string): string {
+    if (!ENCRYPTION_KEY || !plaintext) return plaintext;
+    const key = Buffer.from(ENCRYPTION_KEY, 'hex');
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    const authTag = cipher.getAuthTag().toString('hex');
+    return `enc:${iv.toString('hex')}:${authTag}:${encrypted}`;
+}
+
+function decryptApiKey(value: string): string {
+    if (!value || !ENCRYPTION_KEY) return value;
+    // 평문 (기존 데이터) 호환: enc: 접두사 없으면 그대로 반환
+    if (!value.startsWith('enc:')) return value;
+    try {
+        const parts = value.split(':');
+        if (parts.length !== 4) return value;
+        const iv = Buffer.from(parts[1], 'hex');
+        const authTag = Buffer.from(parts[2], 'hex');
+        const encrypted = parts[3];
+        const key = Buffer.from(ENCRYPTION_KEY, 'hex');
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        decipher.setAuthTag(authTag);
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+    } catch (error) {
+        console.error('Failed to decrypt API key:', error);
+        return value;
+    }
+}
+
+function decryptUserApiKeys(user: User): User {
+    if (!user.settings) return user;
+    return {
+        ...user,
+        settings: {
+            ...user.settings,
+            geminiApiKey: user.settings.geminiApiKey ? decryptApiKey(user.settings.geminiApiKey) : undefined,
+            hailuoApiKey: user.settings.hailuoApiKey ? decryptApiKey(user.settings.hailuoApiKey) : undefined,
+            openaiApiKey: user.settings.openaiApiKey ? decryptApiKey(user.settings.openaiApiKey) : undefined,
+        },
+    };
+}
+
+// ============================================
 // PASSWORD HASHING
 // ============================================
 
 function hashPassword(password: string, salt: string): string {
-    return crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+    return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
 }
 
 function generateSalt(): string {
@@ -112,7 +164,8 @@ export async function findUserByEmail(email: string): Promise<User | null> {
     if (!db) return null;
 
     try {
-        return await db.collection<User>('users').findOne({ email: email.toLowerCase() });
+        const user = await db.collection<User>('users').findOne({ email: email.toLowerCase() });
+        return user ? decryptUserApiKeys(user) : null;
     } catch (error) {
         console.error('Failed to find user:', error);
         return null;
@@ -127,7 +180,8 @@ export async function findUserById(userId: string): Promise<User | null> {
     if (!db) return null;
 
     try {
-        return await db.collection<User>('users').findOne({ _id: new ObjectId(userId) });
+        const user = await db.collection<User>('users').findOne({ _id: new ObjectId(userId) });
+        return user ? decryptUserApiKeys(user) : null;
     } catch (error) {
         console.error('Failed to find user:', error);
         return null;
@@ -192,13 +246,13 @@ export async function saveUserSettings(userId: string, settings: Partial<UserSet
         const updateFields: Record<string, unknown> = {};
 
         if (settings.geminiApiKey !== undefined) {
-            updateFields['settings.geminiApiKey'] = settings.geminiApiKey || undefined;
+            updateFields['settings.geminiApiKey'] = settings.geminiApiKey ? encryptApiKey(settings.geminiApiKey) : undefined;
         }
         if (settings.hailuoApiKey !== undefined) {
-            updateFields['settings.hailuoApiKey'] = settings.hailuoApiKey || undefined;
+            updateFields['settings.hailuoApiKey'] = settings.hailuoApiKey ? encryptApiKey(settings.hailuoApiKey) : undefined;
         }
         if (settings.openaiApiKey !== undefined) {
-            updateFields['settings.openaiApiKey'] = settings.openaiApiKey || undefined;
+            updateFields['settings.openaiApiKey'] = settings.openaiApiKey ? encryptApiKey(settings.openaiApiKey) : undefined;
         }
         if (settings.textModel) {
             updateFields['settings.textModel'] = settings.textModel;

@@ -42,6 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             anchorImage,
             strength,
             aspectRatio,
+            imageStyle,
         } = req.body as GenerateAdSceneImageRequest;
 
         if (!imagePrompt) {
@@ -56,10 +57,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const apiKey = await getEachLabsApiKey(auth.userId);
         const ratio = aspectRatio === '9:16' ? '9:16' : '16:9';
 
+        // 스타일에 따른 프롬프트 접두사
+        const STYLE_PREFIXES: Record<string, string> = {
+            photorealistic: 'Photorealistic cinematic scene for advertisement',
+            animation: 'High-quality anime style illustration for advertisement',
+            illustration: 'Professional digital illustration for advertisement',
+            cinematic: 'Cinematic film still for advertisement',
+            watercolor: 'Watercolor painting style scene for advertisement',
+            '3d_render': 'High-quality 3D rendered scene for advertisement',
+        };
+        const stylePrefix = STYLE_PREFIXES[imageStyle || 'photorealistic'] || STYLE_PREFIXES.photorealistic;
+
         // FLUX용 프롬프트 구성 (간결하고 명확하게)
         const moodPart = mood ? `, ${mood} mood` : '';
         const cameraPart = cameraAngle ? `, ${cameraAngle.toLowerCase()} shot` : '';
-        const fluxPrompt = `Photorealistic cinematic scene for advertisement, absolutely no visible text, letters, numbers, or writing in any language including on screens, signs, labels, and packaging, no watermarks${moodPart}${cameraPart}. ${imagePrompt}`;
+        const fluxPrompt = `${stylePrefix}, absolutely no visible text, letters, numbers, or writing in any language including on screens, signs, labels, and packaging, no watermarks${moodPart}${cameraPart}. ${imagePrompt}`;
 
         console.log(`[ad-scene-image] Step: ${pipelineStep}, Prompt (${fluxPrompt.length} chars): ${fluxPrompt.substring(0, 150)}...`);
 

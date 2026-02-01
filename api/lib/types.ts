@@ -140,6 +140,7 @@ export interface GenerateAdSceneImageRequest {
     anchorImage?: ImageData;       // 변형 단계: 앵커 이미지
     strength?: number;             // 변형 단계: 변형 강도 (0-1)
     aspectRatio: AspectRatio;
+    imageStyle?: ImageStyle;       // 이미지 스타일 (animation, photorealistic 등)
 }
 
 export interface VideoGenerationResult {

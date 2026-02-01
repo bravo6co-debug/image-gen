@@ -237,6 +237,7 @@ export function useAdScenario(): UseAdScenarioReturn {
               pipelineStep: 'anchor',
               referenceImages: refImages,
               aspectRatio,
+              imageStyle: adScenario.imageStyle,
             });
           } else {
             // 참조 이미지 없으면 기존 방식으로 폴백
@@ -265,6 +266,7 @@ export function useAdScenario(): UseAdScenarioReturn {
                 anchorImage,
                 strength,
                 aspectRatio,
+                imageStyle: adScenario.imageStyle,
               });
               updateAdScene(scene.id, {
                 generatedImage: imageData,

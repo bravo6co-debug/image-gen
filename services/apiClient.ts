@@ -367,6 +367,7 @@ export interface GenerateAdSceneImageParams {
     anchorImage?: ImageData;
     strength?: number;
     aspectRatio: AspectRatio;
+    imageStyle?: ImageStyle;
 }
 
 /**
@@ -470,7 +471,6 @@ ${scene.imagePrompt}
 ${charactersInScene}
 
 **Style Requirements:**
-- Cinematic, photorealistic quality
 - Korean characters if people are depicted
 - Emotional storytelling through visuals
 - IMPORTANT: Each character must look EXACTLY like their reference photo

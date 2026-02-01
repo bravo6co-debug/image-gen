@@ -471,7 +471,7 @@ export const AD_ENGINE_OPTIONS: {
   description: string;
   cost: string;
 }[] = [
-  { value: 'gemini', label: 'Gemini 엔진', description: '안정적, 참조 이미지 무제한', cost: '무료 (API 키)' },
+  { value: 'gemini', label: 'Gemini 엔진', description: '안정적, 참조 이미지 무제한', cost: '유료 (API 키)' },
   { value: 'flux', label: 'FLUX 엔진', description: '고품질, 씬간 일관성 강화', cost: '~$0.12 / 5씬' },
 ];
 

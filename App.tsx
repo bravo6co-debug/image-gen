@@ -192,7 +192,7 @@ const getFriendlyErrorMessage = (originalError: unknown): string => {
         return '오류: 캐릭터 설명 분석에 실패했습니다. 내용을 조금 더 자세히 작성하거나, 잠시 후 다시 시도해주세요.';
     }
     if (message.includes('Image generation failed')) {
-        return '오류: 이미지 생성에 실패했습니다. API 무료 사용량을 초과했거나, 일시적인 서비스 오류일 수 있습니다. 잠시 후 다시 시도해 주세요.';
+        return '오류: 이미지 생성에 실패했습니다. API 사용량을 초과했거나, 일시적인 서비스 오류일 수 있습니다. 잠시 후 다시 시도해 주세요.';
     }
     if (message.includes('Scenario generation failed')) {
         return '오류: 시나리오 생성에 실패했습니다. 주제를 더 구체적으로 작성하거나, 잠시 후 다시 시도해 주세요.';

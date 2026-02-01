@@ -418,7 +418,7 @@ ${originStory ? `- **브랜드 탄생 배경**: ${sanitizePrompt(originStory, 30
             scenes,
             scenarioType: 'ad',
             productName: productName,
-            productFeatures: sanitizedUsps.join(', '),
+            productFeatures: (usps || []).map((u: string) => sanitizePrompt(u, 200)).join(', '),
             createdAt: Date.now(),
             updatedAt: Date.now(),
         };

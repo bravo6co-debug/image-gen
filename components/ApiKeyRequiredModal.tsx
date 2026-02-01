@@ -85,7 +85,7 @@ const ApiKeyRequiredModal: React.FC<ApiKeyRequiredModalProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>
-                API 키는 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300">Google AI Studio</a>에서 무료로 발급받을 수 있습니다.
+                API 키는 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-300">Google AI Studio</a>에서 발급받을 수 있습니다. (API 사용은 유료)
               </span>
             </p>
           </div>

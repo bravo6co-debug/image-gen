@@ -72,12 +72,29 @@ export interface LongformScene {
   narrationStatus: AssetStatus;
 }
 
+// ─── 캐릭터 ─────────────────────────────────────
+export type CharacterRole = 'main' | 'supporting' | 'minor';
+
+export interface LongformCharacter {
+  id: string;
+  name: string;                    // 한국어 이름
+  nameEn: string;                  // 영어 이름 (이미지 프롬프트용)
+  role: CharacterRole;
+  appearanceDescription: string;   // 영어 외형 묘사 (상세)
+  outfit: string;                  // 영어 의상 묘사
+  personality: string;             // 한국어 성격 요약
+  sceneNumbers: number[];          // 등장 씬 번호
+  referenceImage?: ImageData;      // 레퍼런스 포트레이트
+  imageStatus: AssetStatus;
+}
+
 // ─── 전체 시나리오 ────────────────────────────────
 export interface LongformScenario {
   id: string;
   config: LongformConfig;
   hookScene: HookScene;
   scenes: LongformScene[];
+  characters?: LongformCharacter[];
   metadata: {
     title: string;
     synopsis: string;
@@ -128,7 +145,7 @@ export interface LongformOutput {
 }
 
 // ─── 워크플로우 상태 ──────────────────────────────
-export type LongformStep = 1 | 2 | 3 | 4;
+export type LongformStep = 1 | 2 | 3 | 4 | 5;
 
 export interface LongformState {
   currentStep: LongformStep;

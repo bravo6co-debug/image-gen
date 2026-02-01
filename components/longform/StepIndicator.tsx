@@ -9,8 +9,9 @@ interface StepIndicatorProps {
 const STEPS: { step: LongformStep; label: string }[] = [
   { step: 1, label: '기본 설정' },
   { step: 2, label: '시나리오' },
-  { step: 3, label: '에셋 생성' },
-  { step: 4, label: '미리보기' },
+  { step: 3, label: '캐릭터' },
+  { step: 4, label: '에셋 생성' },
+  { step: 5, label: '미리보기' },
 ];
 
 export const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep, completedSteps }) => {

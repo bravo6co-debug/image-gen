@@ -1,4 +1,4 @@
-import type { LongformConfig, LongformScenario, LongformScene } from '../types/longform';
+import type { LongformConfig, LongformScenario, LongformScene, LongformCharacter } from '../types/longform';
 
 const API_BASE = '';
 const TOKEN_KEY = 's2v_auth_token';
@@ -104,6 +104,36 @@ export async function generateSceneImages(
     imageModel,
     batchSize,
   }, 'Generate Scene Images');
+}
+
+// ─── 캐릭터 추출 ────────────────────────────────
+export async function extractLongformCharacters(
+  scenes: { sceneNumber: number; imagePrompt: string; narration: string }[],
+  hookScene: { visualDescription: string; hookText: string },
+  metadata: { title: string; synopsis: string },
+  textModel?: string
+): Promise<{ characters: LongformCharacter[] }> {
+  return post('/api/longform/extract-characters', {
+    scenes,
+    hookScene,
+    metadata,
+    ...(textModel && { textModel }),
+  }, 'Extract Longform Characters');
+}
+
+// ─── 캐릭터 이미지 생성 (개별) ──────────────────
+export async function generateCharacterImage(
+  characterName: string,
+  appearanceDescription: string,
+  outfit: string,
+  imageModel: string
+): Promise<{ image: { mimeType: string; data: string } }> {
+  return post('/api/longform/generate-character-image', {
+    characterName,
+    appearanceDescription,
+    outfit,
+    imageModel,
+  }, 'Generate Character Image');
 }
 
 // ─── 나레이션 일괄 생성 ──────────────────────────

@@ -110,7 +110,7 @@ export const Step2ScenarioEditor: React.FC<Step2ScenarioEditorProps> = ({
           onClick={onNext}
           className="px-5 py-2.5 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-semibold rounded-lg hover:from-teal-600 hover:to-cyan-700 transition-all min-h-[44px]"
         >
-          다음 단계: 에셋 생성
+          다음 단계: 캐릭터 설정
         </button>
       </div>
     </div>

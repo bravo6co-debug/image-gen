@@ -112,7 +112,18 @@ export function useLongformGeneration(): UseLongformGenerationReturn {
       // Phase 2: Scene images + narrations in parallel
       updateProgress(p => ({ ...p, currentStep: 'scene-images' }));
 
-      const sceneInputs = scenario.scenes.map(s => ({ sceneNumber: s.sceneNumber, imagePrompt: s.imagePrompt }));
+      // Enrich scene image prompts with character descriptions for consistency
+      const sceneInputs = scenario.scenes.map(scene => {
+        const sceneChars = (scenario.characters || [])
+          .filter(c => c.sceneNumbers.includes(scene.sceneNumber));
+        if (sceneChars.length === 0) {
+          return { sceneNumber: scene.sceneNumber, imagePrompt: scene.imagePrompt };
+        }
+        const charDesc = sceneChars
+          .map(c => `[${c.nameEn}: ${c.appearanceDescription}, wearing ${c.outfit}]`)
+          .join(' ');
+        return { sceneNumber: scene.sceneNumber, imagePrompt: `${charDesc} ${scene.imagePrompt}` };
+      });
       const narrationInputs = scenario.scenes.map(s => ({ sceneNumber: s.sceneNumber, narration: s.narration }));
 
       const [imageResults, narrationResults] = await Promise.all([

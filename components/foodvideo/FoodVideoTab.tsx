@@ -200,7 +200,9 @@ export const FoodVideoTab: React.FC = () => {
 
   const [foodName, setFoodName] = useState('');
   const [personSource, setPersonSource] = useState<'upload' | 'generate'>('upload');
+  const [personGenMode, setPersonGenMode] = useState<'preset' | 'custom'>('preset');
   const [personType, setPersonType] = useState<MukbangPersonType>('young-woman');
+  const [customPersonDesc, setCustomPersonDesc] = useState('');
   const [isGeneratingMukbangImage, setIsGeneratingMukbangImage] = useState(false);
   const [mukbangComposite, setMukbangComposite] = useState<ImageData | null>(null);
   const [mukbangCompositeUrl, setMukbangCompositeUrl] = useState<string | null>(null);
@@ -310,6 +312,7 @@ export const FoodVideoTab: React.FC = () => {
     if (!mukFoodUpload.image) { setMukbangError('음식 이미지를 업로드해 주세요.'); return; }
     if (!foodName.trim()) { setMukbangError('음식 이름을 입력해 주세요.'); return; }
     if (personSource === 'upload' && !mukPersonUpload.image) { setMukbangError('인물 사진을 업로드해 주세요.'); return; }
+    if (personSource === 'generate' && personGenMode === 'custom' && !customPersonDesc.trim()) { setMukbangError('인물 설명을 입력해 주세요.'); return; }
     if (!checkAuth()) return;
 
     setIsGeneratingMukbangImage(true);
@@ -325,7 +328,8 @@ export const FoodVideoTab: React.FC = () => {
         {
           personImage: personSource === 'upload' ? mukPersonUpload.image || undefined : undefined,
           generatePerson: personSource === 'generate',
-          personType: personSource === 'generate' ? personType : undefined,
+          personType: personSource === 'generate' && personGenMode === 'preset' ? personType : undefined,
+          customPersonPrompt: personSource === 'generate' && personGenMode === 'custom' ? customPersonDesc.trim() : undefined,
         }
       );
 
@@ -659,26 +663,66 @@ export const FoodVideoTab: React.FC = () => {
                     accentColor="purple"
                   />
                 ) : (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-2">인물 유형 선택</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {PERSON_TYPE_OPTIONS.map(opt => (
-                        <button
-                          key={opt.value}
-                          onClick={() => setPersonType(opt.value)}
-                          className={`p-3 rounded-lg border text-xs font-medium transition-all ${
-                            personType === opt.value
-                              ? 'border-purple-500 bg-purple-900/30 text-purple-300'
-                              : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
+                  <div className="space-y-2">
+                    {/* 프리셋 / 직접입력 서브 토글 */}
+                    <div className="flex bg-gray-900/60 rounded-lg p-0.5 gap-0.5">
+                      <button
+                        onClick={() => setPersonGenMode('preset')}
+                        className={`flex-1 py-1.5 px-2 text-[11px] font-medium rounded-md transition-all ${
+                          personGenMode === 'preset'
+                            ? 'bg-purple-700 text-white shadow-sm'
+                            : 'text-gray-400 hover:text-gray-300'
+                        }`}
+                      >
+                        프리셋 선택
+                      </button>
+                      <button
+                        onClick={() => setPersonGenMode('custom')}
+                        className={`flex-1 py-1.5 px-2 text-[11px] font-medium rounded-md transition-all ${
+                          personGenMode === 'custom'
+                            ? 'bg-purple-700 text-white shadow-sm'
+                            : 'text-gray-400 hover:text-gray-300'
+                        }`}
+                      >
+                        직접 입력
+                      </button>
                     </div>
-                    <p className="text-[10px] text-gray-500 mt-2">
-                      FLUX AI가 선택한 유형의 인물을 자동 생성합니다
-                    </p>
+
+                    {personGenMode === 'preset' ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          {PERSON_TYPE_OPTIONS.map(opt => (
+                            <button
+                              key={opt.value}
+                              onClick={() => setPersonType(opt.value)}
+                              className={`p-3 rounded-lg border text-xs font-medium transition-all ${
+                                personType === opt.value
+                                  ? 'border-purple-500 bg-purple-900/30 text-purple-300'
+                                  : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-gray-500">
+                          FLUX AI가 선택한 유형의 인물을 자동 생성합니다
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <textarea
+                          value={customPersonDesc}
+                          onChange={(e) => setCustomPersonDesc(e.target.value)}
+                          placeholder="예: 30대 여성, 긴 생머리, 흰색 블라우스, 자연스러운 메이크업"
+                          className="w-full bg-gray-800/70 text-xs text-gray-200 rounded-lg p-2.5 resize-none border border-gray-700 focus:border-purple-500 focus:outline-none placeholder-gray-600"
+                          rows={2}
+                        />
+                        <p className="text-[10px] text-gray-500">
+                          한국어로 인물 특징을 입력하면 AI가 영어로 변환하여 생성합니다
+                        </p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

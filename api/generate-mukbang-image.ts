@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders } from './lib/gemini.js';
+import { setCorsHeaders, ai, MODELS, sanitizePrompt, getAIClientForUser } from './lib/gemini.js';
 import { requireAuth } from './lib/auth.js';
 import { getEachLabsApiKey, generateFlux2Edit } from './lib/eachlabs.js';
 import type { ImageData, ApiErrorResponse } from './lib/types.js';
@@ -43,6 +43,39 @@ interface GenerateMukbangImageRequest {
     personImage?: ImageData;
     generatePerson?: boolean;
     personType?: PersonType;
+    customPersonPrompt?: string;  // 사용자 한국어 인물 설명 (직접 입력)
+}
+
+// =============================================
+// 한국어 인물 설명 → 영어 포트레이트 프롬프트 변환
+// =============================================
+
+async function translatePersonDescription(koreanDesc: string, userId: string): Promise<string> {
+    const aiClient = await getAIClientForUser(userId);
+    const client = aiClient || ai;
+
+    const response = await client.models.generateContent({
+        model: MODELS.TEXT,
+        contents: `Convert the following Korean person description into an English portrait photo prompt.
+Keep it concise (1-2 sentences). Focus on: age, gender, appearance, hairstyle, clothing, expression.
+
+Korean description: "${sanitizePrompt(koreanDesc, 500)}"
+
+Output format (English only, no Korean):
+"A portrait photograph of a Korean [person description], [appearance details], [expression], [clothing]"`,
+        config: {
+            temperature: 0.3,
+        },
+    });
+
+    const translated = (response.text || '').replace(/^["']|["']$/g, '').trim();
+
+    // 포트레이트 필수 접미사 보장
+    const suffix = 'soft studio lighting, head and shoulders, photorealistic, no text';
+    if (translated.toLowerCase().includes('photorealistic')) {
+        return translated;
+    }
+    return `${translated}, ${suffix}`;
 }
 
 interface MukbangImageResult {
@@ -86,6 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             personImage,
             generatePerson,
             personType = 'young-woman',
+            customPersonPrompt,
         } = req.body as GenerateMukbangImageRequest;
 
         if (!foodImage?.data || !foodImage?.mimeType) {
@@ -101,7 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         console.log('=== MUKBANG IMAGE GENERATION START ===');
-        console.log(`Food: ${foodName}, Person: ${personImage ? 'uploaded' : `generate(${personType})`}`);
+        console.log(`Food: ${foodName}, Person: ${personImage ? 'uploaded' : customPersonPrompt ? `custom("${customPersonPrompt}")` : `preset(${personType})`}`);
 
         const apiKey = await getEachLabsApiKey(auth.userId);
 
@@ -112,15 +146,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             console.log('Using uploaded person image');
             finalPersonImage = personImage;
         } else {
-            console.log(`Generating person portrait: ${personType}`);
-            const personPrompt = PERSON_PROMPTS[personType] || PERSON_PROMPTS['young-woman'];
+            let personPrompt: string;
 
-            // FLUX Kontext Pro로 인물 초상화 생성 (단일 이미지, 참조 없음)
-            // flux-2-turbo-edit를 사용하면 참조 없이도 프롬프트로 생성 가능
+            if (customPersonPrompt?.trim()) {
+                // 커스텀 한국어 설명 → 영어 포트레이트 프롬프트 변환
+                console.log(`Translating custom person description: ${customPersonPrompt}`);
+                personPrompt = await translatePersonDescription(customPersonPrompt.trim(), auth.userId);
+                console.log(`Translated prompt: ${personPrompt}`);
+            } else {
+                // 기존 프리셋 사용
+                console.log(`Using preset person type: ${personType}`);
+                personPrompt = PERSON_PROMPTS[personType] || PERSON_PROMPTS['young-woman'];
+            }
+
             finalPersonImage = await generateFlux2Edit({
                 apiKey,
                 prompt: personPrompt,
-                referenceImages: [],  // 참조 없이 프롬프트만으로 생성
+                referenceImages: [],
                 aspectRatio: '9:16',
                 guidanceScale: 3.5,
             });

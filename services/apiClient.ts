@@ -588,6 +588,7 @@ export const generateMukbangImage = async (
         personImage?: ImageData;
         generatePerson?: boolean;
         personType?: MukbangPersonType;
+        customPersonPrompt?: string;
     }
 ): Promise<MukbangImageResult> => {
     return post<MukbangImageResult>('/api/generate-mukbang-image', {
@@ -596,6 +597,7 @@ export const generateMukbangImage = async (
         personImage: options.personImage,
         generatePerson: options.generatePerson,
         personType: options.personType,
+        customPersonPrompt: options.customPersonPrompt,
     }, 'mukbang-image');
 };
 

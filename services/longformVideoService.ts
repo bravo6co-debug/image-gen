@@ -1,13 +1,21 @@
 /**
- * Longform Video Service - 롱폼 비디오 클라이언트 사이드 렌더링
+ * Longform Video Service — Remotion 로직 기반 결정론적 렌더러
  *
- * Canvas + MediaRecorder 기반으로 롱폼 비디오를 렌더링합니다.
- * 시나리오를 파트 1, 파트 2로 분할하여 각각 렌더링합니다.
+ * Canvas + MediaRecorder를 사용하되, Remotion 컴포넌트
+ * (KenBurnsEffect, Subtitles, Transitions, NarrationAudio)와
+ * 동일한 결정론적 프레임 단위 로직으로 렌더링합니다.
+ *
+ * 변경 사항 (기존 대비):
+ * - 실시간 elapsed 기반 → 결정론적 순차 프레임 루프
+ * - 전체 오디오 병합 → 씬별 독립 AudioBufferSourceNode 스케줄
+ * - 10초 세그먼트 Ken Burns → 씬 전체 연속 Ken Burns (KenBurnsEffect.tsx 동일)
+ * - 자막 로직 Subtitles.tsx와 동일하게 정비 (fadeIn/fadeOut 0.3초)
  */
 
 import type { LongformScene, LongformScenario } from '../types/longform';
 import { calculateSplitPoint } from '../types/longform';
 import type { RemotionSceneData } from '../remotion/types';
+import type { AnimationConfig } from '../types';
 
 // ─── 타입 ──────────────────────────────────────
 
@@ -32,16 +40,21 @@ export interface LongformRenderResult {
 
 export type LongformProgressCallback = (progress: LongformRenderProgress) => void;
 
-// ─── 씬 타이밍 상수 ─────────────────────────────
-const BUFFER_SEC = 1;       // 오디오 끝 → 씬 전환까지 여유
-const MIN_SCENE_SEC = 8;    // 오디오 없는 씬의 최소 표시 시간
+// ─── 상수 ──────────────────────────────────────
 
-// ─── 변환 유틸 ─────────────────────────────────
+const FPS = 30;
+const WIDTH = 1920;
+const HEIGHT = 1080;
+const TRANSITION_FRAMES = 15;
+const BUFFER_SEC = 1;
+const MIN_SCENE_SEC = 8;
+const SEGMENT_SECONDS = 10;
+
+// ─── 변환 유틸 (기존과 동일) ────────────────────
 
 export function longformSceneToRemotionScene(scene: LongformScene): RemotionSceneData | null {
   if (!scene.generatedImage) return null;
 
-  // 씬 duration: 오디오 길이 + 버퍼 (오디오 없으면 최소값)
   const audioDurationSec = scene.narrationAudio?.durationMs
     ? scene.narrationAudio.durationMs / 1000
     : 0;
@@ -82,13 +95,54 @@ export function splitScenesForExport(scenario: LongformScenario): {
   };
 }
 
-// ─── 내부 헬퍼 ─────────────────────────────────
+// ─── 씬 타이밍 사전 계산 ────────────────────────
 
-interface AudioSegment {
-  buffer: AudioBuffer;
-  startTime: number;
-  duration: number;
+interface SceneTiming {
+  scene: RemotionSceneData;
+  startFrame: number;
+  durationFrames: number;
+  startTimeSec: number;
 }
+
+function calculateSceneTimings(scenes: RemotionSceneData[]): SceneTiming[] {
+  const timings: SceneTiming[] = [];
+  let currentFrame = 0;
+
+  for (const scene of scenes) {
+    const durationFrames = Math.round(scene.duration * FPS);
+    timings.push({
+      scene,
+      startFrame: currentFrame,
+      durationFrames,
+      startTimeSec: currentFrame / FPS,
+    });
+    currentFrame += durationFrames;
+  }
+
+  return timings;
+}
+
+// ─── 프레임 → 씬 매핑 ──────────────────────────
+
+function getSceneAtFrame(
+  timings: SceneTiming[],
+  frame: number
+): { timing: SceneTiming; frameInScene: number; sceneIndex: number } {
+  for (let i = 0; i < timings.length; i++) {
+    const t = timings[i];
+    if (frame < t.startFrame + t.durationFrames) {
+      return { timing: t, frameInScene: frame - t.startFrame, sceneIndex: i };
+    }
+  }
+  const last = timings[timings.length - 1];
+  return {
+    timing: last,
+    frameInScene: last.durationFrames - 1,
+    sceneIndex: timings.length - 1,
+  };
+}
+
+// ─── 이미지 프리로딩 ────────────────────────────
 
 async function preloadSceneImages(
   scenes: RemotionSceneData[]
@@ -98,10 +152,7 @@ async function preloadSceneImages(
   await Promise.all(scenes.map(scene =>
     new Promise<void>((resolve) => {
       const img = new Image();
-      img.onload = () => {
-        imageMap.set(scene.id, img);
-        resolve();
-      };
+      img.onload = () => { imageMap.set(scene.id, img); resolve(); };
       img.onerror = () => resolve();
       img.src = `data:${scene.imageData.mimeType};base64,${scene.imageData.data}`;
     })
@@ -110,10 +161,11 @@ async function preloadSceneImages(
   return imageMap;
 }
 
+// ─── 오디오 유틸 ────────────────────────────────
+
 async function base64ToAudioBuffer(
   audioContext: AudioContext,
-  base64Data: string,
-  mimeType: string = 'audio/wav'
+  base64Data: string
 ): Promise<AudioBuffer> {
   const binaryString = atob(base64Data);
   const bytes = new Uint8Array(binaryString.length);
@@ -123,106 +175,22 @@ async function base64ToAudioBuffer(
   return await audioContext.decodeAudioData(bytes.buffer);
 }
 
-async function prepareAudioSegments(
-  audioContext: AudioContext,
-  scenes: RemotionSceneData[]
-): Promise<AudioSegment[]> {
-  const segments: AudioSegment[] = [];
-  let currentTime = 0;
-
-  for (const scene of scenes) {
-    if (scene.narrationAudio?.data) {
-      try {
-        const buffer = await base64ToAudioBuffer(
-          audioContext,
-          scene.narrationAudio.data,
-          scene.narrationAudio.mimeType
-        );
-        segments.push({ buffer, startTime: currentTime, duration: scene.duration });
-      } catch (error) {
-        console.warn(`Failed to decode audio for scene ${scene.id}:`, error);
-      }
-    }
-    currentTime += scene.duration;
-  }
-
-  return segments;
-}
-
-function mergeAudioSegments(
-  audioContext: AudioContext,
-  segments: AudioSegment[],
-  totalDuration: number,
-  sampleRate: number = 44100
-): AudioBuffer {
-  const totalSamples = Math.ceil(totalDuration * sampleRate);
-  const mergedBuffer = audioContext.createBuffer(2, totalSamples, sampleRate);
-
-  for (const segment of segments) {
-    const startSample = Math.floor(segment.startTime * sampleRate);
-    const sourceBuffer = segment.buffer;
-
-    for (let channel = 0; channel < Math.min(2, sourceBuffer.numberOfChannels); channel++) {
-      const sourceData = sourceBuffer.getChannelData(channel);
-      const targetData = mergedBuffer.getChannelData(channel);
-
-      for (let i = 0; i < sourceData.length && (startSample + i) < totalSamples; i++) {
-        targetData[startSample + i] += sourceData[i];
-      }
-    }
-
-    if (sourceBuffer.numberOfChannels === 1) {
-      const sourceData = sourceBuffer.getChannelData(0);
-      const targetData = mergedBuffer.getChannelData(1);
-      for (let i = 0; i < sourceData.length && (startSample + i) < totalSamples; i++) {
-        targetData[startSample + i] += sourceData[i];
-      }
-    }
-  }
-
-  return mergedBuffer;
-}
-
-function getSceneAtFrame(
-  scenes: RemotionSceneData[],
-  frame: number,
-  fps: number
-): { sceneIndex: number; frameInScene: number; sceneDurationFrames: number } {
-  let accumulatedFrames = 0;
-
-  for (let i = 0; i < scenes.length; i++) {
-    const sceneDurationFrames = Math.round(scenes[i].duration * fps);
-    if (frame < accumulatedFrames + sceneDurationFrames) {
-      return {
-        sceneIndex: i,
-        frameInScene: frame - accumulatedFrames,
-        sceneDurationFrames,
-      };
-    }
-    accumulatedFrames += sceneDurationFrames;
-  }
-
-  const lastIndex = scenes.length - 1;
-  const lastSceneDuration = Math.round(scenes[lastIndex].duration * fps);
-  return {
-    sceneIndex: lastIndex,
-    frameInScene: lastSceneDuration - 1,
-    sceneDurationFrames: lastSceneDuration,
-  };
-}
+// ─── 이미지 Cover 드로잉 ────────────────────────
 
 function drawImageCover(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   img: HTMLImageElement,
   scale: number = 1,
-  offsetX: number = 0,
-  offsetY: number = 0
+  translateXPercent: number = 0,
+  translateYPercent: number = 0
 ): void {
   const imgRatio = img.width / img.height;
   const canvasRatio = canvas.width / canvas.height;
 
-  let drawWidth, drawHeight;
+  let drawWidth: number;
+  let drawHeight: number;
+
   if (imgRatio > canvasRatio) {
     drawHeight = canvas.height * scale;
     drawWidth = drawHeight * imgRatio;
@@ -231,47 +199,89 @@ function drawImageCover(
     drawHeight = drawWidth / imgRatio;
   }
 
+  // translate 퍼센트를 픽셀로 변환
+  const offsetX = (translateXPercent / 100) * canvas.width;
+  const offsetY = (translateYPercent / 100) * canvas.height;
+
   const drawX = (canvas.width - drawWidth) / 2 - offsetX;
   const drawY = (canvas.height - drawHeight) / 2 - offsetY;
 
   ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
 }
 
-function interpolateValue(
-  value: number,
-  inputRange: number[],
-  outputRange: number[]
-): number {
-  const clampedValue = Math.max(inputRange[0], Math.min(inputRange[inputRange.length - 1], value));
+// ─── lerp (Remotion interpolate 동등) ───────────
 
-  for (let i = 0; i < inputRange.length - 1; i++) {
-    if (clampedValue >= inputRange[i] && clampedValue <= inputRange[i + 1]) {
-      const inputSpan = inputRange[i + 1] - inputRange[i];
-      if (inputSpan === 0) return outputRange[i];
-      const t = (clampedValue - inputRange[i]) / inputSpan;
-      return outputRange[i] + t * (outputRange[i + 1] - outputRange[i]);
-    }
-  }
-
-  return outputRange[outputRange.length - 1];
+function lerp(from: number, to: number, progress: number): number {
+  const p = Math.max(0, Math.min(1, progress));
+  return from + (to - from) * p;
 }
 
-// ─── 메인 렌더링 ───────────────────────────────
+// ─── Ken Burns — KenBurnsEffect.tsx 로직 복제 ──
 
-const FPS = 30;
-const WIDTH = 1920;
-const HEIGHT = 1080;
-const TRANSITION_FRAMES = 15;
-const SEGMENT_SECONDS = 10; // 10초 단위 자막/애니메이션 세그먼트
-const SEGMENT_FRAMES = SEGMENT_SECONDS * FPS;
-const CHARS_PER_SEGMENT = 58; // 세그먼트당 표시할 대략적 글자 수 (350자/분 ÷ 6세그먼트)
+function computeKenBurns(
+  animation: AnimationConfig | undefined,
+  progress: number
+): { scale: number; translateX: number; translateY: number } {
+  const anim = animation || { type: 'kenBurns' as const, direction: 'in' as const, intensity: 0.5 };
+  const intensity = anim.intensity ?? 0.5;
+  const maxScale = 1 + intensity * 0.3;
+  const maxTranslate = intensity * 5;
+
+  let scale = 1;
+  let translateX = 0;
+  let translateY = 0;
+
+  switch (anim.type) {
+    case 'kenBurns':
+      if (anim.direction === 'in') {
+        scale = lerp(1, maxScale, progress);
+        translateX = lerp(0, maxTranslate, progress);
+        translateY = lerp(0, -maxTranslate * 0.5, progress);
+      } else {
+        scale = lerp(maxScale, 1, progress);
+        translateX = lerp(maxTranslate, 0, progress);
+        translateY = lerp(-maxTranslate * 0.5, 0, progress);
+      }
+      break;
+
+    case 'zoom':
+      if (anim.direction === 'in') {
+        scale = lerp(1, maxScale, progress);
+      } else {
+        scale = lerp(maxScale, 1, progress);
+      }
+      break;
+
+    case 'pan':
+      scale = 1.1;
+      switch (anim.direction) {
+        case 'left':
+          translateX = lerp(maxTranslate, -maxTranslate, progress);
+          break;
+        case 'right':
+          translateX = lerp(-maxTranslate, maxTranslate, progress);
+          break;
+        default:
+          translateY = lerp(maxTranslate, -maxTranslate, progress);
+      }
+      break;
+
+    case 'none':
+    default:
+      break;
+  }
+
+  return { scale, translateX, translateY };
+}
+
+// ─── 자막 — Subtitles.tsx 로직 복제 ────────────
 
 /**
- * 나레이션 텍스트를 10초 단위 세그먼트로 분할
- * 문장 경계(. ! ? 등) 또는 공백에서 자연스럽게 나눔
+ * 나레이션 텍스트를 세그먼트로 분할 (문장 경계 우선)
+ * Remotion Subtitles.tsx의 splitNarrationSegments와 동일
  */
-function splitNarrationSegments(narration: string, sceneDurationSec: number): string[] {
-  const segmentCount = Math.max(1, Math.floor(sceneDurationSec / SEGMENT_SECONDS));
+function splitNarrationSegments(narration: string, durationSec: number): string[] {
+  const segmentCount = Math.max(1, Math.floor(durationSec / SEGMENT_SECONDS));
   const targetLen = Math.ceil(narration.length / segmentCount);
 
   const segments: string[] = [];
@@ -280,10 +290,8 @@ function splitNarrationSegments(narration: string, sceneDurationSec: number): st
   for (let i = 0; i < segmentCount - 1; i++) {
     if (!remaining) break;
 
-    // 목표 길이 근처에서 문장 경계 찾기
     let cutIdx = Math.min(targetLen, remaining.length);
 
-    // 먼저 문장 끝(. ! ?) 찾기 (targetLen ± 15 범위)
     let bestCut = -1;
     for (let j = Math.max(0, cutIdx - 15); j <= Math.min(remaining.length - 1, cutIdx + 15); j++) {
       if ('.!?。'.includes(remaining[j]) && j > 10) {
@@ -292,7 +300,6 @@ function splitNarrationSegments(narration: string, sceneDurationSec: number): st
       }
     }
 
-    // 문장 경계 없으면 쉼표/공백에서 자르기
     if (bestCut === -1) {
       for (let j = cutIdx; j >= Math.max(0, cutIdx - 20); j--) {
         if (',، '.includes(remaining[j])) {
@@ -312,32 +319,125 @@ function splitNarrationSegments(narration: string, sceneDurationSec: number): st
 }
 
 /**
- * 10초 세그먼트별 카메라 이동 방향 결정
- * 0: 오른쪽→왼쪽, 1: 위→아래, 2: 왼쪽→오른쪽, 3: 아래→위
+ * 자막을 Canvas에 그리기 — Subtitles.tsx 렌더링 로직 복제
+ * - 10초 세그먼트 분할, 오디오 범위 내에서만 표시
+ * - fadeIn/fadeOut 0.3초 (Subtitles.tsx와 동일)
+ * - 폰트: 화면 높이 6%, Pretendard bold (Subtitles.tsx와 동일)
  */
-function getSegmentAnimation(segmentIndex: number, segmentProgress: number): { scale: number; offsetX: number; offsetY: number } {
-  // 기본 줌: 모든 세그먼트에서 미세하게 확대
-  const baseScale = 1.02 + segmentProgress * 0.04;
-  const panAmount = segmentProgress * 30; // 10초간 30px 이동
+function drawSubtitles(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  scene: RemotionSceneData,
+  frameInScene: number,
+  sceneDurationFrames: number
+): void {
+  if (!scene.narration) return;
 
-  const direction = segmentIndex % 4;
-  switch (direction) {
-    case 0: // 오른쪽 → 왼쪽
-      return { scale: baseScale, offsetX: panAmount, offsetY: 0 };
-    case 1: // 위 → 아래
-      return { scale: baseScale, offsetX: 0, offsetY: panAmount };
-    case 2: // 왼쪽 → 오른쪽
-      return { scale: baseScale, offsetX: -panAmount, offsetY: 0 };
-    case 3: // 아래 → 위
-      return { scale: baseScale, offsetX: 0, offsetY: -panAmount };
-    default:
-      return { scale: baseScale, offsetX: panAmount, offsetY: 0 };
+  // 오디오 기반 자막 범위 (Subtitles.tsx:76-78)
+  const audioDurationFrames = scene.narrationAudio?.durationMs
+    ? Math.round((scene.narrationAudio.durationMs / 1000) * FPS)
+    : sceneDurationFrames;
+
+  // 오디오 범위 밖이면 자막 숨김 (Subtitles.tsx:81)
+  if (frameInScene >= audioDurationFrames) return;
+
+  // 세그먼트 분할 (Subtitles.tsx:84-93)
+  const audioDurationSec = scene.narrationAudio?.durationMs
+    ? scene.narrationAudio.durationMs / 1000
+    : sceneDurationFrames / FPS;
+  const segments = splitNarrationSegments(scene.narration, audioDurationSec);
+  const segFrames = audioDurationFrames / segments.length;
+  const segIdx = Math.min(
+    Math.floor(frameInScene / segFrames),
+    segments.length - 1
+  );
+  const currentText = segments[segIdx];
+  if (!currentText) return;
+
+  // 페이드 계산 (Subtitles.tsx:96-119, fadeIn + fadeOut)
+  const fadeFrames = Math.round(FPS * 0.3);
+  const localFrame = frameInScene - segIdx * segFrames;
+  let opacity = 1;
+  if (localFrame < fadeFrames) {
+    opacity = localFrame / fadeFrames;
+  } else if (localFrame > segFrames - fadeFrames) {
+    opacity = (segFrames - localFrame) / fadeFrames;
   }
+  opacity = Math.max(0, Math.min(1, opacity));
+
+  // 폰트 (Subtitles.tsx:129 — height * 0.06)
+  const fontSize = Math.round(canvas.height * 0.06);
+  ctx.font = `bold ${fontSize}px Pretendard, -apple-system, BlinkMacSystemFont, sans-serif`;
+  ctx.textAlign = 'center';
+
+  // 텍스트 줄바꿈
+  const maxLineWidth = canvas.width * 0.9;
+  const lines: string[] = [];
+  let currentLine = '';
+  for (const char of currentText) {
+    const testLine = currentLine + char;
+    if (ctx.measureText(testLine).width > maxLineWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = char;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+
+  // 배경 박스 (Subtitles.tsx:143-150)
+  const lineHeight = fontSize * 1.5;
+  const padding = 24;
+  const textX = canvas.width / 2;
+
+  let maxWidth = 0;
+  for (const line of lines) {
+    const w = ctx.measureText(line).width;
+    if (w > maxWidth) maxWidth = w;
+  }
+
+  const boxHeight = lines.length * lineHeight + padding;
+  const boxY = canvas.height * 0.92 - boxHeight;
+  const boxX = textX - maxWidth / 2 - padding;
+  const boxWidth = maxWidth + padding * 2;
+
+  ctx.globalAlpha = opacity;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 16);
+  ctx.fill();
+
+  // 텍스트 (Subtitles.tsx:152-168)
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 2;
+  lines.forEach((line, index) => {
+    const textY = boxY + padding / 2 + fontSize + (index * lineHeight);
+    ctx.fillText(line, textX, textY);
+  });
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.globalAlpha = 1;
 }
+
+// ─── UI 블로킹 방지 ────────────────────────────
+
+function yieldToMain(): Promise<void> {
+  return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+const YIELD_EVERY_N_FRAMES = 2;
+
+// ─── 메인 렌더링 (결정론적 프레임 루프) ─────────
 
 export async function renderLongformPart(
   scenes: RemotionSceneData[],
-  onProgress?: LongformProgressCallback
+  onProgress?: LongformProgressCallback,
+  abortSignal?: AbortSignal
 ): Promise<LongformRenderResult> {
   if (scenes.length === 0) {
     return { success: false, duration: 0, sceneCount: 0, error: '렌더링할 씬이 없습니다' };
@@ -346,34 +446,53 @@ export async function renderLongformPart(
   onProgress?.({ status: 'preparing', progress: 0 });
 
   try {
-    const totalDuration = scenes.reduce((acc, s) => acc + s.duration, 0);
-    const totalFrames = Math.round(totalDuration * FPS);
+    // ── 1. 씬 타이밍 사전 계산 ──
+    const timings = calculateSceneTimings(scenes);
+    const totalFrames = timings.reduce((acc, t) => acc + t.durationFrames, 0);
+    const totalDuration = totalFrames / FPS;
 
     onProgress?.({ status: 'preparing', progress: 5, totalFrames });
 
+    // ── 2. Canvas 설정 ──
     const canvas = document.createElement('canvas');
     canvas.width = WIDTH;
     canvas.height = HEIGHT;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas context를 생성할 수 없습니다');
 
-    // 오디오 준비
+    // ── 3. 이미지 프리로딩 ──
+    const imageMap = await preloadSceneImages(scenes);
+    onProgress?.({ status: 'preparing', progress: 10, totalFrames });
+
+    // ── 4. 오디오 준비 — 씬별 독립 스케줄링 ──
     let audioContext: AudioContext | null = null;
     let audioDestination: MediaStreamAudioDestinationNode | null = null;
-    let audioSource: AudioBufferSourceNode | null = null;
+    const audioSources: AudioBufferSourceNode[] = [];
     const hasAudio = scenes.some(s => s.narrationAudio?.data);
 
     if (hasAudio) {
       try {
         audioContext = new AudioContext({ sampleRate: 44100 });
-        const segments = await prepareAudioSegments(audioContext, scenes);
+        audioDestination = audioContext.createMediaStreamDestination();
 
-        if (segments.length > 0) {
-          const mergedBuffer = mergeAudioSegments(audioContext, segments, totalDuration, audioContext.sampleRate);
-          audioDestination = audioContext.createMediaStreamDestination();
-          audioSource = audioContext.createBufferSource();
-          audioSource.buffer = mergedBuffer;
-          audioSource.connect(audioDestination);
+        // 씬별로 독립적인 AudioBufferSourceNode 생성
+        for (const timing of timings) {
+          if (timing.scene.narrationAudio?.data) {
+            try {
+              const buffer = await base64ToAudioBuffer(
+                audioContext,
+                timing.scene.narrationAudio.data
+              );
+              const source = audioContext.createBufferSource();
+              source.buffer = buffer;
+              source.connect(audioDestination);
+              audioSources.push(source);
+              // 스케줄 시간 저장 (start 호출은 렌더링 시작 시)
+              (source as any).__scheduledTime = timing.startTimeSec;
+            } catch (e) {
+              console.warn(`Failed to decode audio for scene ${timing.scene.id}:`, e);
+            }
+          }
         }
       } catch (audioError) {
         console.warn('오디오 준비 실패, 오디오 없이 진행:', audioError);
@@ -382,14 +501,9 @@ export async function renderLongformPart(
       }
     }
 
-    onProgress?.({ status: 'preparing', progress: 10, totalFrames });
-
-    // 이미지 프리로딩
-    const imageMap = await preloadSceneImages(scenes);
-
     onProgress?.({ status: 'preparing', progress: 15, totalFrames });
 
-    // 비디오 스트림 생성
+    // ── 5. MediaRecorder 설정 ──
     const videoStream = canvas.captureStream(0);
     const videoTrack = videoStream.getVideoTracks()[0] as any;
     const canRequestFrame = videoTrack && typeof videoTrack.requestFrame === 'function';
@@ -416,10 +530,11 @@ export async function renderLongformPart(
       if (e.data.size > 0) chunks.push(e.data);
     };
 
-    return new Promise((resolve) => {
+    // ── 6. 렌더링 시작 ──
+    return new Promise<LongformRenderResult>((resolve) => {
       mediaRecorder.onstop = () => {
-        if (audioSource) {
-          try { audioSource.stop(); } catch { /* already stopped */ }
+        for (const source of audioSources) {
+          try { source.stop(); } catch { /* already stopped */ }
         }
         if (audioContext) audioContext.close();
 
@@ -437,175 +552,116 @@ export async function renderLongformPart(
         });
       };
 
-      const renderStartTime = audioContext ? audioContext.currentTime : performance.now() / 1000;
-      if (audioSource) audioSource.start(0);
-
       mediaRecorder.start();
+
+      // 오디오 시작 — 씬별 독립 스케줄
+      const audioStartTime = audioContext ? audioContext.currentTime : 0;
+      for (const source of audioSources) {
+        const scheduledTime = (source as any).__scheduledTime || 0;
+        source.start(audioStartTime + scheduledTime);
+      }
 
       onProgress?.({ status: 'rendering', progress: 20, totalFrames, currentFrame: 0 });
 
-      let lastRenderedFrame = -1;
+      // ── 결정론적 프레임 루프 ──
+      const renderLoop = async () => {
+        for (let frame = 0; frame < totalFrames; frame++) {
+          // 취소 확인
+          if (abortSignal?.aborted) {
+            mediaRecorder.stop();
+            return;
+          }
 
-      const getElapsed = (): number => {
-        if (audioContext && audioContext.state !== 'closed') {
-          return audioContext.currentTime - renderStartTime;
-        }
-        return (performance.now() / 1000) - renderStartTime;
-      };
+          // 현재 씬 찾기
+          const { timing, frameInScene, sceneIndex } = getSceneAtFrame(timings, frame);
+          const { scene, durationFrames } = timing;
+          const img = imageMap.get(scene.id);
 
-      const renderFrame = () => {
-        const elapsed = getElapsed();
-        const currentFrame = Math.min(Math.floor(elapsed * FPS), totalFrames - 1);
+          // 캔버스 클리어
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        if (elapsed >= totalDuration) {
-          mediaRecorder.stop();
-          return;
-        }
+          if (img) {
+            const isLastScene = sceneIndex >= timings.length - 1;
+            const isInTransition = !isLastScene &&
+              frameInScene >= durationFrames - TRANSITION_FRAMES;
 
-        if (currentFrame <= lastRenderedFrame) {
-          const nextFrameTime = (lastRenderedFrame + 1) / FPS;
-          const delay = Math.max(1, (nextFrameTime - elapsed) * 1000);
-          setTimeout(renderFrame, delay);
-          return;
-        }
+            if (isInTransition) {
+              // ── 씬 전환: Fade 크로스페이드 (Transitions.tsx 동일) ──
+              const nextTiming = timings[sceneIndex + 1];
+              const nextImg = imageMap.get(nextTiming.scene.id);
 
-        lastRenderedFrame = currentFrame;
+              if (nextImg) {
+                const transitionFrame = frameInScene - (durationFrames - TRANSITION_FRAMES);
+                const transitionProgress = Math.min(1, Math.max(0, transitionFrame / TRANSITION_FRAMES));
 
-        const { sceneIndex, frameInScene, sceneDurationFrames } = getSceneAtFrame(scenes, currentFrame, FPS);
-        const scene = scenes[sceneIndex];
-        const img = imageMap.get(scene.id);
+                // 현재 씬 (페이드 아웃) + Ken Burns
+                ctx.globalAlpha = 1 - transitionProgress;
+                const currentKB = computeKenBurns(scene.animation, frameInScene / durationFrames);
+                drawImageCover(ctx, canvas, img, currentKB.scale, currentKB.translateX, currentKB.translateY);
 
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        if (img) {
-          const isInTransition = sceneIndex < scenes.length - 1 &&
-            frameInScene >= sceneDurationFrames - TRANSITION_FRAMES;
-
-          if (isInTransition) {
-            const nextScene = scenes[sceneIndex + 1];
-            const nextImg = imageMap.get(nextScene.id);
-
-            if (nextImg) {
-              const transitionFrame = frameInScene - (sceneDurationFrames - TRANSITION_FRAMES);
-              const transitionProgress = Math.min(1, Math.max(0, transitionFrame / TRANSITION_FRAMES));
-
-              // Fade transition
-              ctx.globalAlpha = 1 - transitionProgress;
-              drawImageCover(ctx, canvas, img);
-              ctx.globalAlpha = transitionProgress;
-              drawImageCover(ctx, canvas, nextImg);
-              ctx.globalAlpha = 1;
+                // 다음 씬 (페이드 인)
+                ctx.globalAlpha = transitionProgress;
+                drawImageCover(ctx, canvas, nextImg, 1, 0, 0);
+                ctx.globalAlpha = 1;
+              } else {
+                const kb = computeKenBurns(scene.animation, frameInScene / durationFrames);
+                drawImageCover(ctx, canvas, img, kb.scale, kb.translateX, kb.translateY);
+              }
             } else {
-              const progress = frameInScene / sceneDurationFrames;
-              drawImageCover(ctx, canvas, img, 1 + progress * 0.09, progress * 12);
+              // ── 일반 프레임: Ken Burns (KenBurnsEffect.tsx 동일) ──
+              const kb = computeKenBurns(scene.animation, frameInScene / durationFrames);
+              drawImageCover(ctx, canvas, img, kb.scale, kb.translateX, kb.translateY);
+            }
+
+            // ── 자막 (Subtitles.tsx 동일) ──
+            drawSubtitles(ctx, canvas, scene, frameInScene, durationFrames);
+          }
+
+          // 프레임 푸시
+          if (canRequestFrame) videoTrack.requestFrame();
+
+          // 진행률 업데이트
+          const progressPercent = 20 + ((frame + 1) / totalFrames) * 75;
+          onProgress?.({
+            status: 'rendering',
+            progress: Math.min(progressPercent, 95),
+            currentFrame: frame + 1,
+            totalFrames,
+          });
+
+          // ── 오디오 동기화 대기 ──
+          // audioContext 시간에 맞춰 프레임 속도를 조절하여
+          // 비디오 프레임과 오디오가 정확히 동기화되도록 함
+          if (audioContext && audioContext.state !== 'closed') {
+            const targetTime = audioStartTime + (frame + 1) / FPS;
+            const currentTime = audioContext.currentTime;
+            const waitMs = (targetTime - currentTime) * 1000;
+            if (waitMs > 2) {
+              await new Promise<void>(r => setTimeout(r, waitMs));
+            } else if (frame % YIELD_EVERY_N_FRAMES === 0) {
+              await yieldToMain();
             }
           } else {
-            // 가변 씬 길이에 맞춰 Ken Burns 세그먼트 분할
-            const totalKBSegments = Math.max(1, Math.ceil(sceneDurationFrames / SEGMENT_FRAMES));
-            const actualSegFrames = sceneDurationFrames / totalKBSegments;
-            const segmentIndex = Math.floor(frameInScene / actualSegFrames);
-            const segmentProgress = (frameInScene % actualSegFrames) / actualSegFrames;
-            const anim = getSegmentAnimation(segmentIndex, segmentProgress);
-            drawImageCover(ctx, canvas, img, anim.scale, anim.offsetX, anim.offsetY);
-          }
-
-          // 자막 (오디오 재생 시간 내에서만 비례 분할 표시)
-          if (scene.narration) {
-            const sceneDurationSec = sceneDurationFrames / FPS;
-            const audioDurationSec = scene.narrationAudio?.durationMs
-              ? scene.narrationAudio.durationMs / 1000
-              : sceneDurationSec;
-            const audioDurationFrames = Math.round(audioDurationSec * FPS);
-
-            // 오디오 범위 안에서만 자막 표시
-            if (frameInScene < audioDurationFrames) {
-              const segments = splitNarrationSegments(scene.narration, audioDurationSec);
-              const segDurationFrames = audioDurationFrames / segments.length;
-              const segmentIndex = Math.min(
-                Math.floor(frameInScene / segDurationFrames),
-                segments.length - 1
-              );
-              const currentText = segments[segmentIndex] || '';
-
-            if (currentText) {
-              const fontSize = Math.round(canvas.height * 0.05);
-              ctx.font = `bold ${fontSize}px Pretendard, sans-serif`;
-              ctx.textAlign = 'center';
-
-              const maxLineWidth = canvas.width * 0.9;
-              const lines: string[] = [];
-              let currentLine = '';
-              for (const char of currentText) {
-                const testLine = currentLine + char;
-                if (ctx.measureText(testLine).width > maxLineWidth && currentLine) {
-                  lines.push(currentLine);
-                  currentLine = char;
-                } else {
-                  currentLine = testLine;
-                }
-              }
-              if (currentLine) lines.push(currentLine);
-
-              const lineHeight = fontSize * 1.5;
-              const padding = 24;
-              const textX = canvas.width / 2;
-
-              let maxWidth = 0;
-              for (const line of lines) {
-                const w = ctx.measureText(line).width;
-                if (w > maxWidth) maxWidth = w;
-              }
-
-              const boxHeight = lines.length * lineHeight + padding;
-              const boxY = canvas.height * 0.92 - boxHeight;
-              const boxX = textX - maxWidth / 2 - padding;
-              const boxWidth = maxWidth + padding * 2;
-
-              // 세그먼트 전환 시 페이드인 효과 (첫 10프레임)
-              const frameInSegment = frameInScene % Math.round(segDurationFrames);
-              const fadeAlpha = Math.min(1, frameInSegment / 10);
-
-              ctx.globalAlpha = fadeAlpha;
-              ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-              ctx.beginPath();
-              ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 12);
-              ctx.fill();
-
-              ctx.fillStyle = '#fff';
-              ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-              ctx.shadowBlur = 4;
-              ctx.shadowOffsetX = 1;
-              ctx.shadowOffsetY = 1;
-              lines.forEach((line, index) => {
-                const textY = boxY + padding / 2 + fontSize + (index * lineHeight);
-                ctx.fillText(line, textX, textY);
-              });
-              ctx.shadowColor = 'transparent';
-              ctx.shadowBlur = 0;
-              ctx.globalAlpha = 1;
+            if (frame % YIELD_EVERY_N_FRAMES === 0) {
+              await yieldToMain();
             }
-            } // end: frameInScene < audioDurationFrames
           }
         }
 
-        if (canRequestFrame) videoTrack.requestFrame();
-
-        const progressPercent = 20 + ((currentFrame + 1) / totalFrames) * 75;
-        onProgress?.({
-          status: 'rendering',
-          progress: Math.min(progressPercent, 95),
-          currentFrame: currentFrame + 1,
-          totalFrames,
-        });
-
-        const nextElapsed = getElapsed();
-        const nextFrameTime = (currentFrame + 1) / FPS;
-        const delay = Math.max(1, (nextFrameTime - nextElapsed) * 1000);
-        setTimeout(renderFrame, delay);
+        // 마지막 데이터 플러시
+        await new Promise<void>(r => setTimeout(r, 500));
+        mediaRecorder.stop();
       };
 
-      setTimeout(renderFrame, 0);
+      renderLoop().catch((err) => {
+        onProgress?.({
+          status: 'error',
+          progress: 0,
+          error: err instanceof Error ? err.message : '렌더링 실패',
+        });
+        try { mediaRecorder.stop(); } catch { /* ignore */ }
+      });
     });
   } catch (error) {
     onProgress?.({

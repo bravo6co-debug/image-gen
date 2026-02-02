@@ -36,12 +36,14 @@ export function useLongformExport(): UseLongformExportReturn {
   const [output, setOutput] = useState<LongformOutput | null>(null);
   const [part1State, setPart1State] = useState<PartExportState>(INITIAL_PART_STATE);
   const [part2State, setPart2State] = useState<PartExportState>(INITIAL_PART_STATE);
-  const cancelledRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const isExporting = part1State.status === 'rendering' || part2State.status === 'rendering';
 
   const startExportPart1 = useCallback(async (scenario: LongformScenario) => {
-    cancelledRef.current = false;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     const { part1 } = splitScenesForExport(scenario);
     const remotionScenes = longformScenesToRemotionScenes(part1);
 
@@ -52,17 +54,21 @@ export function useLongformExport(): UseLongformExportReturn {
 
     setPart1State({ status: 'rendering', progress: 0 });
 
-    const result = await renderLongformPart(remotionScenes, (p: LongformRenderProgress) => {
-      if (cancelledRef.current) return;
-      setPart1State(prev => ({
-        ...prev,
-        progress: p.progress,
-        currentFrame: p.currentFrame,
-        totalFrames: p.totalFrames,
-      }));
-    });
+    const result = await renderLongformPart(
+      remotionScenes,
+      (p: LongformRenderProgress) => {
+        if (controller.signal.aborted) return;
+        setPart1State(prev => ({
+          ...prev,
+          progress: p.progress,
+          currentFrame: p.currentFrame,
+          totalFrames: p.totalFrames,
+        }));
+      },
+      controller.signal
+    );
 
-    if (cancelledRef.current) return;
+    if (controller.signal.aborted) return;
 
     if (result.success) {
       setPart1State({
@@ -88,7 +94,9 @@ export function useLongformExport(): UseLongformExportReturn {
   }, []);
 
   const startExportPart2 = useCallback(async (scenario: LongformScenario) => {
-    cancelledRef.current = false;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     const { part2 } = splitScenesForExport(scenario);
     const remotionScenes = longformScenesToRemotionScenes(part2);
 
@@ -99,17 +107,21 @@ export function useLongformExport(): UseLongformExportReturn {
 
     setPart2State({ status: 'rendering', progress: 0 });
 
-    const result = await renderLongformPart(remotionScenes, (p: LongformRenderProgress) => {
-      if (cancelledRef.current) return;
-      setPart2State(prev => ({
-        ...prev,
-        progress: p.progress,
-        currentFrame: p.currentFrame,
-        totalFrames: p.totalFrames,
-      }));
-    });
+    const result = await renderLongformPart(
+      remotionScenes,
+      (p: LongformRenderProgress) => {
+        if (controller.signal.aborted) return;
+        setPart2State(prev => ({
+          ...prev,
+          progress: p.progress,
+          currentFrame: p.currentFrame,
+          totalFrames: p.totalFrames,
+        }));
+      },
+      controller.signal
+    );
 
-    if (cancelledRef.current) return;
+    if (controller.signal.aborted) return;
 
     if (result.success) {
       setPart2State({
@@ -135,7 +147,8 @@ export function useLongformExport(): UseLongformExportReturn {
   }, []);
 
   const cancelExport = useCallback(() => {
-    cancelledRef.current = true;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
     if (part1State.status === 'rendering') {
       setPart1State(INITIAL_PART_STATE);
     }

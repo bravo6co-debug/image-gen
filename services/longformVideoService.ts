@@ -43,6 +43,7 @@ const SEGMENT_SEC = 10;
 const SEGMENT_FRAMES = SEGMENT_SEC * FPS; // 300
 const SCENE_TRANSITION_FRAMES = 15;       // 씬 간 크로스페이드 (0.5초)
 const VIEWPORT_TRANSITION_FRAMES = 30;    // 뷰포트 전환 애니메이션 (1초)
+const CHARS_PER_SEGMENT = 73;             // 10초당 목표 글자수 (72~74 중간값)
 
 // ─── 뷰포트 (전체 / 오른쪽 / 왼쪽) ──────────────
 
@@ -74,12 +75,11 @@ function lerp(a: number, b: number, t: number): number {
 export function longformSceneToRemotionScene(scene: LongformScene): RemotionSceneData | null {
   if (!scene.generatedImage) return null;
 
-  const audioDurationSec = scene.narrationAudio?.durationMs
-    ? scene.narrationAudio.durationMs / 1000
-    : 0;
-
-  // 10초 단위로 올림 (최소 10초)
-  const segmentCount = Math.max(1, Math.ceil((audioDurationSec + 1) / SEGMENT_SEC));
+  // 텍스트 기반 세그먼트 수 계산 (72-74자 = 10초)
+  const textLength = scene.narration?.length || 0;
+  const segmentCount = textLength > 0
+    ? Math.max(1, Math.ceil(textLength / CHARS_PER_SEGMENT))
+    : 1;
   const duration = segmentCount * SEGMENT_SEC;
 
   return {
@@ -146,13 +146,21 @@ function calculateSceneTimings(scenes: RemotionSceneData[]): SceneTiming[] {
   return timings;
 }
 
-// ─── 나레이션 텍스트 분할 (고정 N등분) ────────────
+// ─── 나레이션 텍스트 분할 (72-74자 자동 맞춤) ──────
 
+/**
+ * 나레이션을 segmentCount개의 세그먼트로 분할하되,
+ * 각 세그먼트가 72~74자에 최대한 가깝도록 자동 조정합니다.
+ *
+ * 1단계: 목표 길이 기준 초기 분할 (문장/단어 경계 우선)
+ * 2단계: 인접 세그먼트 간 리밸런싱 (72-74자 범위에 맞춤)
+ */
 function splitNarrationFixed(narration: string, segmentCount: number): string[] {
   if (!narration || segmentCount <= 0) return [];
   if (segmentCount === 1) return [narration.trim()];
 
-  const targetLen = Math.ceil(narration.length / segmentCount);
+  // ── 1단계: 초기 분할 ──
+  const targetLen = Math.round(narration.length / segmentCount);
   const segments: string[] = [];
   let remaining = narration;
 
@@ -184,11 +192,60 @@ function splitNarrationFixed(narration: string, segmentCount: number): string[] 
   }
 
   if (remaining) segments.push(remaining.trim());
-
-  // 부족한 세그먼트는 빈 문자열로 채움
   while (segments.length < segmentCount) segments.push('');
 
-  return segments;
+  // ── 2단계: 리밸런싱 (72-74자 범위로 조정) ──
+  return rebalanceSegments(segments);
+}
+
+/**
+ * 인접 세그먼트 간 단어를 이동시켜 각 세그먼트를 72~74자에 맞춥니다.
+ * - 앞 세그먼트가 너무 길면 마지막 단어를 다음 세그먼트로 이동
+ * - 앞 세그먼트가 너무 짧으면 다음 세그먼트의 첫 단어를 가져옴
+ * - 3회 반복으로 수렴
+ */
+function rebalanceSegments(segments: string[]): string[] {
+  const result = [...segments];
+  const target = CHARS_PER_SEGMENT;
+  const tolerance = 2; // 72-74 = target(73) ± 1 → 실질적으로 ±2까지 허용
+
+  for (let pass = 0; pass < 3; pass++) {
+    let changed = false;
+
+    for (let i = 0; i < result.length - 1; i++) {
+      const curr = result[i];
+      const next = result[i + 1];
+      if (!curr && !next) continue;
+
+      const currLen = curr.length;
+      const nextLen = next.length;
+
+      // 현재 세그먼트가 너무 길면 → 마지막 단어/어절을 다음으로 이동
+      if (currLen > target + tolerance && nextLen < target + tolerance) {
+        const lastSpace = curr.lastIndexOf(' ');
+        if (lastSpace > 0) {
+          const moved = curr.slice(lastSpace + 1);
+          result[i] = curr.slice(0, lastSpace).trim();
+          result[i + 1] = (moved + ' ' + next).trim();
+          changed = true;
+        }
+      }
+      // 현재 세그먼트가 너무 짧으면 → 다음에서 첫 단어/어절을 가져옴
+      else if (currLen < target - tolerance && nextLen > target - tolerance) {
+        const firstSpace = next.indexOf(' ');
+        if (firstSpace > 0) {
+          const moved = next.slice(0, firstSpace);
+          result[i] = (curr + ' ' + moved).trim();
+          result[i + 1] = next.slice(firstSpace + 1).trim();
+          changed = true;
+        }
+      }
+    }
+
+    if (!changed) break;
+  }
+
+  return result;
 }
 
 // ─── 프레임 → 씬/세그먼트 매핑 ──────────────────

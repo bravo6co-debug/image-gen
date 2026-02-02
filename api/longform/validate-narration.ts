@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { narration, targetMin = 330, targetMax = 350, context, textModel: requestTextModel } = req.body;
+    const { narration, targetMin = 360, targetMax = 370, context, textModel: requestTextModel } = req.body;
 
     if (!narration) {
       return res.status(400).json({ error: 'narration is required' });
@@ -36,8 +36,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const textModel = requestTextModel || await getUserTextModel(auth.userId);
 
     const direction = charCount < targetMin ? '늘려' : '줄여';
-    const prompt = `다음 나레이션을 ${targetMin}~${targetMax}자로 ${direction}주세요.
-의미와 톤을 최대한 유지하면서, 자연스러운 한국어로 수정해주세요.
+    const segmentCount = 5;
+    const perSegMin = 72;
+    const perSegMax = 74;
+    const prompt = `다음 나레이션을 정확히 ${targetMin}~${targetMax}자(띄어쓰기 포함)로 ${direction}주세요.
+
+⚠️ 핵심 규칙:
+- 총 글자수: ${targetMin}~${targetMax}자 (현재 ${charCount}자)
+- 이 나레이션은 ${segmentCount}개의 10초 구간으로 균등 분할됩니다
+- 각 구간이 ${perSegMin}~${perSegMax}자가 되도록 총량을 맞춰주세요
+- 의미와 톤을 최대한 유지하면서, 자연스러운 한국어로 수정
+- 형용사, 부사, 접속사 등을 조절하여 글자수를 정확히 맞추세요
 ${context ? `\n이전 맥락: ${context}` : ''}
 
 원본 나레이션 (${charCount}자):

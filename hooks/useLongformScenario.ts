@@ -75,7 +75,7 @@ export function useLongformScenario(): UseLongformScenarioReturn {
     if (!scene) return;
 
     const charCount = scene.narration.length;
-    if (charCount >= 330 && charCount <= 350) return;
+    if (charCount >= 360 && charCount <= 370) return;
 
     setIsAdjustingNarration(sceneNumber);
 

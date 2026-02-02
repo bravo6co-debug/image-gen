@@ -235,7 +235,7 @@ export function estimateImageCost(model: LongformImageModel, sceneCount: number)
 }
 
 export function estimateTtsCost(model: LongformTtsModel, sceneCount: number): string {
-  const charsPerScene = 290;
+  const charsPerScene = 365;
   const totalChars = sceneCount * charsPerScene;
   if (model === 'tts-1') {
     return `~$${((totalChars / 1_000_000) * 15).toFixed(2)}`;

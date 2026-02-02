@@ -8,8 +8,8 @@ interface NarrationCounterProps {
 
 export const NarrationCounter: React.FC<NarrationCounterProps> = ({
   charCount,
-  min = 360,
-  max = 370,
+  min = 432,
+  max = 444,
 }) => {
   const isValid = charCount >= min && charCount <= max;
   const isTooShort = charCount < min;

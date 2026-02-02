@@ -18,7 +18,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   disabled,
 }) => {
   const charCount = scene.narration.length;
-  const needsAdjustment = charCount < 360 || charCount > 370;
+  const needsAdjustment = charCount < 432 || charCount > 444;
 
   return (
     <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">

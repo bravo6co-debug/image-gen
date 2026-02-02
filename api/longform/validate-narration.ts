@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { narration, targetMin = 360, targetMax = 370, context, textModel: requestTextModel } = req.body;
+    const { narration, targetMin = 432, targetMax = 444, context, textModel: requestTextModel } = req.body;
 
     if (!narration) {
       return res.status(400).json({ error: 'narration is required' });
@@ -36,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const textModel = requestTextModel || await getUserTextModel(auth.userId);
 
     const direction = charCount < targetMin ? '늘려' : '줄여';
-    const segmentCount = 5;
+    const segmentCount = 6;
     const perSegMin = 72;
     const perSegMax = 74;
     const prompt = `다음 나레이션을 정확히 ${targetMin}~${targetMax}자(띄어쓰기 포함)로 ${direction}주세요.

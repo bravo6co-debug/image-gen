@@ -56,34 +56,34 @@ function buildScenePromptGemini(p: ScenePromptParams): string {
   const enhanced = enhanceBase(p.imagePrompt, p.cameraAngle, p.lightingMood);
   const moodClause = p.mood ? ` The atmosphere conveys a sense of ${p.mood}.` : '';
 
-  return `A cinematic anime scene depicting ${enhanced}.${moodClause} The scene is rendered in high-detail anime art style with realistic shading and atmospheric depth, using a rich and vibrant color palette. Professional composition with cinematic framing in widescreen 16:9 aspect ratio. No text, letters, words, watermarks, logos, or UI elements appear anywhere in the image.`;
+  return `A cinematic anime scene depicting ${enhanced}.${moodClause} The scene is rendered in high-detail anime art style with realistic shading and atmospheric depth, using a rich and vibrant color palette. Professional composition with cinematic framing in widescreen 16:9 aspect ratio. No text, letters, words, numbers, or writing of any kind appear anywhere in the image, including no Chinese, Japanese, or Korean characters on signs, walls, banners, screens, or any surface. No watermarks, logos, or UI elements.`;
 }
 
 function buildScenePromptImagen(p: ScenePromptParams): string {
   const enhanced = enhanceBase(p.imagePrompt, p.cameraAngle, p.lightingMood);
   const moodPart = p.mood ? `, ${p.mood} mood` : '';
 
-  return `${enhanced}${moodPart}. Anime style, high-quality, stylized, beautiful, rich color palette, professional composition, realistic shading, atmospheric depth, 16:9 cinematic widescreen. No text, no letters, no watermarks, no logos.`;
+  return `${enhanced}${moodPart}. Anime style, high-quality, stylized, beautiful, rich color palette, professional composition, realistic shading, atmospheric depth, 16:9 cinematic widescreen. No text, no letters, no numbers, no writing in any language including Chinese Japanese Korean on any surface, no watermarks, no logos.`;
 }
 
 function buildScenePromptFlux(p: ScenePromptParams): string {
   const enhanced = enhanceBase(p.imagePrompt, p.cameraAngle, p.lightingMood);
 
-  return `Anime illustration, ${enhanced}. Absolutely no visible text, letters, numbers, or writing in any language, no watermarks, no logos. 16:9 cinematic widescreen.`;
+  return `Anime illustration, ${enhanced}. Absolutely no visible text, letters, numbers, or writing in any language including Chinese Japanese Korean on signs walls banners or any surface, no watermarks, no logos. 16:9 cinematic widescreen.`;
 }
 
 // ─── 후킹 프롬프트 ────────────────────────────────
 
 function buildHookPromptGemini(p: HookPromptParams): string {
-  return `A dramatic and eye-catching anime scene designed as a YouTube video hook: ${p.visualDescription}. The composition is bold and attention-grabbing with saturated colors and cinematic framing that creates immediate visual impact. Rendered in high-detail anime art style with realistic shading and atmospheric depth. Widescreen 16:9 aspect ratio. No text, letters, words, watermarks, logos, or UI elements appear anywhere in the image.`;
+  return `A dramatic and eye-catching anime scene designed as a YouTube video hook: ${p.visualDescription}. The composition is bold and attention-grabbing with saturated colors and cinematic framing that creates immediate visual impact. Rendered in high-detail anime art style with realistic shading and atmospheric depth. Widescreen 16:9 aspect ratio. No text, letters, words, numbers, or writing of any kind appear anywhere in the image, including no Chinese, Japanese, or Korean characters on signs, walls, banners, screens, or any surface. No watermarks, logos, or UI elements.`;
 }
 
 function buildHookPromptImagen(p: HookPromptParams): string {
-  return `${p.visualDescription}. Eye-catching dramatic composition, anime style, high-quality, stylized, rich saturated color palette, professional cinematic framing, 16:9 widescreen, realistic shading, atmospheric depth. No text, no letters, no watermarks, no logos.`;
+  return `${p.visualDescription}. Eye-catching dramatic composition, anime style, high-quality, stylized, rich saturated color palette, professional cinematic framing, 16:9 widescreen, realistic shading, atmospheric depth. No text, no letters, no numbers, no writing in any language including Chinese Japanese Korean on any surface, no watermarks, no logos.`;
 }
 
 function buildHookPromptFlux(p: HookPromptParams): string {
-  return `Dramatic anime illustration, ${p.visualDescription}. Eye-catching cinematic composition, saturated colors. Absolutely no visible text, letters, numbers, or writing in any language, no watermarks, no logos. 16:9 widescreen.`;
+  return `Dramatic anime illustration, ${p.visualDescription}. Eye-catching cinematic composition, saturated colors. Absolutely no visible text, letters, numbers, or writing in any language including Chinese Japanese Korean on signs walls banners or any surface, no watermarks, no logos. 16:9 widescreen.`;
 }
 
 // ─── 캐릭터 프롬프트 ──────────────────────────────
@@ -92,21 +92,21 @@ function buildCharacterPromptGemini(p: CharacterPromptParams): string {
   const name = p.characterName || 'character';
   const outfit = p.outfit || 'casual clothes';
 
-  return `An anime-style character portrait of ${name}. ${p.appearanceDescription}. The character is wearing ${outfit}. The portrait shows the upper body, with the character facing slightly to the side under soft, even lighting against a clean background. Rendered in high-detail anime art style with vibrant colors. No text, letters, watermarks, or UI elements appear in the image.`;
+  return `An anime-style character portrait of ${name}. ${p.appearanceDescription}. The character is wearing ${outfit}. The portrait shows the upper body, with the character facing slightly to the side under soft, even lighting against a clean background. Rendered in high-detail anime art style with vibrant colors. No text, letters, words, numbers, or writing of any kind appear in the image, including no Chinese, Japanese, or Korean characters. No watermarks or UI elements.`;
 }
 
 function buildCharacterPromptImagen(p: CharacterPromptParams): string {
   const name = p.characterName || 'character';
   const outfit = p.outfit || 'casual clothes';
 
-  return `${name}, ${p.appearanceDescription}, wearing ${outfit}. Anime style character portrait, upper body, facing slightly to the side, clean background, soft lighting, high-quality, stylized, vibrant colors, high detail. No text, no watermarks, no letters.`;
+  return `${name}, ${p.appearanceDescription}, wearing ${outfit}. Anime style character portrait, upper body, facing slightly to the side, clean background, soft lighting, high-quality, stylized, vibrant colors, high detail. No text, no letters, no numbers, no writing in any language including Chinese Japanese Korean, no watermarks.`;
 }
 
 function buildCharacterPromptFlux(p: CharacterPromptParams): string {
   const name = p.characterName || 'character';
   const outfit = p.outfit || 'casual clothes';
 
-  return `Anime character portrait of ${name}. ${p.appearanceDescription}. Wearing ${outfit}. Upper body, slight side angle, clean background, soft lighting. Absolutely no visible text, letters, or writing, no watermarks.`;
+  return `Anime character portrait of ${name}. ${p.appearanceDescription}. Wearing ${outfit}. Upper body, slight side angle, clean background, soft lighting. Absolutely no visible text, letters, numbers, or writing in any language including Chinese Japanese Korean, no watermarks.`;
 }
 
 // ─── 통합 빌더 ────────────────────────────────────

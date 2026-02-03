@@ -63,10 +63,13 @@ export interface LongformScene {
   sceneNumber: number;
   timeRange: string;
   imagePrompt: string;
+  narrationKeywords: string[];     // 나레이션에서 추출한 시각화 핵심 키워드 (3~5개)
   narration: string;
   narrationCharCount: number;
   storyPhase: StoryPhase;
   mood: string;
+  cameraAngle?: string;            // 카메라 앵글 (예: "low angle", "bird's eye")
+  lightingMood?: string;           // 조명/분위기 (예: "warm sunset glow")
   generatedImage?: ImageData;
   narrationAudio?: NarrationAudio;
   imageStatus: AssetStatus;

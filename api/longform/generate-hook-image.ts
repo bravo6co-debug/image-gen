@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { visualDescription, imageModel = 'gemini-2.5-flash-image' } = req.body;
     if (!visualDescription) return res.status(400).json({ error: 'visualDescription is required' });
 
-    const prompt = `Anime style illustration. ${visualDescription}. No text, no watermarks, no letters in any language. Vibrant colors, high detail, 16:9 aspect ratio.`;
+    const prompt = `High-quality detailed anime illustration for YouTube video hook scene. ${visualDescription}. Absolutely no text, no letters, no words, no watermarks, no logos, no UI elements. Eye-catching dramatic composition, rich saturated color palette, professional cinematic framing, 16:9 widescreen aspect ratio, high detail anime art with realistic shading and atmospheric depth.`;
 
     if (isFluxModel(imageModel)) {
       const apiKey = await getEachLabsApiKey(auth.userId);

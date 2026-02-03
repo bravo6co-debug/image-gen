@@ -36,13 +36,34 @@ export const SceneCard: React.FC<SceneCardProps> = ({
         <span className="text-xs text-gray-500">{scene.mood}</span>
       </div>
 
+      {/* Narration Keywords */}
+      {scene.narrationKeywords && scene.narrationKeywords.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {scene.narrationKeywords.map((kw, i) => (
+            <span key={i} className="px-1.5 py-0.5 bg-teal-900/40 text-teal-300 rounded text-[10px] border border-teal-700/30">
+              {kw}
+            </span>
+          ))}
+          {scene.cameraAngle && (
+            <span className="px-1.5 py-0.5 bg-purple-900/40 text-purple-300 rounded text-[10px] border border-purple-700/30">
+              {scene.cameraAngle}
+            </span>
+          )}
+          {scene.lightingMood && (
+            <span className="px-1.5 py-0.5 bg-amber-900/40 text-amber-300 rounded text-[10px] border border-amber-700/30">
+              {scene.lightingMood}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Image Prompt */}
       <div className="mb-3">
         <label className="block text-xs text-gray-500 mb-1">이미지 프롬프트</label>
         <textarea
           value={scene.imagePrompt}
           onChange={(e) => onUpdate({ imagePrompt: e.target.value })}
-          rows={2}
+          rows={3}
           className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-xs text-gray-300 resize-none focus:ring-1 focus:ring-teal-500 focus:border-transparent focus:outline-none"
           disabled={disabled}
         />

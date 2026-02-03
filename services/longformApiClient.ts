@@ -89,7 +89,7 @@ export async function generateHookVideo(
 
 // ─── 씬 이미지 일괄 생성 ─────────────────────────
 export async function generateSceneImages(
-  scenes: { sceneNumber: number; imagePrompt: string }[],
+  scenes: { sceneNumber: number; imagePrompt: string; cameraAngle?: string; lightingMood?: string; mood?: string }[],
   imageModel: string,
   batchSize: number = 5
 ): Promise<{

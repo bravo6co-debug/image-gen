@@ -15,7 +15,6 @@ interface Step4PreviewDownloadProps {
   onExportPart2: () => void;
   onCancelExport: () => void;
   onDownloadPart: (part: 'part1' | 'part2') => void;
-  onDownloadHook: () => void;
   onReset: () => void;
 }
 
@@ -59,16 +58,12 @@ export const Step4PreviewDownload: React.FC<Step4PreviewDownloadProps> = ({
   onExportPart2,
   onCancelExport,
   onDownloadPart,
-  onDownloadHook,
   onReset,
 }) => {
   const { part1, part2 } = useMemo(() => splitScenesForExport(scenario), [scenario]);
   const splitPoint = calculateSplitPoint(scenario.scenes.length);
 
-  const hookVideo = scenario.hookScene.generatedVideo;
-  const hasHookVideo = !!hookVideo?.url;
-
-  const part1Duration = part1.length; // 1분 × 씬 수
+  const part1Duration = part1.length; // 1분 x 씬 수
   const part2Duration = part2.length;
 
   return (
@@ -80,44 +75,6 @@ export const Step4PreviewDownload: React.FC<Step4PreviewDownloadProps> = ({
           총 {scenario.scenes.length}개 씬 · ~{config.duration}분
         </p>
       </div>
-
-      {/* 후킹 영상 */}
-      <section className="bg-gray-800/50 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="text-base font-semibold text-white">후킹 영상 (10초)</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Hailuo AI로 생성된 동영상</p>
-          </div>
-          {hasHookVideo && (
-            <button
-              onClick={onDownloadHook}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-500 transition-colors min-h-[36px]"
-            >
-              <DownloadIcon className="w-4 h-4" />
-              다운로드
-            </button>
-          )}
-        </div>
-
-        {hasHookVideo ? (
-          <div className="rounded-lg overflow-hidden bg-black">
-            <video
-              src={hookVideo.url}
-              controls
-              className="w-full max-h-[300px]"
-              poster={hookVideo.thumbnailUrl}
-            />
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-40 bg-gray-900/50 rounded-lg">
-            <p className="text-sm text-gray-500">
-              {scenario.hookScene.videoStatus === 'failed'
-                ? '후킹 영상 생성에 실패했습니다'
-                : '후킹 영상이 없습니다'}
-            </p>
-          </div>
-        )}
-      </section>
 
       {/* 파트 1 */}
       <section className="bg-gray-800/50 rounded-xl p-4">

@@ -12,7 +12,6 @@ interface UseLongformScenarioReturn {
 
   // Scene editing
   updateScene: (sceneNumber: number, updates: Partial<LongformScene>) => void;
-  updateHookScene: (updates: Partial<LongformScenario['hookScene']>) => void;
 
   // Narration validation
   adjustNarration: (sceneNumber: number) => Promise<void>;
@@ -58,16 +57,6 @@ export function useLongformScenario(): UseLongformScenarioReturn {
     });
   }, []);
 
-  const updateHookScene = useCallback((updates: Partial<LongformScenario['hookScene']>) => {
-    setScenario(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        hookScene: { ...prev.hookScene, ...updates },
-      };
-    });
-  }, []);
-
   const adjustNarration = useCallback(async (sceneNumber: number) => {
     if (!scenario) return;
 
@@ -103,7 +92,6 @@ export function useLongformScenario(): UseLongformScenarioReturn {
     setScenario,
     generateScenario,
     updateScene,
-    updateHookScene,
     adjustNarration,
     isAdjustingNarration,
     clearError,

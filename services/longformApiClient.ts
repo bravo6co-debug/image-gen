@@ -41,7 +41,6 @@ export async function generateLongformScenario(config: LongformConfig): Promise<
   return {
     id: result.scenario.id,
     config,
-    hookScene: result.scenario.hookScene,
     scenes: result.scenario.scenes,
     metadata: result.scenario.metadata,
     createdAt: result.scenario.createdAt,
@@ -61,30 +60,6 @@ export async function validateNarration(
     context,
     ...(textModel && { textModel }),
   }, 'Validate Narration');
-}
-
-// ─── 후킹 이미지 생성 ────────────────────────────
-export async function generateHookImage(
-  visualDescription: string,
-  imageModel: string
-): Promise<{ image: { mimeType: string; data: string } }> {
-  return post('/api/longform/generate-hook-image', {
-    visualDescription,
-    style: 'animation',
-    imageModel,
-  }, 'Generate Hook Image');
-}
-
-// ─── 후킹 영상 생성 ────────────────────────────
-export async function generateHookVideo(
-  sourceImage: string,
-  motionPrompt: string
-): Promise<{ videoUrl: string; thumbnailUrl: string }> {
-  return post('/api/longform/generate-hook-video', {
-    sourceImage,
-    motionPrompt,
-    durationSeconds: 10,
-  }, 'Generate Hook Video');
 }
 
 // ─── 씬 이미지 일괄 생성 ─────────────────────────
@@ -110,13 +85,11 @@ export async function generateSceneImages(
 // ─── 캐릭터 추출 ────────────────────────────────
 export async function extractLongformCharacters(
   scenes: { sceneNumber: number; imagePrompt: string; narration: string }[],
-  hookScene: { visualDescription: string; hookText: string },
   metadata: { title: string; synopsis: string },
   textModel?: string
 ): Promise<{ characters: LongformCharacter[] }> {
   return post('/api/longform/extract-characters', {
     scenes,
-    hookScene,
     metadata,
     ...(textModel && { textModel }),
   }, 'Extract Longform Characters');

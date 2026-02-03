@@ -20,19 +20,18 @@ function buildPass1Prompt(topic: string, duration: number, totalScenes: number, 
 이 단계에서는 나레이션과 스토리 구조만 생성합니다. 이미지 프롬프트는 생성하지 않습니다.
 
 ## 규칙
-1. 후킹 시나리오: 본편과 관련되지만 시청자의 호기심을 극도로 자극하는 충격적/궁금증 유발 장면 (10초)
-2. 본편은 ${totalScenes}개의 씬으로 구성
-3. ⚠️ [최우선 규칙] 나레이션 글자수 — 반드시 아래 규칙을 지켜야 합니다:
+1. 본편은 ${totalScenes}개의 씬으로 구성 (각 씬 = 1분)
+2. ⚠️ [최우선 규칙] 나레이션 글자수 — 반드시 아래 규칙을 지켜야 합니다:
    - 각 씬의 나레이션은 정확히 6개 구간으로 구성됩니다 (10초 × 6 = 60초 = 1분)
    - 각 구간은 띄어쓰기 포함 72~74자입니다
    - 따라서 총 글자수는 432~444자 (6 × 72~74)
    - 글자수가 432자 미만이거나 444자를 초과하면 절대 안 됩니다
    - 글자수를 맞추기 위해 형용사, 부사, 접속사 등을 조절하세요
-4. 스토리 구조: 도입(~20%) → 전개(~25%) → 심화(~25%) → 절정(~20%) → 마무리(~10%)
-5. 나레이션은 자연스러운 한국어, 다큐멘터리/설명 톤
-6. 나레이션 작성 후 반드시 글자수를 세서 432~444자 범위인지 검증하세요
-7. 각 씬에서 나레이션의 핵심 시각화 키워드를 3~5개 추출하세요 (영어)
-8. 각 씬의 분위기, 카메라 앵글, 조명/분위기를 지정하세요
+3. 스토리 구조: 도입(~20%) → 전개(~25%) → 심화(~25%) → 절정(~20%) → 마무리(~10%)
+4. 나레이션은 자연스러운 한국어, 다큐멘터리/설명 톤
+5. 나레이션 작성 후 반드시 글자수를 세서 432~444자 범위인지 검증하세요
+6. 각 씬에서 나레이션의 핵심 시각화 키워드를 3~5개 추출하세요 (영어)
+7. 각 씬의 분위기, 카메라 앵글, 조명/분위기를 지정하세요
 
 ## narrationKeywords 추출 규칙
 - 나레이션에서 시각적으로 표현 가능한 핵심 요소를 영어로 추출
@@ -56,15 +55,10 @@ ${reference ? `\n## 참고 자료\n아래는 시나리오 작성에 참고할 �
 
 ## 출력 구조 (JSON)
 {
-  "hookScene": {
-    "hookText": "후킹 자막 텍스트 (한국어, 20자 이내)",
-    "hookKeywords": ["시각화 키워드 3개 (영어)"],
-    "motionPrompt": "10초 동영상 모션 설명 (영어)"
-  },
   "scenes": [
     {
       "sceneNumber": 1,
-      "timeRange": "0:10~1:10",
+      "timeRange": "0:00~1:00",
       "narration": "나레이션 텍스트 (한국어, 정확히 432~444자)",
       "narrationCharCount": 438,
       "narrationKeywords": ["keyword1", "keyword2", "keyword3"],
@@ -126,13 +120,8 @@ function buildPass2Prompt(pass1Result: any): string {
 ## 씬 정보
 ${sceneSummaries}
 
-## 후킹 씬 정보
-- 자막: ${pass1Result.hookScene.hookText}
-- 키워드: ${(pass1Result.hookScene.hookKeywords || []).join(', ')}
-
 ## 출력 구조 (JSON)
 {
-  "hookVisualDescription": "후킹 씬 이미지 프롬프트 (영어, 위 규칙대로 상세하게)",
   "scenePrompts": [
     {
       "sceneNumber": 1,
@@ -146,15 +135,6 @@ ${sceneSummaries}
 const pass1Schema = {
   type: Type.OBJECT,
   properties: {
-    hookScene: {
-      type: Type.OBJECT,
-      properties: {
-        hookText: { type: Type.STRING, description: '후킹 자막 텍스트 (한국어, 20자 이내)' },
-        hookKeywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: '후킹 씬 시각화 키워드 (영어, 3개)' },
-        motionPrompt: { type: Type.STRING, description: '10초 동영상 모션 설명 (영어)' },
-      },
-      required: ['hookText', 'hookKeywords', 'motionPrompt'],
-    },
     scenes: {
       type: Type.ARRAY,
       items: {
@@ -184,14 +164,13 @@ const pass1Schema = {
       required: ['title', 'synopsis', 'totalScenes', 'estimatedDuration'],
     },
   },
-  required: ['hookScene', 'scenes', 'metadata'],
+  required: ['scenes', 'metadata'],
 };
 
 // ─── Pass 2 JSON Schema ──────────────────────────────
 const pass2Schema = {
   type: Type.OBJECT,
   properties: {
-    hookVisualDescription: { type: Type.STRING, description: '후킹 씬 상세 이미지 프롬프트 (영어, 80~150단어)' },
     scenePrompts: {
       type: Type.ARRAY,
       items: {
@@ -204,7 +183,7 @@ const pass2Schema = {
       },
     },
   },
-  required: ['hookVisualDescription', 'scenePrompts'],
+  required: ['scenePrompts'],
 };
 
 // ─── Gemini 2-pass 실행 ─────────────────────────────
@@ -271,17 +250,10 @@ function mergeResults(pass1: any, pass2: any) {
 
   return {
     id: crypto.randomUUID(),
-    hookScene: {
-      visualDescription: pass2.hookVisualDescription || pass1.hookScene.hookText,
-      motionPrompt: pass1.hookScene.motionPrompt,
-      hookText: pass1.hookScene.hookText,
-      imageStatus: 'pending',
-      videoStatus: 'pending',
-    },
     scenes: pass1.scenes.map((scene: any, index: number) => ({
       id: crypto.randomUUID(),
       sceneNumber: scene.sceneNumber || index + 1,
-      timeRange: scene.timeRange || `${Math.floor((index * 60 + 10) / 60)}:${String((index * 60 + 10) % 60).padStart(2, '0')}~${Math.floor(((index + 1) * 60 + 10) / 60)}:${String(((index + 1) * 60 + 10) % 60).padStart(2, '0')}`,
+      timeRange: scene.timeRange || `${index}:00~${index + 1}:00`,
       imagePrompt: promptMap.get(scene.sceneNumber || index + 1) || scene.narrationKeywords?.join(', ') || '',
       narrationKeywords: scene.narrationKeywords || [],
       narration: scene.narration,
@@ -318,7 +290,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const sanitizedTopic = sanitizePrompt(topic, 200);
     const sanitizedReference = referenceText ? sanitizePrompt(referenceText, 5000) : '';
-    const totalScenes = duration - 1;
+    const totalScenes = duration;
     const textModel = requestTextModel || await getUserTextModel(auth.userId);
 
     let pass1Result: any;

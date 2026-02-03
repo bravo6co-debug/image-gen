@@ -39,21 +39,8 @@ export interface LongformConfig {
   tts: TtsConfig;
 }
 
-// ─── 후킹 씬 ─────────────────────────────────────
+// ─── 에셋 상태 ──────────────────────────────────
 export type AssetStatus = 'pending' | 'generating' | 'completed' | 'failed';
-
-export interface HookScene {
-  visualDescription: string;
-  motionPrompt: string;
-  hookText: string;
-  generatedImage?: ImageData;
-  generatedVideo?: {
-    url: string;
-    thumbnailUrl: string;
-  };
-  imageStatus: AssetStatus;
-  videoStatus: AssetStatus;
-}
 
 // ─── 본편 씬 ─────────────────────────────────────
 export type StoryPhase = '도입' | '전개' | '심화' | '절정' | '마무리';
@@ -96,7 +83,6 @@ export interface LongformCharacter {
 export interface LongformScenario {
   id: string;
   config: LongformConfig;
-  hookScene: HookScene;
   scenes: LongformScene[];
   characters?: LongformCharacter[];
   metadata: {
@@ -109,7 +95,7 @@ export interface LongformScenario {
 }
 
 // ─── 생성 진행 상태 ───────────────────────────────
-export type GenerationStep = 'hook-image' | 'hook-video' | 'scene-images' | 'narrations' | 'completed';
+export type GenerationStep = 'scene-images' | 'narrations' | 'completed';
 
 export interface BatchProgress {
   total: number;
@@ -120,8 +106,6 @@ export interface BatchProgress {
 
 export interface GenerationProgress {
   currentStep: GenerationStep;
-  hookImage: AssetStatus;
-  hookVideo: AssetStatus;
   sceneImages: BatchProgress;
   narrations: BatchProgress;
   overallPercent: number;
@@ -129,11 +113,6 @@ export interface GenerationProgress {
 
 // ─── 출력물 ──────────────────────────────────────
 export interface LongformOutput {
-  hookVideo: {
-    url: string;
-    duration: 10;
-    format: 'mp4';
-  } | null;
   partOne: {
     blob?: Blob;
     duration: number;
@@ -218,7 +197,7 @@ export const DEFAULT_LONGFORM_CONFIG: Omit<LongformConfig, 'topic'> = {
 
 // ─── 유틸리티 함수 ────────────────────────────────
 export function calculateSceneCount(duration: LongformDuration): number {
-  return duration - 1;
+  return duration;
 }
 
 export function calculateSplitPoint(totalScenes: number): number {
@@ -234,7 +213,7 @@ export function estimateImageCost(model: LongformImageModel, sceneCount: number)
     'flux-kontext-pro': 0.04,
     'flux-kontext-max': 0.08,
   };
-  const total = costs[model] * (sceneCount + 1); // +1 for hook image
+  const total = costs[model] * sceneCount;
   return `~$${total.toFixed(2)}`;
 }
 

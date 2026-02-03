@@ -22,7 +22,6 @@ export const LongformTab: React.FC = () => {
     error: scenarioError,
     generateScenario,
     updateScene,
-    updateHookScene,
     adjustNarration,
     isAdjustingNarration,
     setScenario,
@@ -61,7 +60,6 @@ export const LongformTab: React.FC = () => {
     startExportPart2,
     cancelExport,
     downloadPart,
-    downloadHookVideo,
   } = useLongformExport();
 
   // 워크플로우 상태
@@ -188,7 +186,6 @@ export const LongformTab: React.FC = () => {
           <Step2ScenarioEditor
             scenario={scenario}
             onUpdateScene={updateScene}
-            onUpdateHook={updateHookScene}
             onAdjustNarration={adjustNarration}
             isAdjustingNarration={isAdjustingNarration}
             onPrev={() => setCurrentStep(1)}
@@ -267,7 +264,6 @@ export const LongformTab: React.FC = () => {
             onExportPart2={() => startExportPart2(scenario)}
             onCancelExport={cancelExport}
             onDownloadPart={(part) => downloadPart(part, scenario)}
-            onDownloadHook={() => downloadHookVideo(scenario)}
             onReset={handleReset}
           />
         );

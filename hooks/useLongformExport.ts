@@ -27,7 +27,6 @@ interface UseLongformExportReturn {
   startExportPart2: (scenario: LongformScenario) => Promise<void>;
   cancelExport: () => void;
   downloadPart: (part: 'part1' | 'part2', scenario: LongformScenario) => void;
-  downloadHookVideo: (scenario: LongformScenario) => void;
 }
 
 const INITIAL_PART_STATE: PartExportState = { status: 'idle', progress: 0 };
@@ -113,7 +112,6 @@ export function useLongformExport(): UseLongformExportReturn {
         result,
       });
       setOutput(prev => ({
-        hookVideo: prev?.hookVideo ?? null,
         partOne: {
           blob: result.videoBlob,
           duration: result.duration,
@@ -179,7 +177,6 @@ export function useLongformExport(): UseLongformExportReturn {
         result,
       });
       setOutput(prev => ({
-        hookVideo: prev?.hookVideo ?? null,
         partOne: prev?.partOne ?? null,
         partTwo: {
           blob: result.videoBlob,
@@ -225,20 +222,6 @@ export function useLongformExport(): UseLongformExportReturn {
     }
   }, [part1State, part2State]);
 
-  const downloadHookVideo = useCallback(async (scenario: LongformScenario) => {
-    const hookUrl = scenario.hookScene.generatedVideo?.url;
-    if (!hookUrl) return;
-
-    try {
-      const response = await fetch(hookUrl);
-      const blob = await response.blob();
-      const title = scenario.metadata.title.replace(/[^a-zA-Z0-9가-힣]/g, '_');
-      downloadLongformVideo(blob, `${title}_후킹.mp4`);
-    } catch (error) {
-      console.error('Hook video download failed:', error);
-    }
-  }, []);
-
   return {
     output,
     part1State,
@@ -248,6 +231,5 @@ export function useLongformExport(): UseLongformExportReturn {
     startExportPart2,
     cancelExport,
     downloadPart,
-    downloadHookVideo,
   };
 }

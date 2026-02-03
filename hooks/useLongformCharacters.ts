@@ -39,7 +39,6 @@ export function useLongformCharacters(): UseLongformCharactersReturn {
       }));
       const result = await extractLongformCharacters(
         sceneInputs,
-        { visualDescription: scenario.hookScene.visualDescription, hookText: scenario.hookScene.hookText },
         { title: scenario.metadata.title, synopsis: scenario.metadata.synopsis },
         scenario.config?.textModel,
       );

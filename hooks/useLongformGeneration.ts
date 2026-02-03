@@ -1,8 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import type { LongformScenario, LongformConfig, GenerationProgress, AssetStatus } from '../types/longform';
 import {
-  generateHookImage,
-  generateHookVideo,
   generateSceneImages,
   generateNarrations,
 } from '../services/longformApiClient';
@@ -16,9 +14,7 @@ interface UseLongformGenerationReturn {
 
 function createInitialProgress(sceneCount: number): GenerationProgress {
   return {
-    currentStep: 'hook-image',
-    hookImage: 'pending',
-    hookVideo: 'pending',
+    currentStep: 'scene-images',
     sceneImages: { total: sceneCount, completed: 0, failed: 0, inProgress: 0 },
     narrations: { total: sceneCount, completed: 0, failed: 0, inProgress: 0 },
     overallPercent: 0,
@@ -26,16 +22,10 @@ function createInitialProgress(sceneCount: number): GenerationProgress {
 }
 
 function calcPercent(p: GenerationProgress): number {
-  const hookImageW = 5;
-  const hookVideoW = 15;
-  const imagesW = 50;
-  const narrationsW = 30;
+  const imagesW = 60;
+  const narrationsW = 40;
 
   let pct = 0;
-  if (p.hookImage === 'completed') pct += hookImageW;
-  else if (p.hookImage === 'generating') pct += hookImageW * 0.5;
-  if (p.hookVideo === 'completed') pct += hookVideoW;
-  else if (p.hookVideo === 'generating') pct += hookVideoW * 0.3;
   if (p.sceneImages.total > 0) pct += (p.sceneImages.completed / p.sceneImages.total) * imagesW;
   if (p.narrations.total > 0) pct += (p.narrations.completed / p.narrations.total) * narrationsW;
 
@@ -68,49 +58,10 @@ export function useLongformGeneration(): UseLongformGenerationReturn {
     let updatedScenario = { ...scenario };
 
     try {
-      // Phase 1: Hook image
-      updateProgress(p => ({ ...p, currentStep: 'hook-image', hookImage: 'generating' }));
-      try {
-        const hookResult = await generateHookImage(scenario.hookScene.visualDescription, config.imageModel);
-        updatedScenario = {
-          ...updatedScenario,
-          hookScene: { ...updatedScenario.hookScene, generatedImage: hookResult.image, imageStatus: 'completed' },
-        };
-        updateProgress(p => ({ ...p, hookImage: 'completed' }));
-      } catch {
-        updateProgress(p => ({ ...p, hookImage: 'failed' }));
-      }
-
-      if (cancelledRef.current) throw new Error('Cancelled');
-
-      // Phase 1: Hook video
-      updateProgress(p => ({ ...p, currentStep: 'hook-video', hookVideo: 'generating' }));
-      if (updatedScenario.hookScene.generatedImage) {
-        try {
-          const videoResult = await generateHookVideo(
-            updatedScenario.hookScene.generatedImage.data,
-            scenario.hookScene.motionPrompt
-          );
-          updatedScenario = {
-            ...updatedScenario,
-            hookScene: {
-              ...updatedScenario.hookScene,
-              generatedVideo: { url: videoResult.videoUrl, thumbnailUrl: videoResult.thumbnailUrl },
-              videoStatus: 'completed',
-            },
-          };
-          updateProgress(p => ({ ...p, hookVideo: 'completed' }));
-        } catch {
-          updateProgress(p => ({ ...p, hookVideo: 'failed' }));
-        }
-      } else {
-        updateProgress(p => ({ ...p, hookVideo: 'failed' }));
-      }
-
-      if (cancelledRef.current) throw new Error('Cancelled');
-
-      // Phase 2: Scene images + narrations in parallel
+      // Scene images + narrations in parallel
       updateProgress(p => ({ ...p, currentStep: 'scene-images' }));
+
+      if (cancelledRef.current) throw new Error('Cancelled');
 
       // Enrich scene image prompts with character descriptions + metadata for consistency
       const sceneInputs = scenario.scenes.map(scene => {

@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { scenes, hookScene, metadata, textModel: requestTextModel } = req.body;
+    const { scenes, metadata, textModel: requestTextModel } = req.body;
 
     if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
       return res.status(400).json({ error: 'scenes array is required' });
@@ -32,11 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 - 제목: ${metadata?.title || '(제목 없음)'}
 - 줄거리: ${metadata?.synopsis || '(요약 없음)'}
 
-## 후킹 씬
-비주얼: ${hookScene?.visualDescription || '(없음)'}
-자막: ${hookScene?.hookText || '(없음)'}
-
-## 본편 씬 목록
+## 씬 목록
 ${scenesText}
 
 ## 작업

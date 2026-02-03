@@ -5,19 +5,6 @@ interface GenerationProgressProps {
   progress: ProgressType;
 }
 
-const StatusIcon: React.FC<{ status: string }> = ({ status }) => {
-  switch (status) {
-    case 'completed':
-      return <span className="text-green-400">&#10003;</span>;
-    case 'generating':
-      return <span className="animate-spin inline-block w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full" />;
-    case 'failed':
-      return <span className="text-red-400">&#10007;</span>;
-    default:
-      return <span className="text-gray-500">&#9711;</span>;
-  }
-};
-
 const BatchProgressBar: React.FC<{ label: string; progress: BatchProgress }> = ({ label, progress: p }) => {
   const percent = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0;
   return (
@@ -48,17 +35,6 @@ export const GenerationProgress: React.FC<GenerationProgressProps> = ({ progress
           />
         </div>
         <span className="text-sm text-teal-400">{progress.overallPercent}%</span>
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 text-sm">
-          <StatusIcon status={progress.hookImage} />
-          <span className="text-gray-300">후킹 이미지 생성</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <StatusIcon status={progress.hookVideo} />
-          <span className="text-gray-300">후킹 영상 생성 (Hailuo AI)</span>
-        </div>
       </div>
 
       <BatchProgressBar label="씬 이미지 생성" progress={progress.sceneImages} />

@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from '../lib/auth.js';
 import { getAIClientForUser, setCorsHeaders, Modality, extractSafetyError } from '../lib/gemini.js';
 import { isFluxModel, getEachLabsApiKey, generateFluxImage } from '../lib/eachlabs.js';
+import { buildImagePrompt } from '../lib/imagePromptBuilder.js';
 
 interface SceneInput {
   sceneNumber: number;
@@ -9,32 +10,6 @@ interface SceneInput {
   cameraAngle?: string;
   lightingMood?: string;
   mood?: string;
-}
-
-// 씬 메타데이터를 활용한 고품질 이미지 프롬프트 래핑
-function buildEnhancedPrompt(scene: SceneInput): string {
-  const basePrompt = scene.imagePrompt.trim();
-  const camera = scene.cameraAngle || '';
-  const lighting = scene.lightingMood || '';
-  const mood = scene.mood || '';
-
-  // 프롬프트에 이미 카메라/조명이 포함되어 있는지 확인
-  const hasCamera = /\b(shot|angle|view|close-up|wide|medium|POV|bird's eye)\b/i.test(basePrompt);
-  const hasLighting = /\b(light|glow|sunlight|moonlight|neon|shadow|backlight|ambient)\b/i.test(basePrompt);
-
-  let enhanced = basePrompt;
-
-  // 카메라 앵글이 프롬프트에 없으면 추가
-  if (!hasCamera && camera) {
-    enhanced += `, ${camera}`;
-  }
-
-  // 조명이 프롬프트에 없으면 추가
-  if (!hasLighting && lighting) {
-    enhanced += `, ${lighting}`;
-  }
-
-  return `High-quality detailed anime illustration for YouTube video scene. ${enhanced}. Absolutely no text, no letters, no words, no watermarks, no logos, no UI elements. Rich color palette, professional composition, 16:9 cinematic widescreen aspect ratio, high detail anime art with realistic shading and atmospheric depth.`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -61,7 +36,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const batchPromises = batch.map(async (scene) => {
         try {
-          const prompt = buildEnhancedPrompt(scene);
+          const prompt = buildImagePrompt(imageModel, 'scene', {
+            imagePrompt: scene.imagePrompt,
+            cameraAngle: scene.cameraAngle,
+            lightingMood: scene.lightingMood,
+            mood: scene.mood,
+          });
 
           if (isFluxModel(imageModel)) {
             const apiKey = await getEachLabsApiKey(auth.userId!);

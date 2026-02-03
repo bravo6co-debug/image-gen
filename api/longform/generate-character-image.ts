@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from '../lib/auth.js';
 import { getAIClientForUser, setCorsHeaders, Modality } from '../lib/gemini.js';
 import { isFluxModel, getEachLabsApiKey, generateFluxImage } from '../lib/eachlabs.js';
+import { buildImagePrompt } from '../lib/imagePromptBuilder.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res, req.headers.origin as string);
@@ -20,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'appearanceDescription is required' });
     }
 
-    const prompt = `Anime style character portrait. ${characterName || 'character'}. ${appearanceDescription}. Wearing ${outfit || 'casual clothes'}. Upper body portrait, facing slightly to the side, clean background, soft lighting. No text, no watermarks, no letters. High detail, vibrant colors.`;
+    const prompt = buildImagePrompt(imageModel, 'character', { characterName, appearanceDescription, outfit });
 
     if (isFluxModel(imageModel)) {
       const apiKey = await getEachLabsApiKey(auth.userId);

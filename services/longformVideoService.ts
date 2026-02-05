@@ -553,10 +553,6 @@ export async function renderLongformPart(
 
     // ── 3. 이미지 프리로드 ──
     const imageMap = await preloadSceneImages(scenes);
-    // [I] base64 데이터 참조 해제 — ~3-6MB/씬 × 6씬 = ~18-36MB 메모리 절감
-    for (const scene of scenes) {
-      (scene.imageData as any).data = '';
-    }
     onProgress?.({ status: 'preparing', progress: 10, totalFrames });
 
     // ── 4. 오디오: 10초 단위 슬라이싱 + 독립 스케줄링 ──

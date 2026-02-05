@@ -55,12 +55,6 @@ const UploadIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-const RefreshIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-  </svg>
-);
-
 const ImageIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -84,34 +78,30 @@ interface SceneCardProps {
   scene: Scene;
   isExpanded: boolean;
   onToggleExpand: () => void;
-  onRegenerate: (sceneId: string, instruction?: string) => void;
   onGenerateImage: (sceneId: string) => void;
   onEditScene: (sceneId: string, updates: Partial<Scene>) => void;
   onDeleteScene: (sceneId: string) => void;
   onDownloadImage: (sceneId: string) => void;
   onReplaceImage: (sceneId: string, image: ImageData) => void;
-  isRegenerating: boolean;
   isGeneratingImage: boolean;
+  isUpdatingPrompt?: boolean;
 }
 
 const SceneCard: React.FC<SceneCardProps> = ({
   scene,
   isExpanded,
   onToggleExpand,
-  onRegenerate,
   onGenerateImage,
   onEditScene,
   onDeleteScene,
   onDownloadImage,
   onReplaceImage,
-  isRegenerating,
   isGeneratingImage,
+  isUpdatingPrompt = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedNarration, setEditedNarration] = useState(scene.narration);
   const [editedVisual, setEditedVisual] = useState(scene.visualDescription);
-  const [regenInstruction, setRegenInstruction] = useState('');
-  const [showRegenInput, setShowRegenInput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const storyBeatColors: Record<string, string> = {
@@ -122,18 +112,17 @@ const SceneCard: React.FC<SceneCardProps> = ({
     Resolution: 'bg-purple-600',
   };
 
+  // 시각적 묘사가 변경되었는지 확인
+  const visualDescriptionChanged = editedVisual !== scene.visualDescription;
+
   const handleSaveEdit = () => {
     onEditScene(scene.id, {
       narration: editedNarration,
       visualDescription: editedVisual,
+      // 시각적 묘사가 변경되면 플래그 설정 (부모에서 imagePrompt 업데이트 처리)
+      ...(visualDescriptionChanged && { needsPromptUpdate: true }),
     });
     setIsEditing(false);
-  };
-
-  const handleRegenerate = () => {
-    onRegenerate(scene.id, regenInstruction || undefined);
-    setRegenInstruction('');
-    setShowRegenInput(false);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -305,32 +294,6 @@ const SceneCard: React.FC<SceneCardProps> = ({
             </pre>
           </details>
 
-          {/* Regeneration Input */}
-          {showRegenInput && (
-            <div className="flex flex-wrap gap-2">
-              <input
-                type="text"
-                value={regenInstruction}
-                onChange={(e) => setRegenInstruction(e.target.value)}
-                placeholder="재생성 지시사항 (선택사항, 예: 더 극적으로)"
-                className="flex-grow min-w-0 p-2 sm:p-3 text-[16px] sm:text-sm bg-gray-700 border border-gray-600 rounded-md focus:ring-2 focus:ring-purple-500 focus:outline-none"
-              />
-              <button
-                onClick={handleRegenerate}
-                disabled={isRegenerating}
-                className="min-h-[44px] px-3 py-2 text-xs sm:text-sm font-medium text-white bg-purple-600 rounded hover:bg-purple-700 disabled:opacity-50"
-              >
-                {isRegenerating ? '재생성 중...' : '확인'}
-              </button>
-              <button
-                onClick={() => setShowRegenInput(false)}
-                className="min-h-[44px] px-3 py-2 text-xs sm:text-sm font-medium text-gray-300 bg-gray-600 rounded hover:bg-gray-500"
-              >
-                취소
-              </button>
-            </div>
-          )}
-
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-700">
             {!isEditing && (
@@ -343,20 +306,12 @@ const SceneCard: React.FC<SceneCardProps> = ({
               </button>
             )}
             <button
-              onClick={() => setShowRegenInput(true)}
-              disabled={isRegenerating || showRegenInput}
-              className="min-h-[44px] flex items-center gap-1 px-3 py-1.5 text-xs sm:text-sm font-medium text-purple-300 bg-purple-900/50 rounded hover:bg-purple-800/50 disabled:opacity-50"
-            >
-              <RefreshIcon className="w-3.5 h-3.5" />
-              씬 재생성
-            </button>
-            <button
               onClick={() => onGenerateImage(scene.id)}
-              disabled={isGeneratingImage}
+              disabled={isGeneratingImage || isUpdatingPrompt}
               className="min-h-[44px] flex items-center gap-1 px-3 py-1.5 text-xs sm:text-sm font-medium text-indigo-300 bg-indigo-900/50 rounded hover:bg-indigo-800/50 disabled:opacity-50"
             >
               <ImageIcon className="w-3.5 h-3.5" />
-              {isGeneratingImage ? '생성 중...' : currentImage ? '이미지 재생성' : '이미지 생성'}
+              {isGeneratingImage ? '생성 중...' : isUpdatingPrompt ? '프롬프트 업데이트 중...' : currentImage ? '이미지 재생성' : '이미지 생성'}
             </button>
             <button
               onClick={() => onDeleteScene(scene.id)}
@@ -719,7 +674,6 @@ export const ScenarioTab: React.FC = () => {
   const {
     scenario,
     isGenerating,
-    regeneratingSceneId,
     generatingImageSceneId,
     isGeneratingAllImages,
     isGeneratingTTS,
@@ -728,7 +682,6 @@ export const ScenarioTab: React.FC = () => {
     generateScenario,
     updateScene,
     removeScene,
-    regenerateScene,
     generateSceneImage,
     generateAllSceneImages,
     replaceSceneImage,
@@ -738,6 +691,8 @@ export const ScenarioTab: React.FC = () => {
     setScenario,
     clearError,
     updateSuggestedCharacter,
+    updateImagePrompt,
+    updatingPromptSceneId,
   } = useScenario();
 
   const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
@@ -746,6 +701,19 @@ export const ScenarioTab: React.FC = () => {
   const [isCharacterSectionCollapsed, setIsCharacterSectionCollapsed] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 씬 업데이트 핸들러 (시각적 묘사 변경 시 imagePrompt 자동 업데이트)
+  const handleUpdateScene = async (sceneId: string, updates: Partial<Scene> & { needsPromptUpdate?: boolean }) => {
+    const { needsPromptUpdate, ...sceneUpdates } = updates;
+
+    // 기본 업데이트 먼저 적용
+    updateScene(sceneId, sceneUpdates);
+
+    // 시각적 묘사가 변경되었으면 imagePrompt 업데이트
+    if (needsPromptUpdate && sceneUpdates.visualDescription) {
+      await updateImagePrompt(sceneId, sceneUpdates.visualDescription);
+    }
+  };
 
   // 시나리오 생성 버튼 클릭 핸들러 (인증 체크)
   const handleOpenGenerator = () => {
@@ -1279,14 +1247,13 @@ export const ScenarioTab: React.FC = () => {
                 scene={scene}
                 isExpanded={expandedSceneId === scene.id}
                 onToggleExpand={() => setExpandedSceneId(expandedSceneId === scene.id ? null : scene.id)}
-                onRegenerate={regenerateScene}
                 onGenerateImage={handleGenerateSceneImage}
-                onEditScene={updateScene}
+                onEditScene={handleUpdateScene}
                 onDeleteScene={removeScene}
                 onDownloadImage={downloadSceneImage}
                 onReplaceImage={replaceSceneImage}
-                isRegenerating={regeneratingSceneId === scene.id}
                 isGeneratingImage={generatingImageSceneId === scene.id}
+                isUpdatingPrompt={updatingPromptSceneId === scene.id}
               />
             ))}
           </div>

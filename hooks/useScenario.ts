@@ -11,7 +11,6 @@ import {
 } from '../types';
 import {
   generateScenario as apiGenerateScenario,
-  regenerateScene as apiRegenerateScene,
   generateSceneImage as apiGenerateSceneImage,
 } from '../services/geminiService';
 import { generateNarration, TTSVoice, NamedCharacterImage } from '../services/apiClient';
@@ -25,11 +24,11 @@ interface UseScenarioReturn {
   // 상태
   scenario: Scenario | null;
   isGenerating: boolean;
-  regeneratingSceneId: string | null;
   generatingImageSceneId: string | null;
   isGeneratingAllImages: boolean;
   isGeneratingTTS: boolean;
   ttsProgress: { current: number; total: number };
+  updatingPromptSceneId: string | null;
   error: string | null;
 
   // 시나리오 관리
@@ -44,8 +43,8 @@ interface UseScenarioReturn {
   duplicateScene: (sceneId: string) => void;
   reorderScenes: (sceneIds: string[]) => void;
 
-  // 씬 재생성
-  regenerateScene: (sceneId: string, instruction?: string) => Promise<Scene>;
+  // 이미지 프롬프트 업데이트
+  updateImagePrompt: (sceneId: string, visualDescription: string) => Promise<void>;
 
   // 이미지 생성 (캐릭터 일관성 향상을 위해 allCharacters 추가)
   generateSceneImage: (
@@ -93,11 +92,11 @@ export function useScenario(): UseScenarioReturn {
   } = useProject();
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [regeneratingSceneId, setRegeneratingSceneId] = useState<string | null>(null);
   const [generatingImageSceneId, setGeneratingImageSceneId] = useState<string | null>(null);
   const [isGeneratingAllImages, setIsGeneratingAllImages] = useState(false);
   const [isGeneratingTTS, setIsGeneratingTTS] = useState(false);
   const [ttsProgress, setTtsProgress] = useState({ current: 0, total: 0 });
+  const [updatingPromptSceneId, setUpdatingPromptSceneId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // =============================================
@@ -206,28 +205,41 @@ export function useScenario(): UseScenarioReturn {
   }, [contextReorderScenes]);
 
   // =============================================
-  // 씬 재생성
+  // 이미지 프롬프트 업데이트
   // =============================================
 
-  const regenerateScene = useCallback(async (
+  const updateImagePrompt = useCallback(async (
     sceneId: string,
-    instruction?: string
-  ): Promise<Scene> => {
-    if (!scenario) throw new Error('시나리오가 없습니다.');
+    visualDescription: string
+  ): Promise<void> => {
+    if (!scenario) return;
 
-    setRegeneratingSceneId(sceneId);
+    setUpdatingPromptSceneId(sceneId);
     setError(null);
 
     try {
-      const newScene = await apiRegenerateScene(scenario, sceneId, instruction);
-      contextUpdateScene(sceneId, newScene);
-      return newScene;
+      const response = await fetch('/api/update-image-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visualDescription,
+          imageStyle: scenario.imageStyle,
+          tone: scenario.tone,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('이미지 프롬프트 업데이트 실패');
+      }
+
+      const data = await response.json();
+      contextUpdateScene(sceneId, { imagePrompt: data.imagePrompt });
     } catch (e) {
-      const message = e instanceof Error ? e.message : '씬 재생성에 실패했습니다.';
+      const message = e instanceof Error ? e.message : '이미지 프롬프트 업데이트에 실패했습니다.';
       setError(message);
       throw e;
     } finally {
-      setRegeneratingSceneId(null);
+      setUpdatingPromptSceneId(null);
     }
   }, [scenario, contextUpdateScene]);
 
@@ -556,11 +568,11 @@ export function useScenario(): UseScenarioReturn {
     // 상태
     scenario,
     isGenerating,
-    regeneratingSceneId,
     generatingImageSceneId,
     isGeneratingAllImages,
     isGeneratingTTS,
     ttsProgress,
+    updatingPromptSceneId,
     error,
 
     // 시나리오 관리
@@ -575,8 +587,8 @@ export function useScenario(): UseScenarioReturn {
     duplicateScene,
     reorderScenes,
 
-    // 씬 재생성
-    regenerateScene,
+    // 이미지 프롬프트 업데이트
+    updateImagePrompt,
 
     // 이미지 생성
     generateSceneImage,

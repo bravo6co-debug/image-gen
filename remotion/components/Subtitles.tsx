@@ -68,9 +68,12 @@ export const Subtitles: React.FC<SubtitlesProps> = ({
   fadeOut = true,
 }) => {
   const frame = useCurrentFrame();
-  const { durationInFrames, fps, height } = useVideoConfig();
+  const { durationInFrames, fps, height, width } = useVideoConfig();
 
   if (!text) return null;
+
+  // 세로 영상 여부 확인
+  const isVertical = height > width;
 
   // 오디오 기반 자막 범위 계산
   const audioDurationFrames = audioDurationMs
@@ -125,8 +128,12 @@ export const Subtitles: React.FC<SubtitlesProps> = ({
     transform: position === 'center' ? 'translateY(-50%)' : undefined,
   };
 
-  // 화면 높이 기준으로 폰트 크기 계산 (6% of height)
-  const dynamicFontSize = Math.round(height * 0.06);
+  // 화면 크기 기준으로 폰트 크기 계산
+  // 가로 영상: height * 0.06 (약 65px at 1080p)
+  // 세로 영상: width * 0.05 (약 54px at 1080 width) - 좁은 화면에 맞게 작게
+  const dynamicFontSize = isVertical
+    ? Math.round(width * 0.05)
+    : Math.round(height * 0.06);
 
   return (
     <AbsoluteFill

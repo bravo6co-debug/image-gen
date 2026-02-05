@@ -12,6 +12,7 @@ import {
   ScenarioTone,
   ScenarioMode,
   ImageStyle,
+  AspectRatio,
   SuggestedCharacter,
   CharacterAsset,
   CharacterRole,
@@ -79,12 +80,13 @@ interface SceneCardProps {
   isExpanded: boolean;
   onToggleExpand: () => void;
   onGenerateImage: (sceneId: string) => void;
-  onEditScene: (sceneId: string, updates: Partial<Scene>) => void;
+  onEditScene: (sceneId: string, updates: Partial<Scene>) => Promise<void>;
   onDeleteScene: (sceneId: string) => void;
   onDownloadImage: (sceneId: string) => void;
   onReplaceImage: (sceneId: string, image: ImageData) => void;
   isGeneratingImage: boolean;
   isUpdatingPrompt?: boolean;
+  isGeneratingAllImages?: boolean;
 }
 
 const SceneCard: React.FC<SceneCardProps> = ({
@@ -98,8 +100,10 @@ const SceneCard: React.FC<SceneCardProps> = ({
   onReplaceImage,
   isGeneratingImage,
   isUpdatingPrompt = false,
+  isGeneratingAllImages = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editedNarration, setEditedNarration] = useState(scene.narration);
   const [editedVisual, setEditedVisual] = useState(scene.visualDescription);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -115,14 +119,24 @@ const SceneCard: React.FC<SceneCardProps> = ({
   // 시각적 묘사가 변경되었는지 확인
   const visualDescriptionChanged = editedVisual !== scene.visualDescription;
 
-  const handleSaveEdit = () => {
-    onEditScene(scene.id, {
-      narration: editedNarration,
-      visualDescription: editedVisual,
-      // 시각적 묘사가 변경되면 플래그 설정 (부모에서 imagePrompt 업데이트 처리)
-      ...(visualDescriptionChanged && { needsPromptUpdate: true }),
-    });
-    setIsEditing(false);
+  // 전체 작업 진행 중 여부 (편집 불가)
+  const isBusy = isGeneratingImage || isGeneratingAllImages || isUpdatingPrompt || isSaving;
+
+  const handleSaveEdit = async () => {
+    setIsSaving(true);
+    try {
+      await onEditScene(scene.id, {
+        narration: editedNarration,
+        visualDescription: editedVisual,
+        // 시각적 묘사가 변경되면 플래그 설정 (부모에서 imagePrompt 업데이트 처리)
+        ...(visualDescriptionChanged && { needsPromptUpdate: true }),
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Scene save error:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,9 +219,10 @@ const SceneCard: React.FC<SceneCardProps> = ({
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={handleSaveEdit}
-                      className="min-h-[44px] px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700"
+                      disabled={isSaving}
+                      className="min-h-[44px] px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      저장
+                      {isSaving ? '저장 중...' : '저장'}
                     </button>
                     <button
                       onClick={() => {
@@ -215,7 +230,8 @@ const SceneCard: React.FC<SceneCardProps> = ({
                         setEditedNarration(scene.narration);
                         setEditedVisual(scene.visualDescription);
                       }}
-                      className="min-h-[44px] px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-300 bg-gray-600 rounded hover:bg-gray-500"
+                      disabled={isSaving}
+                      className="min-h-[44px] px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-300 bg-gray-600 rounded hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       취소
                     </button>
@@ -299,7 +315,8 @@ const SceneCard: React.FC<SceneCardProps> = ({
             {!isEditing && (
               <button
                 onClick={() => setIsEditing(true)}
-                className="min-h-[44px] flex items-center gap-1 px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-300 bg-gray-700 rounded hover:bg-gray-600"
+                disabled={isBusy}
+                className="min-h-[44px] flex items-center gap-1 px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-300 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <PencilIcon className="w-3.5 h-3.5" />
                 편집
@@ -315,7 +332,8 @@ const SceneCard: React.FC<SceneCardProps> = ({
             </button>
             <button
               onClick={() => onDeleteScene(scene.id)}
-              className="min-h-[44px] flex items-center gap-1 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-300 bg-red-900/50 rounded hover:bg-red-800/50 ml-auto"
+              disabled={isBusy}
+              className="min-h-[44px] flex items-center gap-1 px-3 py-1.5 text-xs sm:text-sm font-medium text-red-300 bg-red-900/50 rounded hover:bg-red-800/50 ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <TrashIcon className="w-3.5 h-3.5" />
               삭제
@@ -351,6 +369,7 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
   const [mode, setMode] = useState<ScenarioMode>('character');
   const [includeCharacters, setIncludeCharacters] = useState(false);  // 환경 모드에서 캐릭터 포함 여부
   const [imageStyle, setImageStyle] = useState<ImageStyle>(defaultImageStyle);
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');  // 영상 비율
 
   if (!isOpen) return null;
 
@@ -366,6 +385,7 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
       customTone: tone === 'custom' ? customTone : undefined,
       mode,
       imageStyle,
+      aspectRatio,
       includeCharacters: mode === 'environment' ? includeCharacters : undefined,
     };
     onGenerate(config);
@@ -381,6 +401,7 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
       setMode('character');
       setIncludeCharacters(false);
       setImageStyle(defaultImageStyle);
+      setAspectRatio('16:9');
       onClose();
     }
   };
@@ -486,6 +507,43 @@ const ScenarioGeneratorModal: React.FC<ScenarioGeneratorModalProps> = ({
                   <span>{option.label}</span>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Aspect Ratio Selection */}
+          <div>
+            <label className="text-xs sm:text-sm font-medium text-gray-300 mb-2 block">영상 비율</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setAspectRatio('16:9')}
+                disabled={isLoading}
+                className={`min-h-[44px] flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                  aspectRatio === '16:9'
+                    ? 'bg-emerald-600 text-white ring-2 ring-emerald-400'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                } disabled:opacity-50`}
+              >
+                <span className="text-lg">📺</span>
+                <div className="text-left">
+                  <div>가로형 (16:9)</div>
+                  <div className="text-xs opacity-70">YouTube, PC</div>
+                </div>
+              </button>
+              <button
+                onClick={() => setAspectRatio('9:16')}
+                disabled={isLoading}
+                className={`min-h-[44px] flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                  aspectRatio === '9:16'
+                    ? 'bg-emerald-600 text-white ring-2 ring-emerald-400'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                } disabled:opacity-50`}
+              >
+                <span className="text-lg">📱</span>
+                <div className="text-left">
+                  <div>세로형 (9:16)</div>
+                  <div className="text-xs opacity-70">Shorts, Reels, TikTok</div>
+                </div>
+              </button>
             </div>
           </div>
 
@@ -1254,6 +1312,7 @@ export const ScenarioTab: React.FC = () => {
                 onReplaceImage={replaceSceneImage}
                 isGeneratingImage={generatingImageSceneId === scene.id}
                 isUpdatingPrompt={updatingPromptSceneId === scene.id}
+                isGeneratingAllImages={isGeneratingAllImages}
               />
             ))}
           </div>

@@ -298,13 +298,14 @@ export function useScenario(): UseScenarioReturn {
         ? filterCharactersForScene(scene, allCharacters)
         : undefined;
 
-      // 시나리오의 imageStyle을 전달
+      // 시나리오의 imageStyle과 aspectRatio 사용 (시나리오에 없으면 프로젝트 설정 fallback)
+      const scenarioAspectRatio = scenario.aspectRatio || aspectRatio;
       const imageData = await apiGenerateSceneImage(
         scene,
         characterImages,
         propImages,
         backgroundImage,
-        aspectRatio,
+        scenarioAspectRatio,
         scenario.imageStyle,
         namedCharacters  // 이름이 포함된 캐릭터 전달
       );
@@ -354,12 +355,14 @@ export function useScenario(): UseScenarioReturn {
             ? filterCharactersForScene(scene, allCharacters)
             : undefined;
 
+          // 시나리오의 aspectRatio 사용 (시나리오에 없으면 프로젝트 설정 fallback)
+          const scenarioAspectRatio = scenario.aspectRatio || aspectRatio;
           const imageData = await apiGenerateSceneImage(
             scene,
             characterImages,
             propImages,
             backgroundImage,
-            aspectRatio,
+            scenarioAspectRatio,
             scenario.imageStyle,
             namedCharacters  // 이름이 포함된 캐릭터 전달
           );

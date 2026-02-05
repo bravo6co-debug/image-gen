@@ -131,6 +131,13 @@ const STYLE_DESCRIPTIONS: Record<ImageStyle, string> = {
     cinematic: '시네마틱 영화 스타일. 할리우드 블록버스터 급의 드라마틱한 비주얼.',
     watercolor: '수채화 스타일. 부드러운 색감과 붓터치가 느껴지는 전통 회화풍.',
     '3d_render': '3D 렌더링 스타일. 픽사/디즈니 애니메이션 급의 CGI 비주얼.',
+    low_poly: '로우폴리 3D 스타일. 기하학적 면 분할과 미니멀한 미학.',
+    pixel_art: '픽셀 아트 스타일. 레트로 게임풍의 선명한 픽셀과 제한된 색상 팔레트.',
+    stop_motion: '스톱모션 스타일. 클레이메이션 느낌의 수제작 질감.',
+    sketch: '스케치 스타일. 연필 드로잉과 예술적인 선화.',
+    comic_book: '만화책 스타일. 굵은 외곽선, 망점, 역동적인 구도.',
+    art_movement: '고전 예술 운동 스타일. 인상파/표현주의 등 예술사조 영감.',
+    motion_graphics: '모션그래픽 스타일. 깔끔한 도형과 현대적인 그라데이션.',
 };
 
 interface DurationConfig {
@@ -225,7 +232,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: 'config.topic is required' } as ApiErrorResponse);
         }
 
-        const { topic, duration, tone, mode = 'character', imageStyle = 'photorealistic', customTone, includeCharacters = false } = config;
+        const { topic, duration, tone, mode = 'character', imageStyle = 'photorealistic', aspectRatio = '16:9', customTone, includeCharacters = false } = config;
         const sanitizedTopic = sanitizePrompt(topic, 5000);
         const durationConfig = getDurationConfig(duration);
         const toneDescription = tone === 'custom' && customTone ? customTone : (TONE_DESCRIPTIONS[tone as ScenarioTone] || TONE_DESCRIPTIONS.emotional);
@@ -664,6 +671,7 @@ ${chapterGuidelines}
             tone: tone as ScenarioTone,
             mode: mode,
             imageStyle: imageStyle,
+            aspectRatio: aspectRatio,
             recommendedImageStyle: recommendedStyle,
             recommendedImageStyleReason: parsed.recommendedImageStyleReason || '',
             recommendedTone: recommendedTone,

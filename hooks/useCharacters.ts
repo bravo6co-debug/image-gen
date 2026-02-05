@@ -56,6 +56,7 @@ export function useCharacters(): UseCharactersReturn {
     setActiveCharacterIds,
     toggleActiveCharacter,
     aspectRatio,
+    imageStyle,
   } = useProject();
 
   const [isCreating, setIsCreating] = useState(false);
@@ -107,8 +108,8 @@ export function useCharacters(): UseCharactersReturn {
         throw new Error('캐릭터 설명 분석에 실패했습니다. 더 자세히 작성해주세요.');
       }
 
-      // 2. 캐릭터 초상화 생성
-      const imagesData = await generateCharacterPortraits(englishDescription, count, aspectRatio);
+      // 2. 캐릭터 초상화 생성 (imageStyle 전달)
+      const imagesData = await generateCharacterPortraits(englishDescription, count, aspectRatio, imageStyle);
 
       // 3. CharacterAsset 객체 생성
       const newCharacters: CharacterAsset[] = imagesData.map(imgData => ({
@@ -136,7 +137,7 @@ export function useCharacters(): UseCharactersReturn {
     } finally {
       setIsCreating(false);
     }
-  }, [aspectRatio, contextAddCharacter]);
+  }, [aspectRatio, imageStyle, contextAddCharacter]);
 
   // =============================================
   // 이미지 업로드로 캐릭터 생성

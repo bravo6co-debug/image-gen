@@ -17,19 +17,40 @@ const generateOneCharacterPortrait = async (
 ): Promise<ImageData> => {
     const stylePrompt = getStylePrompt(imageStyle);
 
-    // 스타일에 따른 기본 지시어 결정
+    // 스타일에 따른 기본 지시어 결정 (13가지 스타일 모두 지원)
+    const getStyleDescription = (style?: ImageStyle): string => {
+        switch (style) {
+            case 'photorealistic':
+            case 'cinematic':
+                return "photorealistic character portrait";
+            case 'animation':
+                return "anime-style character illustration with clean linework and vibrant colors";
+            case 'illustration':
+                return "stylized character illustration with bold colors";
+            case 'watercolor':
+                return "watercolor character painting with soft washes";
+            case '3d_render':
+                return "Pixar-style 3D rendered character with smooth textures";
+            case 'low_poly':
+                return "low-poly geometric 3D character with faceted surfaces";
+            case 'pixel_art':
+                return "retro pixel art character with crisp pixels and limited color palette";
+            case 'stop_motion':
+                return "stop-motion claymation style character with tactile handcrafted textures";
+            case 'sketch':
+                return "hand-drawn sketch character with pencil strokes and artistic linework";
+            case 'comic_book':
+                return "bold comic book style character with strong outlines and dynamic coloring";
+            case 'art_movement':
+                return "classic art movement inspired character portrait with expressive brushwork";
+            case 'motion_graphics':
+                return "modern motion graphics style character with clean vector shapes";
+            default:
+                return "character portrait";
+        }
+    };
     const isPhotorealistic = !imageStyle || imageStyle === 'photorealistic' || imageStyle === 'cinematic';
-    const styleDescription = isPhotorealistic
-        ? "photorealistic character portrait"
-        : imageStyle === 'animation'
-            ? "anime-style character illustration"
-            : imageStyle === 'illustration'
-                ? "stylized character illustration"
-                : imageStyle === 'watercolor'
-                    ? "watercolor character painting"
-                    : imageStyle === '3d_render'
-                        ? "3D rendered character"
-                        : "character portrait";
+    const styleDescription = getStyleDescription(imageStyle);
 
     const finalPrompt = `
 **TASK: Generate a ${styleDescription} for a reference library.**
@@ -142,9 +163,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // FLUX 모델인 경우 EachLabs API 사용
         if (isFluxModel(imageModel)) {
             const apiKey = await getEachLabsApiKey(auth.userId);
-            console.log(`[generate-portraits] Using FLUX model: ${imageModel}`);
+            console.log(`[generate-portraits] Using FLUX model: ${imageModel}, style: ${imageStyle || 'default'}`);
 
-            const fluxPrompt = `Generate a character portrait photograph.\n\nCharacter: ${sanitizedPrompt}\n\nRequirements:\n- Bust shot (chest up), facing forward, looking at camera\n- Ethnically Korean character\n- Clean, simple background (solid light gray or off-white)\n- Neutral or gentle facial expression\n- No hands visible in frame\n- Absolutely no visible text, letters, numbers, or writing in any language on any surface\n- No watermarks\n- ${ratio === '9:16' ? 'Vertical 9:16' : 'Horizontal 16:9'} aspect ratio`;
+            // 스타일별 FLUX 프롬프트 생성
+            const getFluxStylePrefix = (style?: ImageStyle): string => {
+                switch (style) {
+                    case 'animation':
+                        return "High-quality Japanese anime style character illustration with clean linework and vibrant colors";
+                    case 'illustration':
+                        return "Professional digital illustration character with clean vector-like artwork and bold colors";
+                    case 'watercolor':
+                        return "Delicate watercolor character painting with soft washes and organic textures";
+                    case '3d_render':
+                        return "Pixar-style 3D rendered character with smooth textures and appealing design";
+                    case 'low_poly':
+                        return "Low-poly geometric 3D art style character with faceted surfaces and minimalist aesthetic";
+                    case 'pixel_art':
+                        return "Retro pixel art style character with crisp pixels and limited color palette";
+                    case 'stop_motion':
+                        return "Stop-motion claymation style character with tactile textures and handcrafted feel";
+                    case 'sketch':
+                        return "Hand-drawn sketch style character with pencil strokes and artistic linework";
+                    case 'comic_book':
+                        return "Bold comic book style character with strong outlines, halftone dots, and dynamic coloring";
+                    case 'art_movement':
+                        return "Classic art movement inspired character portrait with expressive brushwork";
+                    case 'motion_graphics':
+                        return "Modern motion graphics style character with clean shapes and vibrant gradients";
+                    case 'cinematic':
+                        return "Cinematic film-style character portrait with dramatic lighting and professional color grading";
+                    case 'photorealistic':
+                    default:
+                        return "Ultra-realistic DSLR photograph character portrait with cinematic lighting";
+                }
+            };
+
+            const fluxStylePrefix = getFluxStylePrefix(imageStyle);
+            const fluxPrompt = `${fluxStylePrefix}.\n\nCharacter: ${sanitizedPrompt}\n\nRequirements:\n- Bust shot (chest up), facing forward, looking at camera\n- Ethnically Korean character\n- Clean, simple background (solid light gray or off-white)\n- Neutral or gentle facial expression\n- No hands visible in frame\n- Absolutely no visible text, letters, numbers, or writing in any language on any surface\n- No watermarks\n- ${ratio === '9:16' ? 'Vertical 9:16' : 'Horizontal 16:9'} aspect ratio`;
 
             const generationPromises: Promise<ImageData>[] = [];
             for (let i = 0; i < count; i++) {

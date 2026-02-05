@@ -342,6 +342,7 @@ export interface Scenario {
   tone: ScenarioTone;
   mode: ScenarioMode;             // 시나리오 모드
   imageStyle: ImageStyle;         // 이미지 스타일
+  aspectRatio: AspectRatio;       // 영상 비율 (16:9 가로 / 9:16 세로)
   recommendedImageStyle?: ImageStyle;     // AI 추천 이미지 스타일
   recommendedImageStyleReason?: string;   // 추천 이유
   recommendedTone?: ScenarioTone;         // AI 추천 톤/분위기
@@ -583,6 +584,7 @@ export interface ScenarioConfig {
   customTone?: string;           // 직접 입력한 톤/분위기
   mode: ScenarioMode;            // 시나리오 모드
   imageStyle: ImageStyle;        // 이미지 스타일
+  aspectRatio: AspectRatio;      // 영상 비율 (16:9 가로 / 9:16 세로)
   includeCharacters?: boolean;   // 환경/풍경 모드에서 캐릭터 포함 여부 (조연으로)
 }
 

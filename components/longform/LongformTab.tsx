@@ -10,7 +10,8 @@ import { Step2ScenarioEditor } from './Step2ScenarioEditor';
 import { Step3CharacterSetup } from './Step3CharacterSetup';
 import { Step3AssetGeneration } from './Step3AssetGeneration';
 import { Step4PreviewDownload } from './Step4PreviewDownload';
-import type { LongformStep, LongformConfig, LongformOutput } from '../../types/longform';
+import { generateSceneImages } from '../../services/longformApiClient';
+import type { LongformStep, LongformConfig, LongformOutput, AssetStatus } from '../../types/longform';
 
 export const LongformTab: React.FC = () => {
   const { canUseApi, hasOpenaiApiKey, hasApiKey, isAdmin, openSettingsModal } = useAuth();
@@ -70,6 +71,7 @@ export const LongformTab: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showKeyWarning, setShowKeyWarning] = useState(false);
   const [missingKeyMessage, setMissingKeyMessage] = useState('');
+  const [isRegeneratingFailed, setIsRegeneratingFailed] = useState(false);
 
   // 통합 에러
   const displayError = scenarioError || characterError || error;
@@ -152,6 +154,60 @@ export const LongformTab: React.FC = () => {
     setCompletedSteps(prev => [...prev, 4 as LongformStep]);
     setCurrentStep(5);
   }, []);
+
+  // 실패한 씬 재생성 (Step5에서 호출)
+  const handleRegenerateFailedScenes = useCallback(async () => {
+    if (!scenario || !config) return;
+
+    const failedScenes = scenario.scenes.filter(s => s.imageStatus === 'failed');
+    if (failedScenes.length === 0) return;
+
+    setIsRegeneratingFailed(true);
+    setError(null);
+
+    try {
+      const sceneInputs = failedScenes.map(scene => {
+        const sceneChars = (scenario.characters || [])
+          .filter(c => c.sceneNumbers.includes(scene.sceneNumber));
+        let imagePrompt = scene.imagePrompt;
+        if (sceneChars.length > 0) {
+          const charDesc = sceneChars
+            .map(c => `[${c.nameEn}: ${c.appearanceDescription}, wearing ${c.outfit}]`)
+            .join(' ');
+          imagePrompt = `${charDesc} ${imagePrompt}`;
+        }
+        return {
+          sceneNumber: scene.sceneNumber,
+          imagePrompt,
+          cameraAngle: scene.cameraAngle,
+          lightingMood: scene.lightingMood,
+          mood: scene.mood,
+        };
+      });
+
+      const imageResults = await generateSceneImages(sceneInputs, config.imageModel, 5);
+
+      // 결과 적용
+      const updatedScenes = [...scenario.scenes];
+      for (const r of imageResults.results) {
+        const idx = updatedScenes.findIndex(s => s.sceneNumber === r.sceneNumber);
+        if (idx >= 0) {
+          updatedScenes[idx] = {
+            ...updatedScenes[idx],
+            generatedImage: r.success ? r.image : undefined,
+            imageStatus: (r.success ? 'completed' : 'failed') as AssetStatus,
+            imageError: r.success ? undefined : r.error,
+          };
+        }
+      }
+
+      setScenario({ ...scenario, scenes: updatedScenes });
+    } catch {
+      setError('실패 씬 재생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsRegeneratingFailed(false);
+    }
+  }, [scenario, config, setScenario]);
 
   // 처음으로
   const handleReset = useCallback(() => {
@@ -265,6 +321,8 @@ export const LongformTab: React.FC = () => {
             onCancelExport={cancelExport}
             onDownloadPart={(part) => downloadPart(part, scenario)}
             onReset={handleReset}
+            onRegenerateFailedScenes={handleRegenerateFailedScenes}
+            isRegenerating={isRegeneratingFailed}
           />
         );
       default:

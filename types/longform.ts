@@ -60,6 +60,7 @@ export interface LongformScene {
   generatedImage?: ImageData;
   narrationAudio?: NarrationAudio;
   imageStatus: AssetStatus;
+  imageError?: string;             // 이미지 생성 실패 원인
   narrationStatus: AssetStatus;
 }
 

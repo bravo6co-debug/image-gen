@@ -12,6 +12,13 @@ interface SceneInput {
   mood?: string;
 }
 
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [1000, 2000, 4000]; // exponential backoff
+
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res, req.headers.origin as string);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -35,51 +42,62 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const batch = scenes.slice(i, i + batchSize) as SceneInput[];
 
       const batchPromises = batch.map(async (scene) => {
-        try {
-          const prompt = buildImagePrompt(imageModel, 'scene', {
-            imagePrompt: scene.imagePrompt,
-            cameraAngle: scene.cameraAngle,
-            lightingMood: scene.lightingMood,
-            mood: scene.mood,
-          });
+        let lastError = '';
 
-          if (isFluxModel(imageModel)) {
-            const apiKey = await getEachLabsApiKey(auth.userId!);
-            const result = await generateFluxImage({ apiKey, model: imageModel, prompt, aspectRatio: '16:9' });
-            return { sceneNumber: scene.sceneNumber, success: true, image: result };
-          }
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+          try {
+            const prompt = buildImagePrompt(imageModel, 'scene', {
+              imagePrompt: scene.imagePrompt,
+              cameraAngle: scene.cameraAngle,
+              lightingMood: scene.lightingMood,
+              mood: scene.mood,
+            });
 
-          const aiClient = await getAIClientForUser(auth.userId!);
-          const response = await aiClient.models.generateContent({
-            model: imageModel,
-            contents: prompt,
-            config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
-          });
-
-          // 안전 정책 위반 확인
-          const safetyError = extractSafetyError(response as any);
-          if (safetyError) {
-            return { sceneNumber: scene.sceneNumber, success: false, error: safetyError.message };
-          }
-
-          const parts = response.candidates?.[0]?.content?.parts || [];
-          for (const part of parts) {
-            if (part.inlineData) {
-              return {
-                sceneNumber: scene.sceneNumber,
-                success: true,
-                image: { mimeType: part.inlineData.mimeType, data: part.inlineData.data },
-              };
+            if (isFluxModel(imageModel)) {
+              const apiKey = await getEachLabsApiKey(auth.userId!);
+              const result = await generateFluxImage({ apiKey, model: imageModel, prompt, aspectRatio: '16:9' });
+              return { sceneNumber: scene.sceneNumber, success: true, image: result };
             }
+
+            const aiClient = await getAIClientForUser(auth.userId!);
+            const response = await aiClient.models.generateContent({
+              model: imageModel,
+              contents: prompt,
+              config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
+            });
+
+            // 안전 정책 위반 확인 — 재시도 불가 (즉시 실패)
+            const safetyError = extractSafetyError(response as any);
+            if (safetyError) {
+              return { sceneNumber: scene.sceneNumber, success: false, error: `[안전정책] ${safetyError.message}` };
+            }
+
+            const parts = response.candidates?.[0]?.content?.parts || [];
+            for (const part of parts) {
+              if (part.inlineData) {
+                return {
+                  sceneNumber: scene.sceneNumber,
+                  success: true,
+                  image: { mimeType: part.inlineData.mimeType, data: part.inlineData.data },
+                };
+              }
+            }
+
+            // 이미지 없음 — 재시도 가능
+            lastError = 'AI가 이미지를 생성하지 못했습니다.';
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : 'Generation failed';
           }
-          return { sceneNumber: scene.sceneNumber, success: false, error: 'AI가 이미지를 생성하지 못했습니다.' };
-        } catch (err) {
-          return {
-            sceneNumber: scene.sceneNumber,
-            success: false,
-            error: err instanceof Error ? err.message : 'Generation failed',
-          };
+
+          // 마지막 시도가 아니면 대기 후 재시도
+          if (attempt < MAX_RETRIES - 1) {
+            console.log(`[Scene ${scene.sceneNumber}] Retry ${attempt + 1}/${MAX_RETRIES - 1} after ${RETRY_DELAYS[attempt]}ms`);
+            await sleep(RETRY_DELAYS[attempt]);
+          }
         }
+
+        // 3회 모두 실패
+        return { sceneNumber: scene.sceneNumber, success: false, error: lastError };
       });
 
       const batchResults = await Promise.all(batchPromises);

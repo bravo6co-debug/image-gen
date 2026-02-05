@@ -95,7 +95,7 @@ export function useLongformGeneration(): UseLongformGenerationReturn {
         ),
       ]);
 
-      // Apply image results
+      // Apply image results (실패 원인도 저장)
       const updatedScenes = [...updatedScenario.scenes];
       for (const r of imageResults.results) {
         const idx = updatedScenes.findIndex(s => s.sceneNumber === r.sceneNumber);
@@ -104,6 +104,7 @@ export function useLongformGeneration(): UseLongformGenerationReturn {
             ...updatedScenes[idx],
             generatedImage: r.success ? r.image : undefined,
             imageStatus: (r.success ? 'completed' : 'failed') as AssetStatus,
+            imageError: r.success ? undefined : r.error,
           };
         }
       }

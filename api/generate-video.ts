@@ -3,7 +3,10 @@ import { put, del } from '@vercel/blob';
 import { sanitizePrompt, setCorsHeaders } from './lib/gemini.js';
 import { requireAuth } from './lib/auth.js';
 import { findUserById } from './lib/mongodb.js';
+import { createLogger } from './lib/logger.js';
 import type { GenerateVideoRequest, VideoGenerationResult, ApiErrorResponse } from './lib/types.js';
+
+const log = createLogger('generate-video');
 
 // Hailuo V2.3 via eachlabs.ai
 const HAILUO_API_URL = 'https://api.eachlabs.ai/v1/prediction';
@@ -60,9 +63,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const sanitizedPrompt = sanitizePrompt(motionPrompt, 1000);
 
-        console.log('=== VIDEO GENERATION START (Hailuo V2.3) ===');
-        console.log('Duration:', durationSeconds, 'seconds');
-
         // Prepare the enhanced prompt for video generation
         const enhancedPrompt = `
 Cinematic video generation from reference image:
@@ -82,7 +82,6 @@ Technical Requirements:
         // 이미지를 Vercel Blob에 업로드 (eachlabs.ai는 HTTPS URL 필요, data URL 불가)
         let imageUrl: string;
         try {
-            console.log('Uploading image to Vercel Blob...');
             const buffer = Buffer.from(sourceImage.data, 'base64');
             const ext = sourceImage.mimeType === 'image/png' ? 'png' : sourceImage.mimeType === 'image/webp' ? 'webp' : 'jpg';
             const blob = await put(`video/${Date.now()}.${ext}`, buffer, {
@@ -91,9 +90,8 @@ Technical Requirements:
             });
             imageUrl = blob.url;
             blobUrl = blob.url;
-            console.log('Image uploaded to Vercel Blob:', imageUrl);
         } catch (uploadError) {
-            console.error('Vercel Blob upload failed:', uploadError);
+            log.error('Blob upload failed', { error: uploadError instanceof Error ? uploadError.message : String(uploadError) });
             const msg = uploadError instanceof Error ? uploadError.message : String(uploadError);
             return res.status(500).json({
                 error: `이미지 업로드 실패: ${msg}`,
@@ -131,9 +129,7 @@ Technical Requirements:
             }
 
             predictionId = createResult.predictionID;
-            console.log(`Prediction created: ${predictionId}`);
         } catch (initError) {
-            console.error('Failed to create video generation prediction:', initError);
             const errorMsg = initError instanceof Error ? initError.message : String(initError);
 
             if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
@@ -145,8 +141,6 @@ Technical Requirements:
 
             throw new Error(`Hailuo API 호출 실패: ${errorMsg}`);
         }
-
-        console.log('Video generation started, polling for completion...');
 
         // Poll until video generation is complete (max 5 minutes timeout)
         const maxPollingTime = 300000; // 5 minutes
@@ -162,7 +156,6 @@ Technical Requirements:
                 throw new Error(`비디오 생성 시간 초과 (${elapsed}초 경과). 나중에 다시 시도하세요.`);
             }
 
-            console.log(`Polling #${pollCount} - ${elapsed}s elapsed...`);
             await new Promise(resolve => setTimeout(resolve, pollInterval));
 
             try {
@@ -174,16 +167,11 @@ Technical Requirements:
                 const pollResult = await pollResponse.json() as any;
 
                 if (pollResult.status === 'success' && pollResult.output) {
-                    const totalTime = Math.round((Date.now() - startTime) / 1000);
-                    console.log(`Video generation completed in ${totalTime} seconds!`);
-
                     const videoUrl = pollResult.output;
-                    console.log('=== VIDEO GENERATION SUCCESS ===');
-                    console.log('Output URL:', videoUrl);
 
                     // Blob 정리
                     if (blobUrl) {
-                        try { await del(blobUrl); } catch (delErr) { console.warn('Blob cleanup failed:', delErr); }
+                        try { await del(blobUrl); } catch (delErr) { log.warn('Blob cleanup failed', {}, delErr instanceof Error ? delErr : undefined); }
                     }
 
                     const result: VideoGenerationResult = {
@@ -205,7 +193,6 @@ Technical Requirements:
                 if (pollError instanceof Error && pollError.message.includes('비디오')) {
                     throw pollError;
                 }
-                console.error(`Poll #${pollCount} failed:`, pollError);
                 // 네트워크 에러 등은 재시도 허용 (최대 3회 연속 실패 시 중단)
                 if (pollCount > 3) {
                     throw new Error('비디오 생성 상태 확인이 반복 실패했습니다.');
@@ -214,13 +201,12 @@ Technical Requirements:
         }
 
     } catch (e) {
-        console.error('=== VIDEO GENERATION ERROR ===');
-        console.error('Error:', e);
-
         // Blob 정리
         if (blobUrl) {
-            try { await del(blobUrl); } catch (delErr) { console.warn('Blob cleanup failed:', delErr); }
+            try { await del(blobUrl); } catch (delErr) { log.warn('Blob cleanup failed', {}, delErr instanceof Error ? delErr : undefined); }
         }
+
+        log.error('Video generation failed', { error: e instanceof Error ? e.message : String(e) });
 
         if (e instanceof Error) {
             const msg = e.message;

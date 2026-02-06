@@ -102,9 +102,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: '영어 프롬프트가 필요합니다. 먼저 프롬프트 변환을 진행해 주세요.' } as ApiErrorResponse);
         }
 
-        console.log('=== FOOD VIDEO GENERATION START ===');
-        console.log('English prompt:', englishPrompt);
-
         // 사용자별 Hailuo API 키 조회 (개인 설정 키 우선, 환경변수 폴백)
         const user = await findUserById(auth.userId);
         const hailuoApiKey = user?.settings?.hailuoApiKey || process.env.HAILUO_API_KEY;
@@ -119,22 +116,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Step 1: 이미지를 Vercel Blob에 업로드 (eachlabs.ai는 HTTPS URL 필요)
         let imageUrl: string;
         try {
-            console.log('Uploading image to Vercel Blob...');
             const buffer = Buffer.from(foodImage.data, 'base64');
-            console.log(`Image buffer size: ${buffer.length} bytes (${(buffer.length / 1024).toFixed(1)} KB)`);
 
             // 이미지 크기 확인
             const dims = getImageDimensions(buffer);
             if (dims) {
-                console.log(`Image dimensions: ${dims.width}x${dims.height}`);
                 if (dims.width < 300 || dims.height < 300) {
                     return res.status(400).json({
                         error: `이미지가 너무 작습니다 (${dims.width}x${dims.height}). 최소 300x300 이상의 이미지를 사용하세요.`,
                         code: 'IMAGE_TOO_SMALL'
                     } as ApiErrorResponse);
                 }
-            } else {
-                console.warn('Could not extract image dimensions from buffer');
             }
 
             const ext = foodImage.mimeType === 'image/png' ? 'png' : foodImage.mimeType === 'image/webp' ? 'webp' : 'jpg';
@@ -144,18 +136,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
             imageUrl = blob.url;
             blobUrl = blob.url;
-            console.log('Image uploaded to Vercel Blob:', imageUrl);
-
-            // Blob URL 접근 가능 여부 검증
-            try {
-                const verifyResponse = await fetch(imageUrl, { method: 'HEAD' });
-                console.log(`Blob verification: status=${verifyResponse.status}, content-type=${verifyResponse.headers.get('content-type')}, content-length=${verifyResponse.headers.get('content-length')}`);
-                if (!verifyResponse.ok) {
-                    console.error(`Blob URL not accessible: HTTP ${verifyResponse.status}`);
-                }
-            } catch (verifyErr) {
-                console.error('Blob URL verification failed:', verifyErr);
-            }
         } catch (uploadError) {
             console.error('Vercel Blob upload failed:', uploadError);
             const msg = uploadError instanceof Error ? uploadError.message : String(uploadError);
@@ -180,8 +160,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 webhook_url: '',
             };
 
-            console.log('Request body:', JSON.stringify(requestBody));
-
             const createResponse = await fetch(`${HAILUO_API_URL}/`, {
                 method: 'POST',
                 headers: {
@@ -191,11 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 body: JSON.stringify(requestBody),
             });
 
-            // 응답 텍스트를 먼저 읽어서 디버깅
             const responseText = await createResponse.text();
-            console.log('Hailuo API response status:', createResponse.status);
-            console.log('Hailuo API response:', responseText.substring(0, 500));
-
             let createResult: any;
             try {
                 createResult = JSON.parse(responseText);
@@ -214,7 +188,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             predictionId = createResult.predictionID;
-            console.log(`Prediction created: ${predictionId}`);
         } catch (initError) {
             console.error('Failed to create food video prediction:', initError);
             const errorMsg = initError instanceof Error ? initError.message : String(initError);
@@ -230,8 +203,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Step 3: 폴링으로 결과 확인 (최대 5분)
-        console.log('Food video generation started, polling for completion...');
-
         const maxPollingTime = 300000; // 5 minutes
         const pollInterval = 5000; // 5초 간격
         const startTime = Date.now();
@@ -245,7 +216,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 throw new Error(`영상 생성 시간 초과 (${elapsed}초 경과). 나중에 다시 시도하세요.`);
             }
 
-            console.log(`Polling #${pollCount} - ${elapsed}s elapsed...`);
             await new Promise(resolve => setTimeout(resolve, pollInterval));
 
             try {
@@ -261,19 +231,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 try {
                     pollResult = JSON.parse(pollText);
                 } catch {
-                    console.error(`Poll response is not JSON: ${pollText.substring(0, 200)}`);
                     continue;
                 }
 
-                console.log(`Poll #${pollCount} result status: ${pollResult.status}`);
-
                 if (pollResult.status === 'success' && pollResult.output) {
-                    const totalTime = Math.round((Date.now() - startTime) / 1000);
-                    console.log(`Food video generation completed in ${totalTime} seconds!`);
-
                     const videoUrl = pollResult.output;
-                    console.log('=== FOOD VIDEO GENERATION SUCCESS ===');
-                    console.log('Output URL:', videoUrl);
 
                     // Blob 정리
                     if (blobUrl) {
@@ -297,7 +259,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (pollError instanceof Error && pollError.message.includes('영상 생성')) {
                     throw pollError;
                 }
-                console.error(`Poll #${pollCount} failed:`, pollError);
                 if (pollCount > 3) {
                     throw new Error('영상 생성 상태 확인이 반복 실패했습니다.');
                 }
@@ -305,9 +266,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
     } catch (e) {
-        console.error('=== FOOD VIDEO GENERATION ERROR ===');
-        console.error('Error:', e);
-
         // Blob 정리
         if (blobUrl) {
             try { await del(blobUrl); } catch (delErr) { console.warn('Blob cleanup failed:', delErr); }

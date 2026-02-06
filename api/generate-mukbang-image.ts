@@ -202,28 +202,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: '인물 사진을 업로드하거나 자동 생성을 선택해 주세요.' } as ApiErrorResponse);
         }
 
-        console.log('=== MUKBANG IMAGE GENERATION START ===');
-        console.log(`Food: ${foodName}, Person: ${personImage ? 'uploaded' : customPersonPrompt ? `custom("${customPersonPrompt}")` : `preset(${personType})`}`);
-
         const apiKey = await getEachLabsApiKey(auth.userId);
 
         // Step 1: 인물 이미지 준비 (업로드 또는 생성)
         let finalPersonImage: ImageData;
 
         if (personImage?.data) {
-            console.log('Using uploaded person image');
             finalPersonImage = personImage;
         } else {
             let personPrompt: string;
 
             if (customPersonPrompt?.trim()) {
                 // 커스텀 한국어 설명 → 영어 포트레이트 프롬프트 변환
-                console.log(`Translating custom person description: ${customPersonPrompt}`);
                 personPrompt = await translatePersonDescription(customPersonPrompt.trim(), auth.userId);
-                console.log(`Translated prompt: ${personPrompt}`);
             } else {
                 // 기존 프리셋 사용
-                console.log(`Using preset person type: ${personType}`);
                 personPrompt = PERSON_PROMPTS[personType] || PERSON_PROMPTS['young-woman'];
             }
 
@@ -234,30 +227,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 aspectRatio: '9:16',
                 guidanceScale: 3.5,
             });
-            console.log('Person portrait generated successfully');
         }
 
         // Step 2: FLUX 2 Turbo Edit로 먹방 합성 이미지 생성
         // 참조 이미지: [인물, 음식]
-        console.log('Generating mukbang composite image...');
-
         let mukbangPrompt: string;
         let videoPrompt: string;
 
         if (customScenePrompt?.trim()) {
             // 커스텀 한국어 씬 설명 → 영어 프롬프트 변환
-            console.log(`Translating custom scene description: ${customScenePrompt}`);
             mukbangPrompt = await translateSceneDescription(customScenePrompt.trim(), foodName.trim(), auth.userId);
             videoPrompt = await translateVideoDescription(customScenePrompt.trim(), foodName.trim(), auth.userId);
-            console.log(`Translated scene prompt: ${mukbangPrompt}`);
-            console.log(`Translated video prompt: ${videoPrompt}`);
         } else {
             // 기본 프롬프트 사용
             mukbangPrompt = buildMukbangPrompt(foodName.trim());
             videoPrompt = buildMukbangVideoPrompt(foodName.trim());
         }
-
-        console.log('Mukbang prompt:', mukbangPrompt);
 
         const compositeImage = await generateFlux2Edit({
             apiKey,
@@ -267,8 +252,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             guidanceScale: 2.5,
         });
 
-        console.log('=== MUKBANG IMAGE GENERATION SUCCESS ===');
-
         const result: MukbangImageResult = {
             compositeImage,
             videoPrompt,
@@ -277,9 +260,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(result);
 
     } catch (e) {
-        console.error('=== MUKBANG IMAGE GENERATION ERROR ===');
-        console.error('Error:', e);
-
         if (e instanceof Error) {
             const msg = e.message;
 

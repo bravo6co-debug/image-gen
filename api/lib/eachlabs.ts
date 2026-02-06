@@ -81,7 +81,6 @@ async function downloadImageAsBase64(url: string): Promise<ImageData> {
  * EachLabs Prediction 생성 (공통)
  */
 async function createPrediction(apiKey: string, modelName: string, input: Record<string, unknown>): Promise<string> {
-    console.log(`[${modelName}] Creating prediction...`);
     const createResponse = await fetch(`${EACHLABS_API_URL}/`, {
         method: 'POST',
         headers: {
@@ -106,9 +105,7 @@ async function createPrediction(apiKey: string, modelName: string, input: Record
         throw new Error(`[${modelName}] 이미지 생성 요청 실패: ${errMsg}`);
     }
 
-    const predictionId = createResult.predictionID as string;
-    console.log(`[${modelName}] Prediction created: ${predictionId}`);
-    return predictionId;
+    return createResult.predictionID as string;
 }
 
 /**
@@ -131,7 +128,6 @@ async function pollPrediction(apiKey: string, predictionId: string, modelName: s
         }
 
         await new Promise(resolve => setTimeout(resolve, pollInterval));
-        console.log(`[${modelName}] Polling #${pollCount} - ${elapsed}s elapsed...`);
 
         try {
             const pollResponse = await fetch(`${EACHLABS_API_URL}/${predictionId}`, {
@@ -140,8 +136,6 @@ async function pollPrediction(apiKey: string, predictionId: string, modelName: s
             const pollResult = await pollResponse.json() as Record<string, unknown>;
 
             if (pollResult.status === 'success' && pollResult.output) {
-                const totalTime = Math.round((Date.now() - startTime) / 1000);
-                console.log(`[${modelName}] Image generated in ${totalTime}s`);
                 return pollResult.output as string;
             }
 
@@ -156,7 +150,6 @@ async function pollPrediction(apiKey: string, predictionId: string, modelName: s
                 throw pollError;
             }
             consecutiveErrors++;
-            console.error(`[${modelName}] Poll #${pollCount} failed:`, pollError);
             if (consecutiveErrors >= 3) {
                 throw new Error(`[${modelName}] 이미지 생성 상태 확인이 반복 실패했습니다.`);
             }

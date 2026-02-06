@@ -189,9 +189,8 @@ export async function verifyAndMigratePassword(
                 { _id: new ObjectId(userId) },
                 { $set: { passwordHash: newHash, updatedAt: new Date() } }
             );
-            console.log(`[auth] Migrated password hash for user ${userId} (10k → 100k iterations)`);
         } catch (error) {
-            console.error('[auth] Failed to migrate password hash:', error);
+            // Password hash migration failed - silently continue
         }
     }
 

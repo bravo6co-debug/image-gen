@@ -46,10 +46,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const sanitizedPrompt = sanitizePrompt(prompt, 1000);
-
-        console.log('=== FOOD PROMPT TRANSLATION START ===');
-        console.log('Korean prompt:', sanitizedPrompt);
-
         const textModel = await getUserTextModel(auth.userId);
 
         const foodPromptText = `You are a professional food cinematography director. I need TWO outputs from you.
@@ -97,8 +93,6 @@ ${sanitizedPrompt}`;
                 || '';
         }
 
-        console.log('Gemini raw response:', responseText);
-
         // JSON 파싱 시도
         let englishPrompt: string;
         let koreanDescription: string;
@@ -111,7 +105,6 @@ ${sanitizedPrompt}`;
             koreanDescription = parsed.koreanDescription || '';
         } catch {
             // JSON 파싱 실패 시 전체를 영어 프롬프트로 사용
-            console.warn('Failed to parse JSON response, using raw text as English prompt');
             englishPrompt = responseText.trim();
             koreanDescription = '영상 프롬프트가 생성되었습니다. 내용을 확인하고 필요하면 수정한 후 영상을 생성하세요.';
         }
@@ -119,10 +112,6 @@ ${sanitizedPrompt}`;
         if (!englishPrompt) {
             throw new Error('프롬프트 변환 결과가 비어있습니다.');
         }
-
-        console.log('English prompt:', englishPrompt);
-        console.log('Korean description:', koreanDescription);
-        console.log('=== FOOD PROMPT TRANSLATION SUCCESS ===');
 
         const result: TranslateFoodPromptResult = {
             englishPrompt,
@@ -132,9 +121,6 @@ ${sanitizedPrompt}`;
         return res.status(200).json(result);
 
     } catch (e) {
-        console.error('=== FOOD PROMPT TRANSLATION ERROR ===');
-        console.error('Error:', e);
-
         if (e instanceof Error) {
             const msg = e.message;
 

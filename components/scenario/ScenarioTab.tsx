@@ -37,6 +37,7 @@ import {
   SparklesIcon,
   ClearIcon,
   PlusCircleIcon,
+  UploadIcon,
 } from '../Icons';
 
 // 분리된 컴포넌트 import
